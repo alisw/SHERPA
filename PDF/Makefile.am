@@ -1,0 +1,1 @@
+SUBDIRS       =	Main LHAPDF CT12 CT10 MSTW MRST CTEQ GRV Electron Remnant

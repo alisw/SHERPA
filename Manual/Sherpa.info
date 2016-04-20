@@ -1,0 +1,343 @@
+This is Sherpa.info, produced by makeinfo version 5.2 from Sherpa.texi.
+
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU General Public License.
+
+
+Indirect:
+Sherpa.info-1: 195
+Sherpa.info-2: 301130
+
+Tag Table:
+(Indirect)
+Node: Top195
+Node: Introduction1161
+Node: Introduction to Sherpa2112
+Node: Basic structure6917
+Node: Getting started16096
+Node: Installation16384
+Node: Running Sherpa22460
+Ref: Process selection and initialization24547
+Ref: Results directory27663
+Ref: Running Sherpa with AMEGIC++39671
+Node: Merging ME and PS41128
+Ref: The algorithm implemented in Sherpa44577
+Node: Cross section54136
+Node: Command line56623
+Node: Input structure58828
+Node: Interpreter61382
+Node: Tags63499
+Node: Parameters64186
+Node: Run Parameters65374
+Node: EVENTS66575
+Node: EVENT_TYPE66837
+Node: TUNE67634
+Node: OUTPUT68329
+Node: LOG_FILE69070
+Node: RANDOM_SEED69603
+Node: EVENT_SEED_MODE70290
+Node: ANALYSIS70949
+Node: ANALYSIS_OUTPUT72051
+Node: TIMEOUT72544
+Node: RLIMIT_AS73191
+Node: BATCH_MODE74312
+Node: NUM_ACCURACY75694
+Node: SHERPA_CPP_PATH76020
+Node: SHERPA_LIB_PATH76440
+Node: Event output formats76742
+Node: MPI parallelization81941
+Node: Multi-threading82798
+Node: Beam Parameters83566
+Node: Beam Spectra84664
+Node: Intrinsic Transverse Momentum88602
+Node: ISR Parameters89921
+Ref: PDF_LIBRARY_191554
+Ref: PDF_LIBRARY_291574
+Ref: ISR_E_ORDER93165
+Ref: ISR_E_SCHEME93205
+Ref: PDF_SET_194059
+Ref: PDF_SET_294075
+Node: Model Parameters94536
+Ref: Models available in Sherpa97339
+Node: SM97650
+Node: MSSM101822
+Node: ADD102680
+Node: AGC103826
+Node: THDM106537
+Node: EHC107476
+Node: 4thGen108634
+Node: FeynRules109929
+Node: Matrix Elements111790
+Node: ME_SIGNAL_GENERATOR112745
+Node: RESULT_DIRECTORY113732
+Node: EVENT_GENERATION_MODE114347
+Node: SCALES114986
+Node: Scale setters116770
+Node: Custom scale implementation124583
+Node: Predefined scale tags125016
+Node: Scale schemes for NLO calculations127092
+Node: Scale variations128424
+Node: METS scale setting with multiparton core processes129104
+Node: COUPLING_SCHEME130372
+Node: COUPLINGS130994
+Node: KFACTOR131678
+Node: YUKAWA_MASSES133068
+Node: Dipole subtraction133439
+Node: Processes135086
+Node: Process137658
+Node: PDG codes138503
+Node: Particle containers138861
+Node: Curly brackets140207
+Node: Decay140664
+Node: DecayOS141084
+Node: No_Decay141570
+Node: Scales142087
+Node: Couplings142283
+Node: CKKW142486
+Node: Selector_File142919
+Node: Order_EW143094
+Node: Max_Order_EW143572
+Node: Order_QCD144057
+Node: Max_Order_QCD144526
+Node: Min_N_Quarks145005
+Node: Max_N_Quarks145219
+Node: Min_N_TChannels145435
+Node: Max_N_TChannels145675
+Node: Print_Graphs145915
+Node: Integration_Error146427
+Node: Max_Epsilon146886
+Node: Enhance_Factor147417
+Node: RS_Enhance_Factor147878
+Node: Enhance_Function148524
+Node: Enhance_Observable149737
+Node: NLO_QCD_Mode151392
+Node: NLO_QCD_Part152319
+Node: NLO_EW_Mode153013
+Node: NLO_EW_Part153360
+Node: Subdivide_Virtual154066
+Node: ME_Generator154596
+Node: RS_ME_Generator154845
+Node: Loop_Generator155159
+Node: Integrator155823
+Node: End process156020
+Node: Selectors156216
+Node: One particle selectors157011
+Node: Two particle selectors157813
+Node: Decay selectors158820
+Node: Jet finders160069
+Node: Universal selector161603
+Node: Minimum selector165025
+Node: NLO selectors165488
+Node: Fastjet selector166712
+Node: Integration168076
+Node: INTEGRATION_ERROR168842
+Node: INTEGRATOR169025
+Node: VEGAS171267
+Node: FINISH_OPTIMIZATION171529
+Node: PSI_NMAX171819
+Node: PSI_ITMIN172082
+Node: PSI_ITMAX172353
+Node: Hard decays172640
+Node: HDH_NO_DECAY174044
+Node: HDH_ONLY_DECAY174710
+Node: HARD_SPIN_CORRELATIONS175403
+Node: STORE_DECAY_RESULTS175913
+Node: DECAY_RESULT_DIRECTORY176716
+Node: HDH_SET_WIDTHS177027
+Node: HDH_BR_WEIGHTS178049
+Node: HARD_MASS_SMEARING178644
+Node: RESOLVE_DECAYS179092
+Node: DECAY_TAU_HARD179697
+Node: Shower Parameters180242
+Node: SHOWER_GENERATOR180926
+Node: JET_CRITERION181843
+Node: MASSIVE_PS182234
+Node: MASSLESS_PS182645
+Node: CS Shower options183107
+Node: MPI Parameters185719
+Node: MI_HANDLER186677
+Node: SCALE_MIN186885
+Node: PROFILE_FUNCTION187086
+Node: PROFILE_PARAMETERS187492
+Node: REFERENCE_SCALE187875
+Node: RESCALE_EXPONENT188284
+Node: SIGMA_ND_FACTOR188647
+Node: MI_RESULT_DIRECTORY188916
+Node: MI_RESULT_DIRECTORY_SUFFIX189401
+Node: Hadronization189647
+Node: Fragmentation190218
+Node: Hadron decays197727
+Ref: DECAYPATH198716
+Ref: SOFT_MASS_SMEARING199250
+Ref: MAX_PROPER_LIFETIME199815
+Ref: Decay channel files202685
+Node: QED Corrections208325
+Node: General Switches209031
+Node: YFS_MODE209565
+Node: YFS_USE_ME210212
+Node: YFS_IR_CUTOFF211119
+Node: QED Corrections to the Hard Interaction211905
+Node: ME_QED212521
+Node: ME_QED_CLUSTERING213298
+Node: ME_QED_CLUSTERING_THRESHOLD214008
+Node: QED Corrections to Hadron Decays214435
+Node: Minimum Bias214749
+Node: Tips and Tricks221839
+Node: Bash completion222506
+Node: Rivet analyses223094
+Node: HZTool analyses224479
+Node: MCFM interface225428
+Node: Debugging a crashing/stalled event226417
+Node: Versioned installation228432
+Node: NLO calculations228938
+Node: Choosing DIPOLE_ALPHA229326
+Node: Integrating complicated Loop-ME230890
+Node: Avoiding misbinning effects233327
+Node: Enforcing the renormalization scheme234667
+Node: Checking the pole cancellation235311
+Node: Structure of HepMC Output236018
+Node: Structure of ROOT NTuple Output237332
+Node: Customization242473
+Node: Exotic physics243653
+Node: Custom scale setter245949
+Node: External one-loop ME248669
+Node: External RNG253214
+Node: External PDF254757
+Node: Python Interface256670
+Node: Examples259263
+Node: VJets259793
+Node: LHC_WJets259991
+Node: LHC_ZJets264890
+Node: LHC_Wbb269014
+Node: LHC_Zbb270871
+Node: Jets272553
+Node: LHC_Jets272707
+Node: LHC_Jets_MCatNLO273047
+Node: LHC_Jets_MEPS275846
+Node: LEP_Jets277000
+Node: LEP_Jets_LOmerging277355
+Node: LEP_Jets_NLOmerging278821
+Node: HJets281392
+Node: LHC_HInt281595
+Node: LHC_HJets284104
+Node: LHC_HTTBar287553
+Node: TopsJets289431
+Node: Top quark pair production289657
+Node: Tops plus W in MC@NLO291527
+Node: DIS293171
+Node: HERA293332
+Node: FONLO295123
+Node: NTuple production295338
+Node: SoftQCD301130
+Node: Calculation of inclusive cross sections301402
+Node: Simulation of Minimum Bias events302449
+Node: BFactories303800
+Node: QCD continuum304063
+Node: Signal process305092
+Node: Single hadron decay chains306200
+Node: MEvalues307208
+Node: Matrix Element values through Python interface307560
+Node: Matrix Element values through C++ interface310374
+Node: APIexamples313680
+Node: Events313855
+Node: MPIEvents315879
+Node: Getting help318689
+Node: Authors319766
+Node: Copying319942
+Node: References320870
+Ref: Alekhin2005dx320995
+Ref: Alioli2013nda321155
+Ref: Alwall2007fs321334
+Ref: Archibald2008aa321559
+Ref: Bahr2008pv321823
+Ref: Ball2008by321947
+Ref: Barberio1993qi322123
+Ref: Baur1988qt322296
+Ref: Bern2002jx322431
+Ref: Berger2009ep322617
+Ref: Binoth2010xt322927
+Ref: Budnev1974de323125
+Ref: Cacciari2008gp323371
+Ref: Carli2009cg323514
+Ref: Cascioli2011va323692
+Ref: Catani2001cc323852
+Ref: Catani2002hc324008
+Ref: Catani1996vz324240
+Ref: Christensen2008py324415
+Ref: Christensen2009jx324574
+Ref: Dixon2013haa324831
+Ref: Draggiotis2000gm324947
+Ref: Duhr2006iq325125
+Ref: FebresCordero2006sj325288
+Ref: Field1982dg325524
+Ref: Frixione1998jh325642
+Ref: Gangemi1999gt325765
+Ref: Gao2013xoa325961
+Ref: Gehrmann2012yg326112
+Ref: Gleisberg2003ue326311
+Ref: Gleisberg2003bi326500
+Ref: Gleisberg2005qq326738
+Ref: Gleisberg2008fv326962
+Ref: Gleisberg2008ta327086
+Ref: Gluck1991jc327287
+Ref: Gottschalk1982yt327410
+Ref: Gottschalk1983fm327568
+Ref: Gounaris2000dn327734
+Ref: Hagiwara2005wg327922
+Ref: Hagiwara1986vm328099
+Ref: vanHameren2002tc328268
+Ref: Hoche2006ph328451
+Ref: Hoeche2009rj328554
+Ref: Hoeche2009xc328716
+Ref: Hoeche2011fd328898
+Ref: Hoeche2012yf329067
+Ref: Hoeche2012fm329240
+Ref: Hoeche2013mua329436
+Ref: Hoeche2014lxa329668
+Ref: Hou1987vd329800
+Ref: Jadach1993hs329960
+Ref: Kanaki2000ey330125
+Ref: Kleiss1985yh330307
+Ref: Kleiss1985gy330456
+Ref: Kleiss1994qy330645
+Ref: Krauss2001iv330806
+Ref: Krauss2002up330948
+Ref: Krauss2004bs331080
+Ref: Krauss2005nu331260
+Ref: Krauss2005re331440
+Ref: Krauss2010xx331608
+Ref: Lai2010vv331712
+Ref: Lange2001uf331911
+Ref: Lavesson2008ah332037
+Ref: Lepage1980dq332177
+Ref: Lonnblad2001iq332273
+Ref: Mangano2001xp332426
+Ref: Mangano2002ea332655
+Ref: Martin2001es332875
+Ref: Martin2004dh333117
+Ref: Martin2009iq333318
+Ref: Marchesini1987cf333495
+Ref: Martin1999ww333662
+Ref: Nadolsky2008zw333863
+Ref: Nagy2003tz334029
+Ref: Nagy2005aa334201
+Ref: Reina2001sf334329
+Ref: Reina2001bc334503
+Ref: Rosiek1989rs334686
+Ref: Ryskin2009tj334848
+Ref: Schalicke2005nv335027
+Ref: Schumann2007mg335155
+Ref: Schonherr2008av335319
+Ref: Sjostrand2006za335458
+Ref: Sjostrand2007gs335589
+Ref: Sjostrand1987su335756
+Ref: Skands2003cj335918
+Ref: Whalley2005nh336103
+Ref: Winter2003tt336238
+Ref: Wolfenstein1983yz336397
+Ref: Yennie1961ad336520
+Ref: Zarnecki2002qr336686
+Ref: Beazley2003336862
+Node: Index337004
+
+End Tag Table

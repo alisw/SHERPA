@@ -1,0 +1,41 @@
+#!/usr/bin/env python2
+## from mpi4py import MPI
+import sys
+sys.path.append('@PYLIBDIR@')
+import Sherpa
+
+# Add this to the execution arguments to prevent Sherpa from starting the cross section integration
+sys.argv.append('INIT_ONLY=2')
+
+Generator=Sherpa.Sherpa()
+try:
+    Generator.InitializeTheRun(len(sys.argv),sys.argv)
+    Process=Sherpa.MEProcess(Generator)
+
+    # if MPI.COMM_WORLD.Get_rank()>0:
+    #    exit(1)
+
+    # Incoming flavors must be added first!
+    Process.AddInFlav(11);
+    Process.AddInFlav(-11);
+    Process.AddOutFlav(1);
+    Process.AddOutFlav(-1);
+    Process.Initialize();
+
+    if Process.HasColorIntegrator(): 
+        Process.GenerateColorPoint();
+
+    # First argument corresponds to particle index:
+    # index 0 correspons to particle added first, index 1 is the particle added second, and so on...
+    Process.SetMomentum(0, 45.6,0.,0.,45.6)
+    Process.SetMomentum(1, 45.6,0.,0.,-45.6)
+    Process.SetMomentum(2, 45.6,0.,45.6,0.)
+    Process.SetMomentum(3, 45.6,0.,-45.6,0.)
+
+    print '\nSquared matrix element:'
+    print Process.CSMatrixElement()
+    print '\n'
+
+except Sherpa.Exception as exc:
+    print exc
+    exit(1)

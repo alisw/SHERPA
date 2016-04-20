@@ -1,0 +1,65 @@
+/* Using HEPMC2 */
+#undef USING__HEPMC2
+
+/* HepMC::IO_GenEvent available */
+#undef USING__HEPMC2__IOGENEVENT
+
+/* HepMC::Units available */
+#undef USING__HEPMC2__UNITS
+
+/* HepMCDefs.h available */
+#undef USING__HEPMC2__DEFS
+
+/* using gzip */
+#undef USING__GZIP
+
+/* using sqlite */
+#undef USING__SQLITE
+
+/* using LHAPDF */
+#undef USING__LHAPDF
+
+/* hztool found */
+#undef USING__HZTOOL
+
+/* cernlib found */
+#undef USING__CERNLIB
+
+/* using LHAPDF */
+#undef LHAPDF_PATH
+
+/* using native C++ wrapper */
+#undef LHAPDF__NATIVE__WRAPPER
+
+/* using ROOT */
+#undef USING__ROOT
+
+/* using Rivet */
+#undef USING__RIVET
+
+/* setSumOfWeights function available in Rivet */
+#undef USING__RIVET__SETSOW
+
+/* Rivet uses YODA as its histogramming backend */
+#undef USING__RIVET__YODA
+
+/* using FASTJET */
+#undef USING__FASTJET
+
+/* using FASTJET 3 */
+#undef USING__FASTJET__3
+
+/* using BLACKHAT */
+#undef USING__BLACKHAT
+
+/* BLACKHAT directory */
+#undef BLACKHAT_PATH
+
+/* OpenLoops installation prefix */
+#undef OPENLOOPS_PREFIX
+
+/* using MCFM */
+#undef USING__MCFM
+
+/* using Delphes */
+#undef USING__DELPHES

@@ -1,0 +1,365 @@
+* Menu
+
+* 1/ALPHAQED(0)
+* 1/ALPHAQED(default)
+* A
+* ACTIVE[<id>]
+* ALPHA
+* ALPHAS(default)
+* ALPHAS(MZ)
+* ALPHA_4_G_4
+* ALPHA_5
+* ANALYSIS
+* ANALYSIS_OUTPUT
+* ANALYSIS_OUTPUT <1>
+* ANALYSIS_OUTPUT <2>
+* A_14
+* A_24
+* A_34
+* BARYON_FRACTION
+* BATCH_MODE
+* BEAM_1
+* BEAM_2
+* BEAM_ENERGY_1
+* BEAM_ENERGY_2
+* BEAM_REMNANTS
+                                                             (line 2028)
+* BEAM_SMAX
+* BEAM_SMIN
+* BEAM_SPECTRUM_1
+* BEAM_SPECTRUM_2
+* beta_0^2
+* BH_SETTINGS_FILE
+* BUNCH_1
+* BUNCH_2
+* CABIBBO
+* CHECK_BORN
+                                                             (line 4965)
+* CHECK_FINITE
+                                                             (line 4965)
+* CHECK_POLES
+                                                             (line 4965)
+* CHECK_POLES_THRESHOLD
+                                                             (line 4965)
+* Chi_S
+* CKMORDER
+* COMIX_ME_THREADS
+* COMIX_PS_THREADS
+* CORE_SCALE
+                                                             (line 2809)
+* COUPLINGS
+* COUPLING_SCHEME
+* CSS_EVOLUTION_SCHEME
+* CSS_EW_MODE
+* CSS_FS_AS_FAC
+* CSS_FS_PT2MIN
+* CSS_IS_AS_FAC
+* CSS_IS_PT2MIN
+* CSS_KIN_SCHEME
+* CSS_MASS_THRESHOLD
+* CSS_MAXEM
+* CSS_NOEM
+* CSS_SCALE_SCHEME
+* DEACTIVATE_GGH
+* DEACTIVATE_PPH
+* DECAYMODEL
+* DECAYPATH
+* DECAY_OFFSET
+* DECAY_RESULT_DIRECTORY
+                                                             (line 3802)
+* DECAY_TAU_HARD
+* Delphes
+                                                             (line 1795)
+* Delta
+* deltaY
+* DIPOLE_ALPHA
+* DIPOLE_AMIN
+* DIPOLE_KAPPA
+* DIPOLE_NF_GSPLIT
+* EHC_SCALE2
+* EPA_AlphaQED
+* EPA_Form_Factor_1
+* EPA_Form_Factor_2
+* EPA_ptMin_1
+* EPA_ptMin_2
+* EPA_q2Max_1
+* EPA_q2Max_2
+* ETA
+* EVENTS
+* EVENT_DISPLAY_INTERVAL
+* EVENT_GENERATION_MODE
+                                                             (line 2527)
+* EVENT_INPUT
+                                                             (line 1795)
+* EVENT_OUTPUT
+                                                             (line 1795)
+* EVENT_TYPE
+* EVENT_TYPE <1>
+* EVT_FILE_PATH
+                                                             (line 1795)
+* EVT_OUTPUT
+* EW_SCHEME
+* E_LASER_
+* E_LASER_ <1>
+* F4_GAMMA
+* F4_Z
+* F5_GAMMA
+* F5_Z
+* FeynRules
+* FILE_SIZE
+                                                             (line 1795)
+* FINISH_OPTIMIZATION
+                                                             (line 3706)
+* FINITE_TOP_MASS
+* FINITE_W_MASS
+* FRAGMENTATION
+* FR_IDENTFILE
+* FR_INTERACTIONS
+* FR_PARAMCARD
+* FR_PARAMDEF
+* FR_PARTICLES
+* G1_GAMMA
+* G1_Z
+* G4_GAMMA
+* G4_Z
+* G5_GAMMA
+* G5_Z
+* G_NEWTON
+* H1_GAMMA
+* H1_Z
+* H2_GAMMA
+* H2_Z
+* H3_GAMMA
+* H3_Z
+* H4_GAMMA
+* H4_Z
+* HARD_DECAYS
+* HARD_MASS_SMEARING
+* HARD_SPIN_CORRELATIONS
+                                                             (line 3780)
+* HARD_SPIN_CORRELATIONS <1>
+* HDH_BR_WEIGHTS
+* HDH_NO_DECAY
+* HDH_ONLY_DECAY
+* HDH_SET_WIDTHS
+* HEAVY_BARYON_ENHANCEMEMT
+* HEPEVT
+                                                             (line 1795)
+* HepMC_GenEvent
+                                                             (line 1795)
+* HepMC_Short
+                                                             (line 1795)
+* HIGGS_INTERFERENCE_MODE
+* HIGGS_INTERFERENCE_ONLY
+* HIGGS_INTERFERENCE_SPIN
+* INTEGRATION_ERROR
+* INTEGRATOR
+* ISR_E_ORDER
+* ISR_E_SCHEME
+* ISR_SMAX
+* ISR_SMIN
+* kappa
+* KAPPAT_GAMMA
+* KAPPAT_Z
+* KAPPA_GAMMA
+* KAPPA_Z
+* KFACTOR
+* KK_CONVENTION
+* KT2_Factor
+* K_PERP_MEAN_1
+                                                             (line 2028)
+* K_PERP_MEAN_2
+                                                             (line 2028)
+* K_PERP_SIGMA_1
+                                                             (line 2028)
+* K_PERP_SIGMA_2
+                                                             (line 2028)
+* LAMBDA
+* lambda
+* Lambda2
+* LAMBDAT_GAMMA
+* LAMBDAT_Z
+* LAMBDA_GAMMA
+* LAMBDA_Z
+* LASER_ANGLES
+* LASER_MODE
+* LASER_NONLINEARITY
+* LHEF
+                                                             (line 1795)
+* LHOLE_BOOST_TO_CMS
+                                                             (line 5303)
+* LHOLE_CONTRACTFILE
+                                                             (line 5303)
+* LHOLE_IR_REGULARISATION
+                                                             (line 5303)
+* LHOLE_OLP
+                                                             (line 5303)
+* LHOLE_ORDERFILE
+                                                             (line 5303)
+* LOG_FILE
+* Loop_Generator
+* LOOP_ME_INIT
+                                                             (line 4955)
+* MassExponent_C->HH
+* MASSIVE[<id>]
+* MASS[<id>]
+* MASS[<id>] <1>
+* MAX_PROPER_LIFETIME
+* MEMLEAK_WARNING_THRESHOLD
+* ME_QED
+* ME_QED_CLUSTERING
+* ME_QED_CLUSTERING_THRESHOLD
+                                                             (line 4533)
+* ME_SIGNAL_GENERATOR
+                                                             (line 2491)
+* Mixing_0+
+* Mixing_1-
+* MI_HANDLER
+* MI_RESULT_DIRECTORY
+                                                             (line 4026)
+* MI_RESULT_DIRECTORY_SUFFIX
+                                                             (line 4035)
+* MODEL
+* MOMENTA_DATA_FILE
+                                                             (line 6868)
+* MSTJ
+* MSTP
+* MSTU
+* MULTI_WEIGHT_L0R0_DELTA_3/2
+* MULTI_WEIGHT_L0R0_N*_1/2
+* MULTI_WEIGHT_L0R0_N_1/2
+* MULTI_WEIGHT_L0R0_PSEUDOSCALARS
+* MULTI_WEIGHT_L0R0_TENSORS2
+* MULTI_WEIGHT_L0R0_TENSORS3
+* MULTI_WEIGHT_L0R0_TENSORS4
+* MULTI_WEIGHT_L0R0_VECTORS
+* MULTI_WEIGHT_L0R1_AXIALVECTORS
+* MULTI_WEIGHT_L0R1_SCALARS
+* MULTI_WEIGHT_L1R0_AXIALVECTORS
+* MULTI_WEIGHT_L1R0_DELTA*_3/2
+* MULTI_WEIGHT_L1R0_N*_1/2
+* MULTI_WEIGHT_L1R0_N*_3/2
+* MULTI_WEIGHT_L1R0_SCALARS
+* MULTI_WEIGHT_L1R0_TENSORS2
+* MULTI_WEIGHT_L2R0_VECTORS
+* MULTI_WEIGHT_L3R0_VECTORS
+* M_BIND_0
+* M_BIND_1
+* M_BOTTOM
+* M_CHARM
+* M_CUT
+* M_DIQUARK_OFFSET
+* M_S
+* M_STRANGE
+* M_UP_DOWN
+* NUMBER_OF_POINTS
+                                                             (line 6868)
+* NUM_ACCURACY
+* N_ED
+* ORDER_ALPHAS
+* OUTPUT
+* OUTPUT_MIXING
+* OUTPUT_PRECISION
+                                                             (line 1795)
+* PARJ
+* PARP
+* PARTICLE_CONTAINER
+                                                             (line 2981)
+* PARU
+* PATH
+* PDF_LIBRARY
+* PDF_LIBRARY_1
+* PDF_LIBRARY_2
+* PDF_SET
+* PDF_SET_1
+* PDF_SET_2
+* PDF_SET_VERSION
+* PG_THREADS
+* PHI_2
+* PHI_3
+* PHI_L2
+* PHI_L3
+* PROFILE_FUNCTION
+* PROFILE_PARAMETERS
+* PSI_ITMAX
+* PSI_ITMIN
+* PSI_NMAX
+* PT^2_0
+* PT_MAX
+* P_LASER_
+* P_LASER_ <1>
+* P_{QQ_1}/P_{QQ_0}
+* P_{QS}/P_{QQ}
+* P_{SS}/P_{QQ}
+* Q_0^2
+* Q_as^2
+* Q_as^2 <1>
+* RANDOM_SEED
+* REFERENCE_SCALE
+* RESCALE_EXPONENT
+* RescProb
+* RescProb1
+* RESOLVE_DECAYS
+* RESULT_DIRECTORY
+* RHO
+* RLIMIT_AS
+* RLIMIT_BY_CPU
+* Root
+                                                             (line 1795)
+* RUNDATA
+* SCALES
+* SCALE_MIN
+* SHERPA_CPP_PATH
+* SHERPA_LDADD
+* SHERPA_LIB_PATH
+* SHOW_MODEL_SYNTAX
+* SHOW_PDF_SETS
+* SHOW_VARIABLE_SYNTAX
+* Shrimps_Mode
+* SIGMA_ND_FACTOR
+* SIN2THETAW
+* SINGLET_SUPPRESSION
+* SLHA_INPUT
+* SOFT_COLLISIONS
+* SOFT_MASS_SMEARING
+* SOFT_SPIN_CORRELATIONS
+* SPECTRUM_FILE_1
+* SPECTRUM_FILE_2
+* STABLE[<id>]
+* STABLE[<id>] <1>
+* STABLE[<id>] <2>
+* STORE_DECAY_RESULTS
+                                                             (line 3789)
+* STRANGE_FRACTION
+* TAN(BETA)
+* THETA_L14
+* THETA_L24
+* THETA_L34
+* TIMEOUT
+* TRANSITION_OFFSET
+* TUNE
+* UNITARIZATION_M
+* UNITARIZATION_M3
+* UNITARIZATION_M4
+* UNITARIZATION_N
+* UNITARIZATION_N3
+* UNITARIZATION_N4
+* UNITARIZATION_SCALE
+* UNITARIZATION_SCALE3
+* UNITARIZATION_SCALE4
+* USE_PDF_ALPHAS
+* USR_WGT_MODE
+                                                             (line 5005)
+* VEGAS
+* VEV
+* WIDTH[<id>]
+* WIDTH[<id>] <1>
+* WIDTH[<id>] <2>
+* WIDTH_SCHEME
+* xi
+* YFS_IR_CUTOFF
+* YFS_MODE
+* YFS_USE_ME
+* YUKAWA[<id>]
+* YUKAWA_MASSES
+

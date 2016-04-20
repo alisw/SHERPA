@@ -1,0 +1,34 @@
+#!/bin/sh
+
+case $1 in
+  --version)
+    echo @PACKAGE_VERSION@;;
+  --prefix)
+    echo @prefix@;;
+  --libs)
+    hepmc2libs=$(echo "@CONDITIONAL_HEPMC2LIBS@" | cut -d " " -f 1,3);
+    echo -L@LIBDIR@ -lSherpaMain $hepmc2libs;;
+  --incdir)
+    echo @INCLUDEDIR@;;
+  --libdir)
+    echo @LIBDIR@;;
+  --datadir)
+    echo @DATADIR@;;
+  --ldflags)
+    hepmc2libs=$(echo "@CONDITIONAL_HEPMC2LIBS@" | cut -d " " -f 1,3);
+    echo -L@LIBDIR@ -lSherpaMain $hepmc2libs @AM_LDFLAGS@;;
+  --cppflags)
+    echo -I@INCLUDEDIR@;;
+  *)
+    echo "Sherpa-config: configuration tool for the Monte Carlo";
+    echo "               event generator Sherpa: http://sherpa-mc.de";
+    echo "Options:";
+    echo "  Sherpa-config --version : returns Sherpa version";
+    echo "  Sherpa-config --prefix  : returns the installation path";
+    echo "  Sherpa-config --incdir  : returns the path of Sherpa headers";
+    echo "  Sherpa-config --libs    : returns the linker line to link with Sherpa";
+    echo "  Sherpa-config --datadir : returns the path of Sherpa data (like Decaydata, PDFs)";
+    echo "  Sherpa-config --ldflags : returns the LDFLAGS used for Sherpa";
+    echo "  Sherpa-config --cppflags : returns the preprocessor FLAGS needed for Sherpa headers";;
+esac
+

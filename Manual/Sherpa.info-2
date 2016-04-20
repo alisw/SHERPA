@@ -1,0 +1,1330 @@
+This is Sherpa.info, produced by makeinfo version 5.2 from Sherpa.texi.
+
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU General Public License.
+
+
+File: Sherpa.info,  Node: SoftQCD,  Next: BFactories,  Prev: FONLO,  Up: Examples
+
+10.7 Soft QCD: Minimum Bias and Cross Sections
+==============================================
+
+* Menu:
+
+* Calculation of inclusive cross sections::
+* Simulation of Minimum Bias events::
+
+
+File: Sherpa.info,  Node: Calculation of inclusive cross sections,  Next: Simulation of Minimum Bias events,  Up: SoftQCD
+
+10.7.1 Calculation of inclusive cross sections
+----------------------------------------------
+
+     (run){
+       OUTPUT              = 2
+       EVENT_TYPE          = MinimumBias
+       SOFT_COLLISIONS     = Shrimps
+       Shrimps_Mode        = Xsecs
+     }(run)
+
+     (beam){
+       BEAM_1 =  2212; BEAM_ENERGY_1 = 450.;
+       BEAM_2 =  2212; BEAM_ENERGY_2 = 450.;
+     }(beam)
+
+     (me){
+       ME_SIGNAL_GENERATOR = None
+     }(me)
+
+
+Things to notice:
+   * Inclusive cross sections (total, inelastic, low-mass
+     single-diffractive, low-mass double-diffractive, elastic) and the
+     elastic slope are calculated for varying c.m.  energies in pp
+     collisions
+   * The results are written to the file
+     InclusiveQuantities/xsecs_total.dat and to the screen.  The
+     directory will automatically be created in the path from where
+     Sherpa is run.
+   * The parameters of the model are not very well tuned.
+
+
+File: Sherpa.info,  Node: Simulation of Minimum Bias events,  Prev: Calculation of inclusive cross sections,  Up: SoftQCD
+
+10.7.2 Simulation of Minimum Bias events
+----------------------------------------
+
+     run){
+       EVENTS              = 1000000
+       OUTPUT              = 2
+       EVENT_TYPE          = MinimumBias
+       SOFT_COLLISIONS     = Shrimps
+       Shrimps_Mode        = Inelastic
+
+       ANALYSIS            = Rivet
+
+       ANALYSIS_OUTPUT     = Shrimps.7TeV
+       MAX_PROPER_LIFETIME = 10.
+     }(run)
+
+     (beam){
+       BEAM_1 =  2212; BEAM_ENERGY_1 = 3500.;
+       BEAM_2 =  2212; BEAM_ENERGY_2 = 3500.;
+     }(beam)
+
+     (analysis){
+       BEGIN_RIVET {
+       -a DIFFMASS ATLAS_2010_S8918562 ATLAS_2010_S8894728 ATLAS_2011_S8994773 ATLAS_2012_I1084540 TOTEM_2012_DNDETA ATLAS_2011_I919017 CMS_2011_S8978280 CMS_2011_S9120041 CMS_2011_S9215166 #CMS_2010_S8547297 CMS_2010_S8656010 CMS_2011_S8884919 CMS_QCD_10_024
+       } END_RIVET
+     }(analysis)
+
+     (me){
+       ME_SIGNAL_GENERATOR = None
+     }(me)
+
+
+Things to notice:
+   * The SHRiMPS model is not properly tuned yet - all parameters are
+     set to very natural values, such as for example 1.0 GeV for
+     infrared parameters.
+   * Eleastic scattering and low-mass diffraction are not included.
+   * A large number of Minimum Bias-type analyses is enabled.
+
+
+File: Sherpa.info,  Node: BFactories,  Next: MEvalues,  Prev: SoftQCD,  Up: Examples
+
+10.8 Setups for event production at B-factories
+===============================================
+
+* Menu:
+
+* QCD continuum::
+* Signal process::
+* Single hadron decay chains::
+
+
+File: Sherpa.info,  Node: QCD continuum,  Next: Signal process,  Up: BFactories
+
+10.8.1 QCD continuum
+--------------------
+
+Example setup for QCD continuum production at the Belle/KEK collider.
+Please note, it does not include any hadronic resonance.
+     (run){
+       % general settings
+       EVENTS 5M;
+       % model parameters
+       ALPHAS(MZ) 0.1188;
+       ORDER_ALPHAS 1;
+       MASSIVE[4] 1;
+       MASSIVE[5] 1;
+       MASSIVE_PS 3;
+       % collider setup
+       BEAM_1  11; BEAM_ENERGY_1 7.;
+       BEAM_2 -11; BEAM_ENERGY_2 4.;
+     }(run)
+
+     (processes){
+       Process 11 -11 -> 93 93;
+       Order_EW 2;
+       End process;
+       Process 11 -11 -> 4 -4;
+       Order_EW 2;
+       End process;
+       Process 11 -11 -> 5 -5;
+       Order_EW 2;
+       End process;
+     }(processes)
+
+Things to notice:
+   * Asymmetric beam energies, photon ISR is switched on per default.
+   * Full mass effects of c and b quarks computed.
+   * Strong coupling constant value set to 0.1188 and two loop (NLO)
+     running.
+
+
+File: Sherpa.info,  Node: Signal process,  Next: Single hadron decay chains,  Prev: QCD continuum,  Up: BFactories
+
+10.8.2 Signal process
+---------------------
+
+Example setup for B-hadron pair production on the Y(4S) pole.
+     (run){
+       % general settings
+       EVENTS 5M;
+       % model parameters
+       ALPHAS(MZ) 0.1188;
+       ORDER_ALPHAS 1;
+       MASSIVE[4] 1;
+       MASSIVE[5] 1;
+       MASSIVE_PS 3;
+       ME_SIGNAL_GENERATORS Internal;
+       SCALES VAR{sqr(91.2)};
+       % collider setup
+       BEAM_1  11; BEAM_ENERGY_1 7.;
+       BEAM_2 -11; BEAM_ENERGY_2 4.;
+     }(run)
+
+     (processes){
+       #
+       # electron positron -> Y(4S) -> B+ B-
+       #
+       Process 11 -11 -> 300553[a];
+       Decay 300553[a] -> 521 -521;
+       End process;
+       #
+       # electron positron -> Y(4S) -> B0 B0bar
+       #
+       Process 11 -11 -> 300553[a];
+       Decay 300553[a] -> 511 -511;
+       End process;
+     }(processes)
+
+Things to notice:
+   * Same setup as *note QCD continuum::, except for process
+     specification.
+   * Production of both B0 and B+ pairs, in due proportion.
+
+
+File: Sherpa.info,  Node: Single hadron decay chains,  Prev: Signal process,  Up: BFactories
+
+10.8.3 Single hadron decay chains
+---------------------------------
+
+This setup is not a collider setup, but a simulation of a hadronic decay
+chain.
+     (run){
+       % general settings
+       EVENTS 5M;
+       EVENT_TYPE HadronDecay;
+
+       % specify hadron to be decayed
+       DECAYER 511;
+
+       % initialise rest for Sherpa not to complain
+       % model parameters
+       ME_SIGNAL_GENERATORS Internal;
+       SCALES VAR{sqr(91.2)};
+       % collider setup
+       BEAM_1  11; BEAM_ENERGY_1 7.;
+       BEAM_2 -11; BEAM_ENERGY_2 4.;
+     }(run)
+
+     (processes){
+       Process 11 -11 -> 13 -13;
+       End process;
+     }(processes)
+
+Things to notice:
+   * 'EVENT_TYPE' is set to 'HadronDecay'.
+   * 'DECAYER' specifies the hadron flavour initialising the decay
+     chain.
+   * A place holder process is declared such that the Sherpa framework
+     can be initialised.  That process will not be used.
+
+
+File: Sherpa.info,  Node: MEvalues,  Next: APIexamples,  Prev: BFactories,  Up: Examples
+
+10.9 Calculating matrix element values for externally given configurations
+==========================================================================
+
+* Menu:
+
+* Matrix Element values through Python interface::
+* Matrix Element values through C++ interface::
+
+
+File: Sherpa.info,  Node: Matrix Element values through Python interface,  Next: Matrix Element values through C++ interface,  Up: MEvalues
+
+10.9.1 Computing matrix elements for idividual phase space points using the Python Interface
+--------------------------------------------------------------------------------------------
+
+Sherpa's Python interface (see *note Python Interface::) can be used to
+compute matrix elemtents for individual phase space points.  Access to a
+designated class "MEProcess" is provided by interface to compute matrix
+elements as illustrated in the example script.
+
+Please note that the process in the script must be compatible with the
+one specified in the run card in the working directory.  This also
+applies to the initial state particle momenta as well as the masses of
+all external particles.
+
+If AMEGIC++ is used as the matrix element generator, executing the
+script will result in AMEGIC++ writing out libraries and exiting.  After
+compiling the libraries using './makelibs', the script must be executed
+again in order to obtain the matrix element.  On some systems, this
+might result in a termination with errors of the form
+Library_Loader::LoadLibrary(): ./Process/lib/libProc_P2_2_2_6_24_16_5_0.so: undefined symbol: _ZN6AMEGIC10Basic_Func1XEiii
+
+If this is the case, the library libSherpaMain.so must be preloaded,
+which can be achieved on a linux system via setting LD_PRELOAD
+accordingly:
+export LD_PRELOAD=<prefix>/lib/SHERPA-MC/libSherpaMain.so
+
+     #!/usr/bin/env python2
+     ## from mpi4py import MPI
+     import sys
+     sys.path.append('@PYLIBDIR@')
+     import Sherpa
+
+     # Add this to the execution arguments to prevent Sherpa from starting the cross section integration
+     sys.argv.append('INIT_ONLY=2')
+
+     Generator=Sherpa.Sherpa()
+     try:
+         Generator.InitializeTheRun(len(sys.argv),sys.argv)
+         Process=Sherpa.MEProcess(Generator)
+
+         # if MPI.COMM_WORLD.Get_rank()>0:
+         #    exit(1)
+
+         # Incoming flavors must be added first!
+         Process.AddInFlav(11);
+         Process.AddInFlav(-11);
+         Process.AddOutFlav(1);
+         Process.AddOutFlav(-1);
+         Process.Initialize();
+
+         if Process.HasColorIntegrator():
+             Process.GenerateColorPoint();
+
+         # First argument corresponds to particle index:
+         # index 0 correspons to particle added first, index 1 is the particle added second, and so on...
+         Process.SetMomentum(0, 45.6,0.,0.,45.6)
+         Process.SetMomentum(1, 45.6,0.,0.,-45.6)
+         Process.SetMomentum(2, 45.6,0.,45.6,0.)
+         Process.SetMomentum(3, 45.6,0.,-45.6,0.)
+
+         print '\nSquared matrix element:'
+         print Process.CSMatrixElement()
+         print '\n'
+
+     except Sherpa.Exception as exc:
+         print exc
+         exit(1)
+
+
+File: Sherpa.info,  Node: Matrix Element values through C++ interface,  Prev: Matrix Element values through Python interface,  Up: MEvalues
+
+10.9.2 Computing matrix elements for idividual phase space points using the C++ Interface
+-----------------------------------------------------------------------------------------
+
+Matrix elements values for user defined phase space points can also be
+quarried using a small C++ executable provided in 'Examples/API/ME2'.
+It can be compiled using the provided 'Makefile'.  The test program is
+then run typing (note: the 'LD_LIBRARY_PATH' must be set to include
+'<Sherpa-installation>/lib/SHERPA-MC')
+
+./test <options>
+
+where the usual options for Sherpa are passed.  An example run card,
+giving both the process and the requested phase space points looks like
+
+     (run){
+       EVENTS 0;
+       INIT_ONLY 2;
+     }(run)
+
+     (beam){
+       BEAM_1  11; BEAM_ENERGY_1 45.6;
+       BEAM_2 -11; BEAM_ENERGY_2 45.6;
+     }(beam)
+
+     (isr){
+       PDF_LIBRARY None;
+     }(isr)
+
+     (processes){
+       Process 11 -11 -> 2 -2 21 21 21 21
+       End process;
+     }(processes)
+
+     (momenta){
+       NUMBER_OF_POINTS 4
+       Point 1
+       11  45.6   0.0   0.0  45.6
+      -11  45.6   0.0   0.0 -45.6
+       21  10.0   0.0   0.0 -10.0 1 2
+       21  10.0   0.0   0.0  10.0 2 3
+       21  10.0  10.0   0.0   0.0 3 1
+       21  10.0 -10.0   0.0   0.0 1 3
+        2  25.6   0.0  25.6   0.0 3 0
+       -2  25.6   0.0 -25.6   0.0 0 1
+       End point
+       Point 2
+       11  45.6   0.0   0.0  45.6
+      -11  45.6   0.0   0.0 -45.6
+       21  12.0   0.0   0.0 -12.0 1 2
+       21  12.0   0.0   0.0  12.0 2 3
+       21  12.0  12.0   0.0   0.0 3 1
+       21  12.0 -12.0   0.0   0.0 1 3
+        2  21.6   0.0  21.6   0.0 3 0
+       -2  21.6   0.0 -21.6   0.0 0 1
+       End point
+       Point 3
+       11  45.6   0.0   0.0  45.6
+      -11  45.6   0.0   0.0 -45.6
+       21  14.0   0.0   0.0 -14.0 1 2
+       21  14.0   0.0   0.0  14.0 2 3
+       21  14.0  14.0   0.0   0.0 3 1
+       21  14.0 -14.0   0.0   0.0 1 3
+        2  17.6   0.0  17.6   0.0 3 0
+       -2  17.6   0.0 -17.6   0.0 0 1
+       End point
+       Point 4
+       11  45.6   0.0   0.0  45.6
+      -11  45.6   0.0   0.0 -45.6
+       21  16.0   0.0   0.0 -16.0 1 2
+       21  16.0   0.0   0.0  16.0 2 3
+       21  16.0  16.0   0.0   0.0 3 1
+       21  16.0 -16.0   0.0   0.0 1 3
+        2  13.6   0.0  13.6   0.0 3 0
+       -2  13.6   0.0 -13.6   0.0 0 1
+       End point
+     }(momenta)
+
+Please note that both the process and the beam specifications need to be
+present in order for Sherpa to initialise properly.  The momenta need to
+be given in the proper ordering employed in Sherpa, which can be read
+from the process name printed on screen.  For each entry the sequence is
+the following
+
+  <pdg-id> <E> <px> <py> <pz> [triplet-index antitriplet-index]
+
+with the colour indices ranging from 1..3 for both the triplet and the
+antitriplet index in the colour-flow basis.  The colour information is
+only needed if Comix is used for the calculation as Comix then also
+gives the squared matrix element value for this colour cinfiguration.
+In any case, the colour-summed value is printed to screen.
+
+Alternatively, the momenta can be given in a separate file specified
+through 'MOMENTA_DATA_FILE=<file>'.
+
+
+File: Sherpa.info,  Node: APIexamples,  Prev: MEvalues,  Up: Examples
+
+10.10 Using the Python interface
+================================
+
+* Menu:
+
+* Events::
+* MPIEvents::
+
+
+File: Sherpa.info,  Node: Events,  Next: MPIEvents,  Up: APIexamples
+
+10.10.1 Generate events using scripts
+-------------------------------------
+
+This example shows how to generate events with Sherpa using a Python
+wrapper script.  For each event the weight, the number of trials and the
+particle information is printed to stdout.  This script can be used as a
+basis for constructing interfaces to own analysis routines.
+
+     #!/usr/bin/python2
+     ## from mpi4py import MPI
+     import sys
+     sys.path.append('@PYLIBDIR@')
+     import Sherpa
+
+     Generator=Sherpa.Sherpa()
+     try:
+         Generator.InitializeTheRun(len(sys.argv),sys.argv)
+         Generator.InitializeTheEventHandler()
+         for n in range(1,1+Generator.NumberOfEvents()):
+             Generator.GenerateOneEvent()
+             blobs=Generator.GetBlobList();
+             print "Event",n,"{"
+             ## print blobs
+             print "  Weight ",blobs.GetFirst(1)["Weight"];
+             print "  Trials ",blobs.GetFirst(1)["Trials"];
+             for i in range(0,blobs.size()):
+                 print "  Blob",i,"{"
+                 ## print blobs[i];
+                 print "    Incoming particles"
+                 for j in range(0,blobs[i].NInP()):
+                     part=blobs[i].InPart(j)
+                     ## print part
+                     s=part.Stat()
+                     f=part.Flav()
+                     p=part.Momentum()
+                     print "     ",j,": ",s,f,p
+                 print "    Outgoing particles"
+                 for j in range(0,blobs[i].NOutP()):
+                     part=blobs[i].OutPart(j)
+                     ## print part
+                     s=part.Stat()
+                     f=part.Flav()
+                     p=part.Momentum()
+                     print "     ",j,": ",s,f,p
+                 print "  } Blob",i
+             print "} Event",n
+             if ((n%100)==0): print "  Event ",n
+         Generator.SummarizeRun()
+
+     except Sherpa.Exception as exc:
+         exit(1)
+
+
+File: Sherpa.info,  Node: MPIEvents,  Prev: Events,  Up: APIexamples
+
+10.10.2 Generate events with MPI using scripts
+----------------------------------------------
+
+This example shows how to generate events with Sherpa using a Python
+wrapper script and MPI. For each event the weight, the number of trials
+and the particle information is send to the MPI master node and written
+into a single gzip'ed output file.  Note that you need the mpi4py module
+to run this Example.  Sherpa must be configured and installed using
+'--enable-mpi', see *note MPI parallelization::.
+
+     #!/usr/bin/python2
+     from mpi4py import MPI
+     import sys
+     sys.path.append('@PYLIBDIR@')
+     import Sherpa
+     import gzip
+
+     class MyParticle:
+         def __init__(self,p):
+             self.kfc=p.Flav().Kfcode()
+             if p.Flav().IsAnti(): self.kfc=-self.kfc
+             self.E=p.Momentum()[0]
+             self.px=p.Momentum()[1]
+             self.py=p.Momentum()[2]
+             self.pz=p.Momentum()[3]
+         def __str__(self):
+             return (str(self.kfc)+" "+str(self.E)+" "
+                     +str(self.px)+" "+str(self.py)+" "+str(self.pz))
+
+     Generator=Sherpa.Sherpa()
+     try:
+         Generator.InitializeTheRun(len(sys.argv),sys.argv)
+         Generator.InitializeTheEventHandler()
+         comm=MPI.COMM_WORLD
+         rank=comm.Get_rank()
+         size=comm.Get_size()
+         if rank==0:
+             outfile=gzip.GzipFile("events.gz",'w')
+             for n in range(1,1+Generator.NumberOfEvents()):
+                 for t in range(1,size):
+                     weight=comm.recv(source=t,tag=t)
+                     trials=comm.recv(source=t,tag=2*t)
+                     parts=comm.recv(source=t,tag=3*t)
+                     outfile.write("E "+str(weight)+" "+str(trials)+"\n")
+                     for p in parts:
+                         outfile.write(str(p)+"\n")
+                 if (n%100)==0: print "  Event",n
+             outfile.close()
+         else:
+             for n in range(1,1+Generator.NumberOfEvents()):
+                 Generator.GenerateOneEvent()
+                 blobs=Generator.GetBlobList();
+                 weight=blobs.GetFirst(1)["Weight"]
+                 trials=blobs.GetFirst(1)["Trials"]
+                 parts=[]
+                 for i in range(0,blobs.size()):
+                     for j in range(0,blobs[i].NOutP()):
+                         part=blobs[i].OutPart(j)
+                         if part.Stat()==1 and part.HasDecBlob()==0:
+                             parts.append(MyParticle(part))
+                 comm.send(weight,dest=0,tag=rank)
+                 comm.send(trials,dest=0,tag=2*rank)
+                 comm.send(parts,dest=0,tag=3*rank)
+         Generator.SummarizeRun()
+
+     except Sherpa.Exception as exc:
+         exit(1)
+
+
+File: Sherpa.info,  Node: Getting help,  Next: Authors,  Prev: Examples,  Up: Top
+
+11 Getting help
+***************
+
+If Sherpa exits abnormally, first check the Sherpa output for hints on
+the reason of program abort, and try to figure out what has gone wrong
+with the help of the Manual.  Note that Sherpa throwing a
+‘normal_exit’ exception does not imply any abnormal program
+termination!  When using AMEGIC++ Sherpa will exit with the message:
+        New libraries created. Please compile.
+In this case, follow the instructions given in *note Running Sherpa with
+AMEGIC++::.
+
+If this does not help, contact the Sherpa team (see the Sherpa Team
+section of the website http://www.sherpa-mc.de), providing all
+information on your setup.  Please include
+  1. A complete tarred and gzipped set of the '.dat' files leading to
+     the crash.  Use the status recovery directory 'Status__<date of
+     crash>' produced before the program abort.
+  2. The command line (including possible parameters) you used to start
+     Sherpa.
+  3. The installation log file, if available.
+
+
+File: Sherpa.info,  Node: Authors,  Next: Copying,  Prev: Getting help,  Up: Top
+
+12 Authors
+**********
+
+Sherpa was written by the Sherpa Team, see http://www.sherpa-mc.de.
+
+
+File: Sherpa.info,  Node: Copying,  Next: References,  Prev: Authors,  Up: Top
+
+13 Copying
+**********
+
+Sherpa is free software.  You can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free
+Software Foundation.  You should have received a copy of the GNU General
+Public License along with the source for Sherpa; see the file COPYING.
+If not, write to the Free Software Foundation, 59 Temple Place, Suite
+330, Boston, MA 02111-1307, USA.
+
+Sherpa is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+more details.
+
+Sherpa was created during the Marie Curie RTN's HEPTOOLS, MCnet and
+LHCphenonet.  The MCnet Guidelines apply, see the file GUIDELINES and
+http://www.montecarlonet.org/index.php?p=Publications/Guidelines.
+
+
+File: Sherpa.info,  Node: References,  Next: Index,  Prev: Copying,  Up: Top
+
+Appendix A References
+*********************
+
+     [Ale05] S. Alekhin and others, _HERA and the LHC - A workshop on
+     the implications of HERA for LHC physics: Proceedings Part A_,
+     hep-ph/0601012.
+
+     [Ali13] S. Alioli and others, _Update of the Binoth Les Houches
+     Accord for a standard interface between Monte Carlo tools and
+     one-loop programs_, arXiv:1308.3462.
+
+     [Alw07] J. Alwall and others, _Comparative study of various
+     algorithms for the merging of parton showers and matrix elements in
+     hadronic collisions_, Eur.  Phys.  J. C53 (2008) 473-500
+     [arXiv:0706.2569].
+
+     [Arc08] J. Archibald and T. Gleisberg and S. Hoche and F. Krauss
+     and M. Schonherr and S. Schumann and F. Siegert and J. C. Winter,
+     _Simulation of photon-photon interactions in hadron collisions with
+     Sherpa_, Nucl.  Phys.  179 (2008) 218-225 .
+
+     [Bah08b] M. Bahr and others, _Herwig++ Physics and Manual_, Eur.
+     Phys.  J. C58 (2008) 639-707 [arXiv:0803.0883].
+
+     [Bal08] R. D. Ball and others, _A determination of parton
+     distributions with faithful uncertainty estimation_, Nucl.  Phys.
+     B809 (2009) 1-63 [arXiv:0808.1231].
+
+     [Bar93] E. Barberio and Z. Wc as, _PHOTOS - a universal monte carlo
+     for QED radiative corrections: version 2.0_, Comput.  Phys.
+     Commun.  79 (1994) 291-308 .
+
+     [Bau88] U. Baur and D. Zeppenfeld, _Probing the WWgamma vertex at
+     future hadron colliders_, Nucl.  Phys.  B308 (1988) 127 .
+
+     [Ber02] Z. Bern and L. J. Dixon and C. Schmidt, _Isolating a light
+     Higgs boson from the di-photon background at the LHC_, Phys.  Rev.
+     D66 (2002) 074018 [hep-ph/0206194].
+
+     [Ber09a] C. F. Berger and Z. Bern and L. J. Dixon and F.
+     Febres-Cordero and D. Forde and T. Gleisberg and H. Ita and D. A.
+     Kosower and D. Ma^itre, _Next-to-leading order QCD predictions for
+     W+3-Jet distributions at hadron colliders_, Phys.  Rev.  D80 (2009)
+     074036 [arXiv:0907.1984].
+
+     [Bin10a] T. Binoth and others, _A proposal for a standard interface
+     between Monte Carlo tools and one-loop programs_, Comput.  Phys.
+     Commun.  181 (2010) 1612-1622 [arXiv:1001.1307].
+
+     [Bud74] V. M. Budnev and I. F. Ginzburg and G. V. Meledin and V. G.
+     Serbo, _The two photon particle production mechanism.  Physical
+     problems.  Applications.  Equivalent photon approximation_, Phys.
+     Rept.  15 (1974) 181-281 .
+
+     [Cac08] M. Cacciari and G. P. Salam and G. Soyez, _The Anti-k(t)
+     jet clustering algorithm_, JHEP 0804 (2008) 063 [arXiv:0802.1189].
+
+     [Car09] T. Carli and T. Gehrmann and S. Hoche, _Hadronic final
+     states in deep-inelastic scattering with Sherpa_, Eur.  Phys.  J.
+     C67 (2010) 73 [arXiv:0912.3715].
+
+     [Cas11] F. Cascioli and P. Maierhofer and S. Pozzorini, _Scattering
+     Amplitudes with Open Loops_, Eur.Phys.J. C72 (2012) 1889
+     [arXiv:1111.5206].
+
+     [Cat01a] S. Catani and F. Krauss and R. Kuhn and B. R. Webber, _QCD
+     matrix elements + parton showers_, JHEP 11 (2001) 063
+     [hep-ph/0109231].
+
+     [Cat02] S. Catani and S. Dittmaier and M. H. Seymour and Z.
+     Trocsanyi, _The dipole formalism for next-to-leading order QCD
+     calculations with massive partons_, Nucl.  Phys.  B627 (2002)
+     189-265 [hep-ph/0201036].
+
+     [Cat96b] S. Catani and M. H. Seymour, _A general algorithm for
+     calculating jet cross sections in NLO QCD_, Nucl.  Phys.  B485
+     (1997) 291-419 [hep-ph/9605323].
+
+     [Chr08] N. D. Christensen and C. Duhr, _FeynRules - Feynman rules
+     made easy_, Comput.  Phys.  Commun.  180 (2009) 1614-1641
+     [arXiv:0806.4194].
+
+     [Chr09] N. D. Christensen and P. de Aquino and C. Degrande and C.
+     Duhr and B. Fuks and M. Herquet and F. Maltoni and S. Schumann, _A
+     comprehensive approach to new physics simulations_, Eur.  Phys.  J.
+     C71 (2011) 1541 [arXiv:0906.2474].
+
+     [Dix13] L. J. Dixon and Y. Li, _Bounding the Higgs Boson Width
+     Through Interferometry_, arXiv:1305.3854.
+
+     [Dra00] P. D. Draggiotis and A. van Hameren and R. Kleiss, _SARGE:
+     An algorithm for generating QCD-antennas_, Phys.  Lett.  B483
+     (2000) 124-130 [hep-ph/0004047].
+
+     [Duh06] C. Duhr and S. Hoche and F. Maltoni, _Color-dressed
+     recursive relations for multi-parton amplitudes_, JHEP 08 (2006)
+     062 [hep-ph/0607057].
+
+     [Feb06] F. Febres Cordero and L. Reina and D. Wackeroth, _NLO QCD
+     corrections to W boson production with a massive b-quark jet pair
+     at the Tevatron p anti-p collider_, Phys.Rev.  D74 (2006) 034007
+     [hep-ph/0606102].
+
+     [Fie82a] R. D. Field and S. Wolfram, _A QCD model for e^+e^-
+     annihilation_, Nucl.  Phys.  B213 (1983) 65 .
+
+     [Fri98] S. Frixione, _Isolated photons in perturbative QCD_, Phys.
+     Lett.  B429 (1998) 369-374 [hep-ph/9801442].
+
+     [Gan99] F. Gangemi and G. Montagna and M. Moretti and O. Nicrosini
+     and F. Piccinini, _Electroweak physics in six-fermion final states
+     at future e^+ e^- colliders_, hep-ph/0001065.
+
+     [Gao13] J. Gao and M. Guzzi and J. Huston and H. L. Lai and Z. Li
+     and others, _The CT10 NNLO Global Analysis of QCD_,
+     arXiv:1302.6246.
+
+     [Geh12] T. Gehrmann and S. Hoche and F. Krauss and M. Schonherr and
+     F. Siegert, _NLO QCD matrix elements + parton showers in e^+e^- ->
+     hadrons_, JHEP 01 (2013) 144 [arXiv:1207.5031].
+
+     [Gle03a] T. Gleisberg and F. Krauss and K. T. Matchev and A. S. and
+     S. Schumann and G. Soff, _Helicity formalism for spin-2 particles_,
+     JHEP 09 (2003) 001 [hep-ph/0306182].
+
+     [Gle03b] T. Gleisberg and F. Krauss and C. G. Papadopoulos and A.
+     Schalicke and S. Schumann, _Cross sections for multi-particle final
+     states at a linear collider_, Eur.  Phys.  J. C34 (2004) 173-180
+     [hep-ph/0311273].
+
+     [Gle05] T. Gleisberg and F. Krauss and A. Schalicke and S. Schumann
+     and J. C. Winter, _Studying W^+ W^- production at the Fermilab
+     Tevatron with Sherpa_, Phys.  Rev.  D72 (2005) 034028
+     [hep-ph/0504032].
+
+     [Gle08] T. Gleisberg and S. Hoche, _Comix a new matrix element
+     generator_, JHEP 12 (2008) 039 [arXiv:0808.3674].
+
+     [Gle08b] T. Gleisberg and S. Hoche and F. Krauss and M. Schonherr
+     and S. Schumann and F Siegert and J. Winter, _Event generation with
+     Sherpa 1.1_, JHEP 02 (2009) 007 [arXiv:0811.4622].
+
+     [Glu91a] M. Gluck and E. Reya and A. Vogt, _Photonic parton
+     distributions_, Phys.  Rev.  D46 (1992) 1973-1979 .
+
+     [Got82] T. D. Gottschalk, _A realistic model for e^+e^-
+     annihilation including parton bremsstrahlung effects_, Nucl.  Phys.
+     B214 (1983) 201 .
+
+     [Got83] T. D. Gottschalk, _An improved description of hadronization
+     in the QCD cluster model for e^+e^- annihilation_, Nucl.  Phys.
+     B239 (1984) 349 .
+
+     [Gou00] G. J. Gounaris and J. Layssac and F. M. Renard, _Off-shell
+     structure of the anomalous Z and gamma self- couplings_, Phys.
+     Rev.  D62 (2000) 073012 [hep-ph/0005269].
+
+     [Hag05] K. Hagiwara and others, _Supersymmetry simulations with
+     off-shell effects for the CERN LHC and an ILC_, Phys.  Rev.  D73
+     (2006) 055005 [hep-ph/0512260].
+
+     [Hag86] K. Hagiwara and R. D. Peccei and D. Zeppenfeld and K.
+     Hikasa, _Probing the weak boson sector in e^+e^-to W^+W^-_, Nucl.
+     Phys.  B282 (1987) 253 .
+
+     [Ham02] A. van Hameren and C. G. Papadopoulos, _A hierarchical
+     phase space generator for QCD antenna structures_, Eur.  Phys.  J.
+     C25 (2002) 563-574 [hep-ph/0204055].
+
+     [Hoc06] S. Hoche and others, _Matching Parton Showers and Matrix
+     Elements_, hep-ph/0602031.
+
+     [Hoe09] S. Hoche and F. Krauss and S. Schumann and F. Siegert, _QCD
+     matrix elements and truncated showers_, JHEP 05 (2009) 053
+     [arXiv:0903.1219].
+
+     [Hoe09a] S. Hoche and S. Schumann and F. Siegert, _Hard photon
+     production and matrix-element parton-shower merging_, Phys.  Rev.
+     D81 (2010) 034026 [arXiv:0912.3501].
+
+     [Hoe11] S. Hoche and F. Krauss and M. Schonherr and F. Siegert, _A
+     critical appraisal of NLO+PS matching methods_, JHEP 09 (2012) 049
+     [arXiv:1111.1220].
+
+     [Hoe12a] S. Hoche and F. Krauss and M. Schonherr and F. Siegert,
+     _QCD matrix elements + parton showers: The NLO case_, JHEP 04
+     (2013) 027 [arXiv:1207.5030].
+
+     [Hoe12b] S. Hoche and M. Schonherr, _Uncertainties in NLO + parton
+     shower matched simulations of inclusive jet and dijet production_,
+     Phys.Rev.  D86 (2012) 094042 arXiv:1208.2815.
+
+     [Hoe13] S. Hoeche and J. Huang and G. Luisoni and M. Schoenherr and
+     J. Winter, _Zero and one jet combined NLO analysis of the top quark
+     forward-backward asymmetry_, Phys.Rev.  D88 (2013) 014040
+     arXiv:1306.2703.
+
+     [Hoe14a] S. Hoeche and F. Krauss and M. Schoenherr, _Uncertainties
+     in MEPS@NLO calculations of h+jets_, arXiv:1401.7971.
+
+     [Hou87a] W. S. Hou and A. Soni and H. Steger, _Charmless Decays of
+     Bottom Mesons and a Fourth Generation_, Phys.  Rev.  Lett.  59
+     (1987) 1521 .
+
+     [Jad93] S. Jadach and Z. Was and R. Decker and J. H. Kuhn, _The tau
+     decay library TAUOLA: Version 2.4_, Comput.  Phys.  Commun.  76
+     (1993) 361-380 .
+
+     [Kan00] A. Kanaki and C. G. Papadopoulos, _HELAC: A package to
+     compute electroweak helicity amplitudes_, Comput.  Phys.  Commun.
+     132 (2000) 306-315 [hep-ph/0002082].
+
+     [Kle85] R. Kleiss and W. J. Stirling, _Spinor techniques for
+     calculating pbarpto W^pm/Z^0+jets_, Nucl.  Phys.  B262 (1985)
+     235-262 .
+
+     [Kle85a] R. Kleiss and W. J. Stirling and S. D. Ellis, _A new Monte
+     Carlo treatment of multiparticle phase space at high energies_,
+     Comput.  Phys.  Commun.  40 (1986) 359 .
+
+     [Kle94] R. Kleiss and R. Pittau, _Weight optimization in
+     multichannel Monte Carlo_, Comput.  Phys.  Commun.  83 (1994)
+     141-146 [hep-ph/9405257].
+
+     [Kra01] F. Krauss and R. Kuhn and G. Soff, _AMEGIC++ 1.0: A Matrix
+     Element Generator In C++_, JHEP 02 (2002) 044 [hep-ph/0109036].
+
+     [Kra02] F. Krauss, _Matrix elements and parton showers in hadronic
+     interactions_, JHEP 0208 (2002) 015 [hep-ph/0205283].
+
+     [Kra04] F. Krauss and A. Schalicke and S. Schumann and G. Soff,
+     _Simulating W/Z + jets production at the Tevatron_, Phys.  Rev.
+     D70 (2004) 114009 [hep-ph/0409106].
+
+     [Kra05] F. Krauss and A. Schalicke and S. Schumann and G. Soff,
+     _Simulating W/Z + jets production at the CERN LHC_, Phys.  Rev.
+     D72 (2005) 054017 [hep-ph/0503280].
+
+     [Kra05a] F. Krauss and A. Schalicke and G. Soff, _APACIC++ 2.0: A
+     PArton Cascade In C++_, Comput.  Phys.  Commun.  174 (2006) 876-902
+     [hep-ph/0503087].
+
+     [Kra10] F. Krauss and T. Laubrich and F. Siegert, _Simulation of
+     hadron decays in Sherpa_, .
+
+     [Lai10] H. L. Lai and M. Guzzi and J. Huston and Z. Li and P. M.
+     Nadolsky and others, _New parton distributions for collider
+     physics_, Phys.Rev.  D82 (2010) 074024 [arXiv:1007.2241].
+
+     [Lan01] D. J. Lange, _The EvtGen particle decay simulation
+     package_, Nucl.  Instrum.  Meth.  A462 (2001) 152-155 .
+
+     [Lav08] N. Lavesson and L. Lonnblad, _Extending CKKW-merging to
+     one-loop matrix elements_, JHEP 12 (2008) 070 [arXiv:0811.2912].
+
+     [Lep80] G. P. Lepage, _VEGAS - An Adaptive Multi-dimensional
+     Integration Program_, .
+
+     [Lon01] L. Lonnblad, _Correcting the colour-dipole cascade model
+     with fixed order matrix elements_, JHEP 05 (2002) 046
+     [hep-ph/0112284].
+
+     [Man01] M. L. Mangano and M. Moretti and R. Pittau, _Multijet
+     matrix elements and shower evolution in hadronic collisions: W
+     bbarb+n-jets as a case study_, Nucl.  Phys.  B632 (2002) 343-362
+     [hep-ph/0108069].
+
+     [Man02] M. L. Mangano and M. Moretti and F. Piccinini and R. Pittau
+     and A. D. Polosa, _ALPGEN a generator for hard multiparton
+     processes in hadronic collisions_, JHEP 07 (2003) 001
+     [hep-ph/0206293].
+
+     [Mar01] A. D. Martin and R. G. Roberts and W. J. Stirling and R. S.
+     Thorne, _MRST2001: Partons and alpha_s from precise deep inelastic
+     scattering and Tevatron jet data_, Eur.  Phys.  J. C23 (2002) 73-87
+     [hep-ph/0110215].
+
+     [Mar04] A. D. Martin and R. G. Roberts and W. J. Stirling and R. S.
+     Thorne, _Parton distributions incorporating QED contributions_,
+     Eur.  Phys.  J. C39 (2005) 155-161 [hep-ph/0411040].
+
+     [Mar09a] A. D. Martin and W. J. Stirling and R. S. Thorne and G.
+     Watt, _Parton distributions for the LHC_, Eur.  Phys.  J. C63
+     (2009) 189-295 [arXiv:0901.0002].
+
+     [Mar87] G. Marchesini and B. R. Webber, _Monte Carlo Simulation of
+     General Hard Processes with Coherent QCD Radiation_, Nucl.  Phys.
+     B310 (1988) 461 .
+
+     [Mar99] A. D. Martin and R. G. Roberts and W. J. Stirling and R. S.
+     Thorne, _Parton distributions and the LHC: W and Z production_,
+     Eur.  Phys.  J. C14 (2000) 133-145 [hep-ph/9907231].
+
+     [Nad08] P. M. Nadolsky and others, _Implications of CTEQ global
+     analysis for collider observables_, Phys.  Rev.  D78 (2008) 013004
+     [arXiv:0802.0007].
+
+     [Nag03] Z. Nagy, _Next-to-leading order calculation of three-jet
+     observables in hadron-hadron collisions_, Phys.  Rev.  D68 (2003)
+     094002 [hep-ph/0307268].
+
+     [Nag05] Z. Nagy and D. E. Soper, _Matching parton showers to NLO
+     computations_, JHEP 10 (2005) 024 [hep-ph/0503053].
+
+     [Rei01] L. Reina and S. Dawson, _Next-to-leading order results for
+     t anti-t h production at the Tevatron_, Phys.Rev.Lett.  87 (2001)
+     201804 [hep-ph/0107101].
+
+     [Rei01a] L. Reina and S. Dawson and D. Wackeroth, _QCD corrections
+     to associated t anti-t h production at the Tevatron_, Phys.Rev.
+     D65 (2002) 053017 [hep-ph/0109066].
+
+     [Ros89] J. Rosiek, _Complete set of Feynman rules for the minimal
+     supersymmetric extension of the standard model_, Phys.  Rev.  D41
+     (1990) 3464 .
+
+     [Rys09] M. G. Ryskin and A. D. Martin and V. A. Khoze, _Soft
+     processes at the LHC I: Multi-component model_, Eur.  Phys.  J. C60
+     (2009) 249-264 [arXiv:0812.2407].
+
+     [Sch05] A. Schalicke and F. Krauss, _Implementing the ME+PS merging
+     algorithm_, JHEP 07 (2005) 018 [hep-ph/0503281].
+
+     [Sch07a] S. Schumann and F. Krauss, _A parton shower algorithm
+     based on Catani-Seymour dipole factorisation_, JHEP 03 (2008) 038
+     [arXiv:0709.1027].
+
+     [Sch08] M. Schonherr and F. Krauss, _Soft photon radiation in
+     particle decays in Sherpa_, JHEP 12 (2008) 018 [arXiv:0810.5071].
+
+     [Sjo06] T. Sjostrand and S. Mrenna and P. Skands, _PYTHIA 6.4
+     physics and manual_, JHEP 05 (2006) 026 [hep-ph/0603175].
+
+     [Sjo07] T. Sjostrand and S. Mrenna and P. Skands, _A brief
+     introduction to PYTHIA 8.1_, Comput.  Phys.  Commun.  178 (2008)
+     852-867 [arXiv:0710.3820].
+
+     [Sjo87] T. Sjostrand and M. van Zijl, _A multiple-interaction model
+     for the event structure in hadron collisions_, Phys.  Rev.  D36
+     (1987) 2019 .
+
+     [Ska03] P. Skands and others, _SUSY Les Houches accord: interfacing
+     SUSY spectrum calculators decay packages and event generators_,
+     JHEP 07 (2004) 036 [hep-ph/0311123].
+
+     [Wha05] M. R. Whalley and D. Bourilkov and R. C. Group, _The Les
+     Houches Accord PDFs (LHAPDF) and LHAGLUE_, hep-ph/0508110.
+
+     [Win03] J. C. Winter and F. Krauss and G. Soff, _A modified
+     cluster-hadronisation model_, Eur.  Phys.  J. C36 (2004) 381-395
+     [hep-ph/0311085].
+
+     [Wol83] L. Wolfenstein, _Parametrization of the Kobayashi-Maskawa
+     Matrix_, Phys.  Rev.  Lett.  51 (1983) 1945 .
+
+     [Yen61] D. R. Yennie and S. C. Frautschi and H. Suura, _The
+     Infrared Divergence Phenomena and High-Energy Processes_, Ann.
+     Phys.  13 (1961) 379-452 .
+
+     [Zar02] A. F. Zarnecki, _CompAZ: Parametrization of the luminosity
+     spectra for the photon collider_, Acta Phys.  Polon.  B34 (2003)
+     2741-2758 [hep-ex/0207021].
+
+     [Bea03] D. M. Beazley, _Automated scientific software scripting
+     with SWIG_, Future Generation Computer Systems 19 (2003) 599-609 .
+
+
+File: Sherpa.info,  Node: Index,  Prev: References,  Up: Top
+
+Appendix B Index
+****************
+
+ [index ]
+* Menu:
+
+* 1/ALPHAQED(0):                         SM.                  (line   6)
+* 1/ALPHAQED(default):                   SM.                  (line   6)
+* A:                                     SM.                  (line   6)
+* ACTIVE[<id>]:                          Model Parameters.    (line   6)
+* ALPHA:                                 THDM.                (line   6)
+* ALPHAS(default):                       SM.                  (line   6)
+* ALPHAS(MZ):                            SM.                  (line   6)
+* ALPHA_4_G_4:                           AGC.                 (line   6)
+* ALPHA_5:                               AGC.                 (line   6)
+* ANALYSIS:                              ANALYSIS.            (line   6)
+* ANALYSIS_OUTPUT:                       ANALYSIS_OUTPUT.     (line   6)
+* ANALYSIS_OUTPUT <1>:                   Rivet analyses.      (line   6)
+* ANALYSIS_OUTPUT <2>:                   HZTool analyses.     (line   6)
+* A_14:                                  4thGen.              (line   6)
+* A_24:                                  4thGen.              (line   6)
+* A_34:                                  4thGen.              (line   6)
+* BARYON_FRACTION:                       Fragmentation.       (line  75)
+* BATCH_MODE:                            BATCH_MODE.          (line   6)
+* BEAM_1:                                Beam Parameters.     (line   6)
+* BEAM_2:                                Beam Parameters.     (line   6)
+* BEAM_ENERGY_1:                         Beam Parameters.     (line   6)
+* BEAM_ENERGY_2:                         Beam Parameters.     (line   6)
+* BEAM_REMNANTS:                         Intrinsic Transverse Momentum.
+                                                              (line   6)
+* BEAM_SMAX:                             Beam Spectra.        (line   6)
+* BEAM_SMIN:                             Beam Spectra.        (line   6)
+* BEAM_SPECTRUM_1:                       Beam Spectra.        (line   6)
+* BEAM_SPECTRUM_2:                       Beam Spectra.        (line   6)
+* beta_0^2:                              Minimum Bias.        (line 123)
+* BH_SETTINGS_FILE:                      Loop_Generator.      (line  13)
+* BUNCH_1:                               ISR Parameters.      (line   6)
+* BUNCH_2:                               ISR Parameters.      (line   6)
+* CABIBBO:                               SM.                  (line   6)
+* CHECK_BORN:                            Checking the pole cancellation.
+                                                              (line   6)
+* CHECK_FINITE:                          Checking the pole cancellation.
+                                                              (line   6)
+* CHECK_POLES:                           Checking the pole cancellation.
+                                                              (line   6)
+* CHECK_POLES_THRESHOLD:                 Checking the pole cancellation.
+                                                              (line   6)
+* Chi_S:                                 Minimum Bias.        (line 143)
+* CKMORDER:                              SM.                  (line   6)
+* COMIX_ME_THREADS:                      Multi-threading.     (line   6)
+* COMIX_PS_THREADS:                      Multi-threading.     (line   6)
+* CORE_SCALE:                            METS scale setting with multiparton core processes.
+                                                              (line   6)
+* COUPLINGS:                             COUPLINGS.           (line   6)
+* COUPLING_SCHEME:                       COUPLING_SCHEME.     (line   6)
+* CSS_EVOLUTION_SCHEME:                  CS Shower options.   (line   6)
+* CSS_EW_MODE:                           CS Shower options.   (line   6)
+* CSS_FS_AS_FAC:                         CS Shower options.   (line   6)
+* CSS_FS_PT2MIN:                         CS Shower options.   (line   6)
+* CSS_IS_AS_FAC:                         CS Shower options.   (line   6)
+* CSS_IS_PT2MIN:                         CS Shower options.   (line   6)
+* CSS_KIN_SCHEME:                        CS Shower options.   (line   6)
+* CSS_MASS_THRESHOLD:                    CS Shower options.   (line   6)
+* CSS_MAXEM:                             CS Shower options.   (line   6)
+* CSS_NOEM:                              CS Shower options.   (line   6)
+* CSS_SCALE_SCHEME:                      CS Shower options.   (line   6)
+* DEACTIVATE_GGH:                        EHC.                 (line   6)
+* DEACTIVATE_PPH:                        EHC.                 (line   6)
+* DECAYMODEL:                            Hadron decays.       (line   6)
+* DECAYPATH:                             Hadron decays.       (line   6)
+* DECAY_OFFSET:                          Fragmentation.       (line  75)
+* DECAY_RESULT_DIRECTORY:                DECAY_RESULT_DIRECTORY.
+                                                              (line   6)
+* DECAY_TAU_HARD:                        DECAY_TAU_HARD.      (line   6)
+* Delphes:                               Event output formats.
+                                                              (line   6)
+* Delta:                                 Minimum Bias.        (line 123)
+* deltaY:                                Minimum Bias.        (line 123)
+* DIPOLE_ALPHA:                          Dipole subtraction.  (line   6)
+* DIPOLE_AMIN:                           Dipole subtraction.  (line   6)
+* DIPOLE_KAPPA:                          Dipole subtraction.  (line   6)
+* DIPOLE_NF_GSPLIT:                      Dipole subtraction.  (line   6)
+* EHC_SCALE2:                            EHC.                 (line   6)
+* EPA_AlphaQED:                          Beam Spectra.        (line  69)
+* EPA_Form_Factor_1:                     Beam Spectra.        (line  69)
+* EPA_Form_Factor_2:                     Beam Spectra.        (line  69)
+* EPA_ptMin_1:                           Beam Spectra.        (line  69)
+* EPA_ptMin_2:                           Beam Spectra.        (line  69)
+* EPA_q2Max_1:                           Beam Spectra.        (line  69)
+* EPA_q2Max_2:                           Beam Spectra.        (line  69)
+* ETA:                                   SM.                  (line   6)
+* EVENTS:                                EVENTS.              (line   6)
+* EVENT_DISPLAY_INTERVAL:                BATCH_MODE.          (line   6)
+* EVENT_GENERATION_MODE:                 EVENT_GENERATION_MODE.
+                                                              (line   6)
+* EVENT_INPUT:                           Event output formats.
+                                                              (line   6)
+* EVENT_OUTPUT:                          Event output formats.
+                                                              (line   6)
+* EVENT_TYPE:                            EVENT_TYPE.          (line   6)
+* EVENT_TYPE <1>:                        Minimum Bias.        (line  90)
+* EVT_FILE_PATH:                         Event output formats.
+                                                              (line   6)
+* EVT_OUTPUT:                            OUTPUT.              (line   6)
+* EW_SCHEME:                             SM.                  (line   6)
+* E_LASER_:                              Beam Spectra.        (line  49)
+* E_LASER_ <1>:                          Beam Spectra.        (line  49)
+* F4_GAMMA:                              AGC.                 (line   6)
+* F4_Z:                                  AGC.                 (line   6)
+* F5_GAMMA:                              AGC.                 (line   6)
+* F5_Z:                                  AGC.                 (line   6)
+* FeynRules:                             FeynRules.           (line   6)
+* FILE_SIZE:                             Event output formats.
+                                                              (line   6)
+* FINISH_OPTIMIZATION:                   FINISH_OPTIMIZATION. (line   6)
+* FINITE_TOP_MASS:                       EHC.                 (line   6)
+* FINITE_W_MASS:                         EHC.                 (line   6)
+* FRAGMENTATION:                         Fragmentation.       (line   9)
+* FR_IDENTFILE:                          FeynRules.           (line   6)
+* FR_INTERACTIONS:                       FeynRules.           (line   6)
+* FR_PARAMCARD:                          FeynRules.           (line   6)
+* FR_PARAMDEF:                           FeynRules.           (line   6)
+* FR_PARTICLES:                          FeynRules.           (line   6)
+* G1_GAMMA:                              AGC.                 (line   6)
+* G1_Z:                                  AGC.                 (line   6)
+* G4_GAMMA:                              AGC.                 (line   6)
+* G4_Z:                                  AGC.                 (line   6)
+* G5_GAMMA:                              AGC.                 (line   6)
+* G5_Z:                                  AGC.                 (line   6)
+* G_NEWTON:                              ADD.                 (line   6)
+* H1_GAMMA:                              AGC.                 (line   6)
+* H1_Z:                                  AGC.                 (line   6)
+* H2_GAMMA:                              AGC.                 (line   6)
+* H2_Z:                                  AGC.                 (line   6)
+* H3_GAMMA:                              AGC.                 (line   6)
+* H3_Z:                                  AGC.                 (line   6)
+* H4_GAMMA:                              AGC.                 (line   6)
+* H4_Z:                                  AGC.                 (line   6)
+* HARD_DECAYS:                           Hard decays.         (line   6)
+* HARD_MASS_SMEARING:                    HARD_MASS_SMEARING.  (line   6)
+* HARD_SPIN_CORRELATIONS:                HARD_SPIN_CORRELATIONS.
+                                                              (line   6)
+* HARD_SPIN_CORRELATIONS <1>:            Hadron decays.       (line 214)
+* HDH_BR_WEIGHTS:                        HDH_BR_WEIGHTS.      (line   6)
+* HDH_NO_DECAY:                          HDH_NO_DECAY.        (line   6)
+* HDH_ONLY_DECAY:                        HDH_ONLY_DECAY.      (line   6)
+* HDH_SET_WIDTHS:                        HDH_SET_WIDTHS.      (line   6)
+* HEAVY_BARYON_ENHANCEMEMT:              Fragmentation.       (line  40)
+* HEPEVT:                                Event output formats.
+                                                              (line   6)
+* HepMC_GenEvent:                        Event output formats.
+                                                              (line   6)
+* HepMC_Short:                           Event output formats.
+                                                              (line   6)
+* HIGGS_INTERFERENCE_MODE:               LHC_HInt.            (line   6)
+* HIGGS_INTERFERENCE_ONLY:               LHC_HInt.            (line   6)
+* HIGGS_INTERFERENCE_SPIN:               LHC_HInt.            (line   6)
+* INTEGRATION_ERROR:                     INTEGRATION_ERROR.   (line   6)
+* INTEGRATOR:                            INTEGRATOR.          (line   6)
+* ISR_E_ORDER:                           ISR Parameters.      (line   6)
+* ISR_E_SCHEME:                          ISR Parameters.      (line   6)
+* ISR_SMAX:                              ISR Parameters.      (line   6)
+* ISR_SMIN:                              ISR Parameters.      (line   6)
+* kappa:                                 Minimum Bias.        (line 123)
+* KAPPAT_GAMMA:                          AGC.                 (line   6)
+* KAPPAT_Z:                              AGC.                 (line   6)
+* KAPPA_GAMMA:                           AGC.                 (line   6)
+* KAPPA_Z:                               AGC.                 (line   6)
+* KFACTOR:                               KFACTOR.             (line   6)
+* KK_CONVENTION:                         ADD.                 (line   6)
+* KT2_Factor:                            Minimum Bias.        (line 143)
+* K_PERP_MEAN_1:                         Intrinsic Transverse Momentum.
+                                                              (line   6)
+* K_PERP_MEAN_2:                         Intrinsic Transverse Momentum.
+                                                              (line   6)
+* K_PERP_SIGMA_1:                        Intrinsic Transverse Momentum.
+                                                              (line   6)
+* K_PERP_SIGMA_2:                        Intrinsic Transverse Momentum.
+                                                              (line   6)
+* LAMBDA:                                SM.                  (line   6)
+* lambda:                                Minimum Bias.        (line 123)
+* Lambda2:                               Minimum Bias.        (line 123)
+* LAMBDAT_GAMMA:                         AGC.                 (line   6)
+* LAMBDAT_Z:                             AGC.                 (line   6)
+* LAMBDA_GAMMA:                          AGC.                 (line   6)
+* LAMBDA_Z:                              AGC.                 (line   6)
+* LASER_ANGLES:                          Beam Spectra.        (line  49)
+* LASER_MODE:                            Beam Spectra.        (line  49)
+* LASER_NONLINEARITY:                    Beam Spectra.        (line  49)
+* LHEF:                                  Event output formats.
+                                                              (line   6)
+* LHOLE_BOOST_TO_CMS:                    External one-loop ME.
+                                                              (line   6)
+* LHOLE_CONTRACTFILE:                    External one-loop ME.
+                                                              (line   6)
+* LHOLE_IR_REGULARISATION:               External one-loop ME.
+                                                              (line   6)
+* LHOLE_OLP:                             External one-loop ME.
+                                                              (line   6)
+* LHOLE_ORDERFILE:                       External one-loop ME.
+                                                              (line   6)
+* LOG_FILE:                              LOG_FILE.            (line   6)
+* Loop_Generator:                        MCFM interface.      (line   6)
+* LOOP_ME_INIT:                          Enforcing the renormalization scheme.
+                                                              (line   6)
+* MassExponent_C->HH:                    Fragmentation.       (line 110)
+* MASSIVE[<id>]:                         Model Parameters.    (line   6)
+* MASS[<id>]:                            Model Parameters.    (line   6)
+* MASS[<id>] <1>:                        Hadron decays.       (line   6)
+* MAX_PROPER_LIFETIME:                   Hadron decays.       (line   6)
+* MEMLEAK_WARNING_THRESHOLD:             RLIMIT_AS.           (line   6)
+* ME_QED:                                ME_QED.              (line   6)
+* ME_QED_CLUSTERING:                     ME_QED_CLUSTERING.   (line   6)
+* ME_QED_CLUSTERING_THRESHOLD:           ME_QED_CLUSTERING_THRESHOLD.
+                                                              (line   6)
+* ME_SIGNAL_GENERATOR:                   ME_SIGNAL_GENERATOR. (line   6)
+* Mixing_0+:                             Fragmentation.       (line  40)
+* Mixing_1-:                             Fragmentation.       (line  40)
+* MI_HANDLER:                            MI_HANDLER.          (line   6)
+* MI_RESULT_DIRECTORY:                   MI_RESULT_DIRECTORY. (line   6)
+* MI_RESULT_DIRECTORY_SUFFIX:            MI_RESULT_DIRECTORY_SUFFIX.
+                                                              (line   6)
+* MODEL:                                 Model Parameters.    (line   6)
+* MOMENTA_DATA_FILE:                     Matrix Element values through C++ interface.
+                                                              (line   6)
+* MSTJ:                                  Fragmentation.       (line   9)
+* MSTP:                                  Fragmentation.       (line   9)
+* MSTU:                                  Fragmentation.       (line   9)
+* MULTI_WEIGHT_L0R0_DELTA_3/2:           Fragmentation.       (line  40)
+* MULTI_WEIGHT_L0R0_N*_1/2:              Fragmentation.       (line  40)
+* MULTI_WEIGHT_L0R0_N_1/2:               Fragmentation.       (line  40)
+* MULTI_WEIGHT_L0R0_PSEUDOSCALARS:       Fragmentation.       (line  40)
+* MULTI_WEIGHT_L0R0_TENSORS2:            Fragmentation.       (line  40)
+* MULTI_WEIGHT_L0R0_TENSORS3:            Fragmentation.       (line  40)
+* MULTI_WEIGHT_L0R0_TENSORS4:            Fragmentation.       (line  40)
+* MULTI_WEIGHT_L0R0_VECTORS:             Fragmentation.       (line  40)
+* MULTI_WEIGHT_L0R1_AXIALVECTORS:        Fragmentation.       (line  40)
+* MULTI_WEIGHT_L0R1_SCALARS:             Fragmentation.       (line  40)
+* MULTI_WEIGHT_L1R0_AXIALVECTORS:        Fragmentation.       (line  40)
+* MULTI_WEIGHT_L1R0_DELTA*_3/2:          Fragmentation.       (line  40)
+* MULTI_WEIGHT_L1R0_N*_1/2:              Fragmentation.       (line  40)
+* MULTI_WEIGHT_L1R0_N*_3/2:              Fragmentation.       (line  40)
+* MULTI_WEIGHT_L1R0_SCALARS:             Fragmentation.       (line  40)
+* MULTI_WEIGHT_L1R0_TENSORS2:            Fragmentation.       (line  40)
+* MULTI_WEIGHT_L2R0_VECTORS:             Fragmentation.       (line  40)
+* MULTI_WEIGHT_L3R0_VECTORS:             Fragmentation.       (line  40)
+* M_BIND_0:                              Fragmentation.       (line  26)
+* M_BIND_1:                              Fragmentation.       (line  26)
+* M_BOTTOM:                              Fragmentation.       (line  26)
+* M_CHARM:                               Fragmentation.       (line  26)
+* M_CUT:                                 ADD.                 (line   6)
+* M_DIQUARK_OFFSET:                      Fragmentation.       (line  26)
+* M_S:                                   ADD.                 (line   6)
+* M_STRANGE:                             Fragmentation.       (line  26)
+* M_UP_DOWN:                             Fragmentation.       (line  26)
+* NUMBER_OF_POINTS:                      Matrix Element values through C++ interface.
+                                                              (line   6)
+* NUM_ACCURACY:                          NUM_ACCURACY.        (line   6)
+* N_ED:                                  ADD.                 (line   6)
+* ORDER_ALPHAS:                          SM.                  (line   6)
+* OUTPUT:                                OUTPUT.              (line   6)
+* OUTPUT_MIXING:                         4thGen.              (line   6)
+* OUTPUT_PRECISION:                      Event output formats.
+                                                              (line   6)
+* PARJ:                                  Fragmentation.       (line   9)
+* PARP:                                  Fragmentation.       (line   9)
+* PARTICLE_CONTAINER:                    Particle containers. (line  22)
+* PARU:                                  Fragmentation.       (line   9)
+* PATH:                                  Input structure.     (line   6)
+* PDF_LIBRARY:                           ISR Parameters.      (line   6)
+* PDF_LIBRARY_1:                         ISR Parameters.      (line   6)
+* PDF_LIBRARY_2:                         ISR Parameters.      (line   6)
+* PDF_SET:                               ISR Parameters.      (line   6)
+* PDF_SET_1:                             ISR Parameters.      (line   6)
+* PDF_SET_2:                             ISR Parameters.      (line   6)
+* PDF_SET_VERSION:                       ISR Parameters.      (line   6)
+* PG_THREADS:                            Multi-threading.     (line   6)
+* PHI_2:                                 4thGen.              (line   6)
+* PHI_3:                                 4thGen.              (line   6)
+* PHI_L2:                                4thGen.              (line   6)
+* PHI_L3:                                4thGen.              (line   6)
+* PROFILE_FUNCTION:                      PROFILE_FUNCTION.    (line   6)
+* PROFILE_PARAMETERS:                    PROFILE_PARAMETERS.  (line   6)
+* PSI_ITMAX:                             PSI_ITMAX.           (line   6)
+* PSI_ITMIN:                             PSI_ITMIN.           (line   6)
+* PSI_NMAX:                              PSI_NMAX.            (line   6)
+* PT^2_0:                                Fragmentation.       (line 126)
+* PT_MAX:                                Fragmentation.       (line 126)
+* P_LASER_:                              Beam Spectra.        (line  49)
+* P_LASER_ <1>:                          Beam Spectra.        (line  49)
+* P_{QQ_1}/P_{QQ_0}:                     Fragmentation.       (line  75)
+* P_{QS}/P_{QQ}:                         Fragmentation.       (line  75)
+* P_{SS}/P_{QQ}:                         Fragmentation.       (line  75)
+* Q_0^2:                                 Minimum Bias.        (line 143)
+* Q_as^2:                                Fragmentation.       (line 126)
+* Q_as^2 <1>:                            Minimum Bias.        (line 143)
+* RANDOM_SEED:                           RANDOM_SEED.         (line   6)
+* REFERENCE_SCALE:                       REFERENCE_SCALE.     (line   6)
+* RESCALE_EXPONENT:                      RESCALE_EXPONENT.    (line   6)
+* RescProb:                              Minimum Bias.        (line 143)
+* RescProb1:                             Minimum Bias.        (line 143)
+* RESOLVE_DECAYS:                        RESOLVE_DECAYS.      (line   6)
+* RESULT_DIRECTORY:                      RESULT_DIRECTORY.    (line   6)
+* RHO:                                   SM.                  (line   6)
+* RLIMIT_AS:                             RLIMIT_AS.           (line   6)
+* RLIMIT_BY_CPU:                         RLIMIT_AS.           (line   6)
+* Root:                                  Event output formats.
+                                                              (line   6)
+* RUNDATA:                               Input structure.     (line   6)
+* SCALES:                                SCALES.              (line   6)
+* SCALE_MIN:                             SCALE_MIN.           (line   6)
+* SHERPA_CPP_PATH:                       SHERPA_CPP_PATH.     (line   6)
+* SHERPA_LDADD:                          Customization.       (line   6)
+* SHERPA_LIB_PATH:                       SHERPA_LIB_PATH.     (line   6)
+* SHOW_MODEL_SYNTAX:                     Model Parameters.    (line   6)
+* SHOW_PDF_SETS:                         ISR Parameters.      (line   6)
+* SHOW_VARIABLE_SYNTAX:                  Universal selector.  (line   6)
+* Shrimps_Mode:                          Minimum Bias.        (line  97)
+* SIGMA_ND_FACTOR:                       SIGMA_ND_FACTOR.     (line   6)
+* SIN2THETAW:                            SM.                  (line   6)
+* SINGLET_SUPPRESSION:                   Fragmentation.       (line  40)
+* SLHA_INPUT:                            MSSM.                (line   6)
+* SOFT_COLLISIONS:                       Minimum Bias.        (line  90)
+* SOFT_MASS_SMEARING:                    Hadron decays.       (line   6)
+* SOFT_SPIN_CORRELATIONS:                Hadron decays.       (line 214)
+* SPECTRUM_FILE_1:                       Beam Spectra.        (line   6)
+* SPECTRUM_FILE_2:                       Beam Spectra.        (line   6)
+* STABLE[<id>]:                          Model Parameters.    (line   6)
+* STABLE[<id>] <1>:                      Hard decays.         (line   6)
+* STABLE[<id>] <2>:                      Hadron decays.       (line   6)
+* STORE_DECAY_RESULTS:                   STORE_DECAY_RESULTS. (line   6)
+* STRANGE_FRACTION:                      Fragmentation.       (line  75)
+* TAN(BETA):                             THDM.                (line   6)
+* THETA_L14:                             4thGen.              (line   6)
+* THETA_L24:                             4thGen.              (line   6)
+* THETA_L34:                             4thGen.              (line   6)
+* TIMEOUT:                               TIMEOUT.             (line   6)
+* TRANSITION_OFFSET:                     Fragmentation.       (line  75)
+* TUNE:                                  TUNE.                (line   6)
+* UNITARIZATION_M:                       AGC.                 (line   6)
+* UNITARIZATION_M3:                      AGC.                 (line   6)
+* UNITARIZATION_M4:                      AGC.                 (line   6)
+* UNITARIZATION_N:                       AGC.                 (line   6)
+* UNITARIZATION_N3:                      AGC.                 (line   6)
+* UNITARIZATION_N4:                      AGC.                 (line   6)
+* UNITARIZATION_SCALE:                   AGC.                 (line   6)
+* UNITARIZATION_SCALE3:                  AGC.                 (line   6)
+* UNITARIZATION_SCALE4:                  AGC.                 (line   6)
+* USE_PDF_ALPHAS:                        SM.                  (line   6)
+* USR_WGT_MODE:                          Structure of ROOT NTuple Output.
+                                                              (line   6)
+* VEGAS:                                 VEGAS.               (line   6)
+* VEV:                                   SM.                  (line   6)
+* WIDTH[<id>]:                           Model Parameters.    (line   6)
+* WIDTH[<id>] <1>:                       HDH_SET_WIDTHS.      (line   6)
+* WIDTH[<id>] <2>:                       Hadron decays.       (line   6)
+* WIDTH_SCHEME:                          SM.                  (line   6)
+* xi:                                    Minimum Bias.        (line 123)
+* YFS_IR_CUTOFF:                         YFS_IR_CUTOFF.       (line   6)
+* YFS_MODE:                              YFS_MODE.            (line   6)
+* YFS_USE_ME:                            YFS_USE_ME.          (line   6)
+* YUKAWA[<id>]:                          Model Parameters.    (line   6)
+* YUKAWA_MASSES:                         YUKAWA_MASSES.       (line   6)
+

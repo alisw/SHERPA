@@ -1,0 +1,303 @@
+@node NLO calculations
+@section NLO calculations
+
+@menu
+* Choosing DIPOLE_ALPHA::
+* Integrating complicated Loop-ME::
+* Avoiding misbinning effects::
+* Enforcing the renormalization scheme::
+* Checking the pole cancellation::
+* Structure of HepMC Output::
+* Structure of ROOT NTuple Output::
+@end menu
+
+@node Choosing DIPOLE_ALPHA
+@subsection Choosing DIPOLE_ALPHA
+
+A variation of the parameter @code{DIPOLE_ALPHA} 
+(see @ref{Dipole subtraction}) changes the 
+contribution from the real (subtracted) piece (@code{RS}) and 
+the integrated subtraction terms (@code{I}), keeping their sum constant.
+Varying this parameter provides a nice check of the consistency 
+of the subtraction procedure and it allows to optimize the
+integration performance of the real correction. This piece
+has the most complicated momentum phase space and is often the
+most time consuming part of the NLO calculation.
+The optimal choice depends on the specific setup and can be 
+determined best by trial. 
+
+Hints to find a good value: 
+@itemize
+@item The smaller @code{DIPOLE_ALPHA} is the less dipole term have to be
+calculated, thus the less time the evaluation/phase space point takes.
+@item Too small choices lead to large cancelations between the @code{RS}
+and the @code{I} parts and thus to large statisical errors.
+@item For very simple processes (with only a total of two 
+partons in the iniatial and the final state
+of the born process) the best choice is typically @code{DIPOLE_ALPHA=1}.
+The more complicated a process is the smaller @code{DIPOLE_ALPHA} should be
+(e.g. with 5 partons the best choice is typically around 0.01).
+@item A good choice is typically such that the cross section from the 
+@code{RS} piece is significantly positive but not much larger than 
+the born cross section.
+@end itemize
+
+@node Integrating complicated Loop-ME
+@subsection Integrating complicated Loop-ME
+
+For complicated processes the evaluation of one-loop matrix elements
+can be very time consuming. The generation time of a fully optimized 
+integration grid can become prohibitively long. Rather than using a 
+poorly optimized grid in this case it is more advisable to use a grid
+optimized with either the born matrix elements or the born matrix 
+elements and the finite part of the integrated subtraction terms only,
+working under the assumption that the distibutions in phase space are 
+rather similar.
+
+This can be done by one of the following methods:
+@enumerate 3
+@item Employ a dummy virtual (requires no computing time, returns 
+      @code{0.} as its finite result) to optimise the grid. This 
+      only works if @code{V} is not the only @code{NLO_QCD_Part} 
+      specified.
+  @enumerate
+  @item During integration set the @code{Loop_Generator} to 
+        @code{Internal} and add @code{USE_DUMMY_VIRTUAL=1} to 
+        your @code{(run)@{...@}(run)} section. The grid will 
+        then be optimised to the phase space distribution of 
+        the sum of the Born matrix element and the finite part 
+        of the integrated subtraction term. @b{Note:} The 
+        cross section displayed during integration will also 
+        correspond to the sum of the Born matrix element and 
+        the finite part of the integrated subtraction term.
+  @item During event generation reset @code{Loop_Generator} to 
+        your generator supplying the virtual correction. The 
+        events generated then carry the correct event weight.
+  @end enumerate
+@item Suppress the evaluation of the virtual and/or the integrated 
+      subtraction terms. This only works if Amegic is used as the 
+      matrix element generator for the @code{BVI} pieces and @code{V} 
+      is not the only @code{NLO_QCD_Part} specified.
+  @enumerate
+  @item During integration add @code{NLO_BVI_MODE=<num>} to your 
+        @code{(run)@{...@}(run)} section. @code{<num>} takes the 
+        following values: @code{1}-@code{B}, @code{2}-@code{I}, 
+        and @code{4}-@code{V}. The values are additive, i.e. 
+        @code{3}-@code{BI}. @b{Note:} The cross section displayed 
+        during integration will match the parts selected by 
+        @code{NLO_BVI_MODE}.
+  @item During event generation remove the switch again and the 
+        events will carry the correct weight.
+  @end enumerate
+@end enumerate
+
+Note: this will not work for the @code{RS} piece!
+
+@node Avoiding misbinning effects
+@subsection Avoiding misbinning effects
+
+Close to the infrared limit, the real emission matrix element and
+corresponding subtraction events exhibit large cancellations. If the
+(minor) kinematics difference of the events happens to cross a parton-level
+cut or analysis histogram bin boundary, then large spurious spikes can appear.
+
+These can be smoothed to some extend by shifting the weight from the subtraction
+kinematic to the real-emission kinematic if the dipole measure alpha is below a given
+threshold. The fraction of the shifted weight is inversely proportional to the
+dipole measure, such that the final real-emission and subtraction weights are
+calculated as:
+@verbatim
+  w_r -> w_r + sum_i [1-x(alpha_i)] w_{s,i}
+  foreach i: w_{s,i} -> x(alpha_i) w_{s,i}
+@end verbatim
+with the function x(alpha)=(alpha/|alpha_0|)^n for alpha<alpha_0 and 1 otherwise.
+
+The threshold can be set by the parameter
+@option{NLO_SMEAR_THRESHOLD=<alpha_0>} and the functional form of alpha and thus
+interpretation of the threshold can be chosen by its sign (positive: relative
+dipole kT in GeV, negative: dipole alpha).
+In addition, the exponent n can be set by @option{NLO_SMEAR_POWER=<n>}.
+
+@node Enforcing the renormalization scheme
+@subsection Enforcing the renormalization scheme
+@cindex LOOP_ME_INIT
+Sherpa takes information about the renormalization scheme from the loop ME generator.
+The default scheme is MSbar, and this is assumed if no loop ME is provided,
+for example when integrated subtraction terms are computed by themselves.
+This can lead to inconsistencies when combining event samples, which may be avoided
+by setting @option{LOOP_ME_INIT=1} in the @code{(run)} section of the input file.
+
+@node Checking the pole cancellation
+@subsection Checking the pole cancellation
+@cindex CHECK_BORN
+@cindex CHECK_FINITE
+@cindex CHECK_POLES
+@cindex CHECK_POLES_THRESHOLD
+To check whether the poles of the dipole subtraction and the interfaced
+one-loop matrix element cancel phase space point by phase space point
+@code{CHECK_POLES=1} can be specified. The accuracy to which the poles
+do have to cancel can be set via @code{CHECK_POLES_THRESHOLD=<accu>}.
+In the same way, the finite contributions of the infrared subtraction
+and the one-loop matrix element can be checked by setting
+@code{CHECK_FINITE=1}, and the Born matrix element via @code{CHECK_BORN=1}.
+
+@node Structure of HepMC Output
+@subsection Structure of HepMC Output
+
+The generated events can be written out in the HepMC format to be passed 
+through an independent analysis. For this purpose a shortened event structure 
+is used containing only a single vertex. Correlated real and subtraction events 
+are labeled with the same event number such that their possible cancelations 
+can be taken into account properly.
+
+To use this output option Sherpa has to be compiled with HepMC support. cf.
+@ref{Installation}. The @code{EVENT_OUTPUT=HepMC_Short[<filename>]} has to used, cf.
+@ref{Event output formats}.
+
+Using this HepMC output format the internal Rivet interface 
+(@ref{Rivet analyses}) can be used to pass the events through Rivet. It has to 
+be stressed, however, that Rivet currently cannot take the correlations 
+between real and subtraction events into account properly. The Monte-Carlo 
+error is thus overestimated. Nonetheless, the mean is unaffected.
+
+As above, the Rivet interface has to be instructed to use the shortened HepMC 
+event structure:
+@verbatim
+  (analysis){
+    BEGIN_RIVET {
+      USE_HEPMC_SHORT 1
+      -a ...
+    } END_RIVET
+  }(analysis)
+@end verbatim
+
+@node Structure of ROOT NTuple Output
+@subsection Structure of ROOT NTuple Output
+@cindex USR_WGT_MODE
+
+The generated events can be stored in a ROOT NTuple file, see 
+@ref{Event output formats}. The internal ROOT Tree has the following Branches:
+@table @samp
+ @item id 
+ Event ID to identify correlated real sub-events.
+ @item nparticle 
+ Number of outgoing partons.
+ @item E/px/py/pz
+ Momentum components of the partons.
+ @item kf
+ Parton PDG code.
+ @item weight
+ Event weight, if sub-event is treated independently.
+ @item weight2
+ Event weight, if correlated sub-events are treated as single event.
+ @item me_wgt
+ ME weight (w/o PDF), corresponds to 'weight'.
+ @item me_wgt2 
+ ME weight (w/o PDF), corresponds to 'weight2'.
+ @item id1
+ PDG code of incoming parton 1.
+ @item id2
+ PDG code of incoming parton 2.
+ @item fac_scale
+ Factorisation scale.
+ @item ren_scale
+ Renormalisation scale.
+ @item x1
+ Bjorken-x of incoming parton 1.
+ @item x2
+ Bjorken-x of incoming parton 2.
+ @item x1p
+ x' for I-piece of incoming parton 1.
+ @item x2p
+ x' for I-piece of incoming parton 2.
+ @item nuwgt
+ Number of additional ME weights for loops and integrated subtraction terms.
+ @item usr_wgt[nuwgt]
+ Additional ME weights for loops and integrated subtraction terms.
+@end table
+
+@subsubsection Computing (differential) cross sections of real correction events with statistical errors
+
+Real correction events and their counter-events from subtraction terms are 
+highly correlated and exhibit large cancellations. Although a treatment of 
+sub-events as independent events leads to the correct cross section the 
+statistical error would be greatly overestimated. In order to get a realistic 
+statistical error sub-events belonging to the same event must be combined 
+before added to the total cross section or a histogram bin of a differential 
+cross section. Since in general each sub-event comes with it's own set of four 
+momenta the following treatment becomes necessary:
+@enumerate
+@item An event here refers to a full real correction event that may contain 
+several sub-events. All entries with the same id belong to the same event. 
+Step 2 has to be repeated for each event.
+@item Each sub-event must be checked separately whether it passes possible 
+phase space cuts. Then for each observable add up @code{weight2} of all 
+sub-events that go into the same histogram bin. These sums x_id are the 
+quantities to enter the actual histogram.
+@item To compute statistical errors each bin must store the sum over all 
+@code{x_id} and the sum over all @code{x_id^2}. The cross section in the bin is 
+given by @code{<x> = 1/N \sum x_id}, where @code{N} is the number of events 
+(not sub-events). The @code{1-\sigma} statistical error for the bin is
+@code{\sqrt@{ (<x^2>-<x>^2)/(N-1) @} }
+@end enumerate
+Note: The main difference between @code{weight} and @code{weight2} is that they 
+refer to a different counting of events. While @code{weight} corresponds to 
+each event entry (sub-event) counted separately, @code{weight2} counts events 
+as defined in step 1 of the above procedure. For NLO pieces other than the real 
+correction @code{weight} and @code{weight2} are identical.
+
+@subsubsection Computation of cross sections with new PDF's
+
+@strong{Born and real pieces:}
+
+Notation:
+
+@code{f_a(x_a) = PDF 1 applied on parton a,
+      F_b(x_b) = PDF 2 applied on parton b.}
+
+The total cross section weight is given by
+
+@code{weight = me_wgt f_a(x_a)F_b(x_b).}
+
+@strong{Loop piece and integrated subtraction terms:}
+
+The weights here have an explicit dependence on the renormalization
+and factorization scales.
+
+To take care of the renormalization scale dependence (other than via 
+@code{alpha_S}) the weight @code{w_0} is defined as
+
+@code{ w_0 = me_wgt + usr_wgts[0] log((\mu_R^new)^2/(\mu_R^old)^2)
+                     + usr_wgts[1] 1/2 [log((\mu_R^new)^2/(\mu_R^old)^2)]^2.}
+
+To address the factorization scale dependence the weights @code{w_1,...,w_8} 
+are given by 
+
+@code{w_i = usr_wgts[i+1] + usr_wgts[i+9] log((\mu_F^new)^2/(\mu_F^old)^2).}
+
+The full cross section weight can be calculated as
+
+@code{weight = w_0 f_a(x_a)F_b(x_b)
+	       + (f_a^1 w_1 + f_a^2 w_2 + f_a^3 w_3 + f_a^4 w_4) F_b(x_b)
+	       + (F_b^1 w_5 + F_b^2 w_6 + F_b^3 w_7 + F_b^4 w_8) f_a(x_a)}
+
+where
+
+@code{f_a^1 = f_a(x_a) (a=quark), \sum_q f_q(x_a) (a=gluon),
+      f_a^2 = f_a(x_a/x'_a)/x'_a (a=quark), \sum_q f_q(x_a/x'_a)x'_a (a=gluon),
+      f_a^3 = f_g(x_a),
+      f_a^4 = f_g(x_a/x'_a)/x'_a.}
+
+The scale dependence coefficients @code{usr_wgts[0]} and @code{usr_wgts[1]} 
+are normally obtained from the finite part of the virtual correction by
+removing renormalization terms and universal terms from dipole subtraction.
+This may be undesirable, especially when the loop provider splits up
+the calculation of the virtual correction into several pieces, like
+leading and sub-leading color. In this case the loop provider should 
+control the scale dependence coefficients, which can be enforced with
+option @option{USR_WGT_MODE=0;} in the @code{(run)} section of Sherpa's
+input file. 
+
+@strong{The loop provider must support this option
+  or the scale dependence coefficients will be invalid!}
+

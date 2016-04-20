@@ -1,0 +1,5 @@
+SUBDIRS       =	\
+		Tools \
+		Model \
+		Main
+

@@ -1,0 +1,135 @@
+@node Examples
+@chapter Examples
+
+Some example set-ups are included in Sherpa, in the 
+@code{<prefix>/share/SHERPA-MC/Examples/} directory. These may be useful to 
+new users to practice with, or as templates for creating your 
+own Sherpa run-cards. In this section, we will look at some 
+of the main features of these examples.
+
+@menu
+* VJets::
+* Jets::
+* HJets::
+* TopsJets::
+* DIS::
+* FONLO::
+* SoftQCD::
+* BFactories::
+* MEvalues::
+* APIexamples::
+@end menu
+
+
+@node VJets
+@section Vector boson + jets production
+
+@menu
+* LHC_WJets::
+* LHC_ZJets::
+* LHC_Wbb::
+* LHC_Zbb::
+@end menu
+
+@include LHC_WJets.texi
+@include LHC_ZJets.texi
+@include LHC_Vbb.texi
+
+
+@node Jets
+@section Jet production
+
+@menu
+* LHC_Jets::
+* LEP_Jets::
+@end menu
+
+@include LHC_Jets.texi
+@include LEP_Jets.texi
+
+@node HJets
+@section Higgs boson + jets production
+
+@menu
+* LHC_HInt::
+* LHC_HJets::
+* LHC_HTTBar::
+@end menu
+
+@include LHC_HInt.texi
+@include LHC_HJets.texi
+@include LHC_TTH.texi
+
+
+@node TopsJets
+@section Top quark (pair) + jets production
+
+@menu
+* Top quark pair production::
+* Tops plus W in MC@@NLO::
+@end menu
+
+@include LHC_TTBar.texi
+@include LHC_TTW.texi
+
+
+@node DIS
+@section Deep-inelastic scattering
+
+@menu
+* HERA::
+@end menu
+
+@include HERA_DIS.texi
+
+@node FONLO
+@section Fixed-order next-to-leading order calculations
+
+@menu
+* NTuple production::
+@end menu
+
+@include NLO_NTuples.texi
+
+@node SoftQCD
+@section Soft QCD: Minimum Bias and Cross Sections
+
+@menu
+* Calculation of inclusive cross sections::
+* Simulation of Minimum Bias events::
+@end menu
+
+@include InclusiveCrossSections.texi
+@include MinimumBiasEvents.texi
+
+@node BFactories
+@section Setups for event production at B-factories
+
+@menu
+* QCD continuum::
+* Signal process::
+* Single hadron decay chains::
+@end menu
+
+@include BFactory.texi
+
+@node MEvalues
+@section Calculating matrix element values for externally given configurations
+
+@menu
+* Matrix Element values through Python interface::
+* Matrix Element values through C++ interface::
+@end menu
+
+@include ME2.texi
+
+@node APIexamples
+@section Using the Python interface
+
+@menu
+* Events::
+* MPIEvents::
+@end menu
+
+@include Events.texi
+@include MPIEvents.texi

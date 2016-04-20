@@ -1,0 +1,400 @@
+@node Run Parameters
+@section Run parameters
+
+The following parameters describe general run information. They may be set in the @code{(run)} section of the run-card, see @ref{Input structure}.
+
+@menu
+* EVENTS::            Number of events to generate.
+* EVENT_TYPE::        Type of events to generate
+* TUNE::              Parameter tunes.
+* OUTPUT::            Output level.
+* LOG_FILE::          Log file.
+* RANDOM_SEED::       Seed for random number generator.
+* EVENT_SEED_MODE::   Setting predefined seeds.
+* ANALYSIS::          Switch internal analysis on or off.
+* ANALYSIS_OUTPUT::   Directory for generated analysis histogram files.
+* TIMEOUT::           Run time limitation.
+* RLIMIT_AS::         Memory limitation and leak detection.
+* BATCH_MODE::        Batch mode settings.
+* NUM_ACCURACY::      Accuracy for gauge tests.
+
+* SHERPA_CPP_PATH::   The C++ code generation path.
+* SHERPA_LIB_PATH::   The runtime library path.
+
+* Event output formats:: Event output in different formats.
+* MPI parallelization::  MPI parallelization with Sherpa.
+* Multi-threading::      Multi-threaded integration with Sherpa.
+@end menu
+
+
+@node EVENTS
+@subsection EVENTS
+@cindex EVENTS
+This parameter specifies the number of events to be generated.
+@*
+It can alternatively be set on the command line through option
+@option{-e}, see @ref{Command line}.
+
+@node EVENT_TYPE
+@subsection EVENT_TYPE
+@cindex EVENT_TYPE
+This parameter specifies the kind of events to be generated.  
+It can alternatively be set on the command line through option
+@option{-t}, see @ref{Command line}.
+@itemize @bullet
+@item
+        The default event type is @code{StandardPerturbative}, which will 
+        generate a hard event through exact matrix elements matched and/or 
+        merged with the paerton shower, eventually including hadronization, 
+        hadron decays, etc..
+@end itemize
+Alternatively there are two more specialised modes, namely:
+@itemize @bullet
+@item
+        @code{MinimumBias}, which generates minimum bias events through the
+        SHRIMPS model implemented in Sherpa, see @ref{Minimum Bias}
+@item
+        @code{HadronDecay}, which allows to simulate the decays of a specific
+        hadron.          
+@end itemize
+
+@node TUNE
+@subsection TUNE
+@cindex TUNE
+This parameter specifies which tune is to be used. Setting different 
+tunes using this parameter ensures, that consistent settings are 
+employed. This affects mostly @ref{MPI Parameters} and
+@ref{Intrinsic Transverse Momentum} parameters. Possible values are:
+@itemize @bullet
+@item
+@code{CT10} MPI tune for the Sherpa's default PDF, CT10. This is the default tune.
+@item
+@code{CT10_UEup} Upward variation of MPI activity, variation of the CT10 tune to 
+assess MPI uncertainties.
+@item
+@code{CT10_UEdown} Downward variation of MPI activity, variation of the CT10 tune to 
+assess MPI uncertainties.
+@end itemize
+
+@node OUTPUT
+@subsection OUTPUT
+@cindex OUTPUT
+@cindex EVT_OUTPUT
+This parameter specifies the output level (verbosity) of the program.
+@*
+It can alternatively be set on the command line through option
+@option{-O}, see @ref{Command line}. A different output level can be 
+specified for the event generation step through @option{EVT_OUTPUT}
+or command line option @option{-o}, see @ref{Command line}
+
+The value can be any sum of the following:
+@itemize @bullet
+@item
+0: Error messages (-> always displayed).
+@item
+1: Event display.
+@item
+2: Informational messages during the run.
+@item
+4: Tracking messages (lots of output).
+@item
+8: Debugging messages (even more output).
+@end itemize
+
+E.g. OUTPUT=3 would display information, events and errors.
+
+@node LOG_FILE
+@subsection LOG_FILE
+@cindex LOG_FILE
+This parameter specifies the log file. If set, the standard output 
+from Sherpa is written to the specified file, but output from child
+processes is not redirected. This option is particularly useful to produce
+clean log files when running the code in MPI mode, see @ref{MPI parallelization}.
+A file name can alternatively be specified on the command line through option
+@option{-l}, see @ref{Command line}.
+
+@node RANDOM_SEED
+@subsection RANDOM_SEED
+@cindex RANDOM_SEED
+Sherpa uses different random-number generators. The default is the Ran3 
+generator described in [@uref{http://www.nr.com/,,ISBN-10:0521880688}].
+Alternatively, a combination of George Marsaglias KISS and SWB 
+[@uref{http://dx.doi.org/10.1214/aoap/1177005878,,Ann.Appl.Probab.1,3(1991)462}]
+can be employed, see @uref{http://groups.google.co.uk/group/sci.stat.math/msg/edcb117233979602,,this} 
+@uref{http://groups.google.co.uk/group/sci.math.num-analysis/msg/eb4ddde782b17051,,website}.
+The integer-valued seeds of the generators are specified by 
+@option{RANDOM_SEED=A .. D}. They can also be set directly using 
+@option{RANDOM_SEED1=A} through @option{RANDOM_SEED4=D}. The Ran3 generator 
+takes only one argument. This value can also be set using the command line 
+option @option{-R}, see @ref{Command line}.
+
+@node EVENT_SEED_MODE
+@subsection EVENT_SEED_MODE
+The tag @option{EVENT_SEED_MODE} can be used to enforce the same seeds in different
+runs of the generator. When set to 1, seed files are written to disk. These files are
+gzip compressed, if Sherpa was compiled with option @option{--enable-gzip}.
+When set to 2, existing random seed files are read and the seed is set to the
+next available value in the file before each event. When set to 3, Sherpa uses
+an internal bookkeeping mechanism to advance to the next predefined seed.
+No seed files are written out or read in.
+
+@node ANALYSIS
+@subsection ANALYSIS
+@cindex ANALYSIS
+Analysis routines can be switched on or off by setting the ANALYSIS flag.
+The default is no analysis, corresponding to option @option{0}.
+This parameter can also be specified on the command line using option
+@option{-a}, see @ref{Command line}.
+
+The following analysis handlers are currently available
+@table @option
+@item Internal
+Sherpa's internal analysis handler.
+@*
+To use this option, the package must be configured with option @option{--enable-analysis}.
+@*
+An output directory can be specified using @ref{ANALYSIS_OUTPUT}.
+@item Rivet
+The Rivet package, see @uref{http://projects.hepforge.org/rivet/,,Rivet Website}.
+@*
+To enable it, Rivet and HepMC have to be installed and Sherpa must be configured
+as described in @ref{Rivet analyses}.
+@item HZTool
+The HZTool package, see @uref{http://hztool.hepforge.org/,,HZTool Website}.
+@*
+To enable it, HZTool and CERNLIB have to be installed and Sherpa must be configured
+as described in @ref{HZTool analyses}.
+@end table
+
+Multiple options can be combined using a comma, e.g. @samp{ANALYSIS=Internal,Rivet}.
+
+@node ANALYSIS_OUTPUT
+@subsection ANALYSIS_OUTPUT
+@cindex ANALYSIS_OUTPUT
+Name of the directory for histogram files when using the internal analysis
+and name of the Aida file when using Rivet, see @ref{ANALYSIS}. 
+The directory / file will be created w.r.t. the working directory. The default
+value is @option{Analysis/}. This parameter can also be specified on the 
+command line using option @option{-A}, see @ref{Command line}.
+
+@node TIMEOUT
+@subsection TIMEOUT
+@cindex TIMEOUT
+A run time limitation can be given in user CPU seconds through TIMEOUT. This option is of
+some relevance when running SHERPA on a batch system. Since in many cases jobs are just
+terminated, this allows to interrupt a run, to store all relevant information and to restart
+it without any loss. This is particularly useful when carrying out long integrations.
+Alternatively, setting the TIMEOUT variable to -1, which is the default setting, translates into
+having no run time limitation at all. The unit is seconds.
+
+@node RLIMIT_AS
+@subsection RLIMIT_AS
+@cindex RLIMIT_AS
+@cindex RLIMIT_BY_CPU
+@cindex MEMLEAK_WARNING_THRESHOLD
+A memory limitation can be given to prevent Sherpa to crash the system it is 
+running on as it continues to build up matrix elements and loads additional 
+libraries at run time. Per default the maximum RAM of the system is determined 
+and set as the memory limit. This can be changed by giving 
+@option{RLIMIT_AS=<size>} where the size is given in the format @code{500 MB}, 
+@code{4 GB}, or @code{10 %}. The space between number and unit is mandatory. 
+When running with @ref{MPI parallelization} it might be necessary to divide 
+the total maximum by the number of cores. This can be done by setting 
+@code{RLIMIT_BY_CPU=1}.
+
+Sherpa checks for memory leaks during integration and event generation. 
+If the allocated memory after start of integration or event generation exceeds
+the parameter @option{MEMLEAK_WARNING_THRESHOLD}, a warning is printed. 
+Like @option{RLIMIT_AS}, @option{MEMLEAK_WARNING_THRESHOLD} can be set 
+using units. However, no spaces are allowed between the number and the unit.
+The warning threshold defaults to @code{16MB}.
+
+@node BATCH_MODE
+@subsection BATCH_MODE
+@cindex BATCH_MODE
+@cindex EVENT_DISPLAY_INTERVAL
+Whether or not to run Sherpa in batch mode. The default is @option{1}, 
+meaning Sherpa does not attempt to save runtime information when catching 
+a signal or an exception. On the contrary, if option @option{0} is used, 
+Sherpa will store potential integration information and analysis results, 
+once the run is terminated abnormally. All possible settings are:
+@itemize
+@item @var{0} Sherpa attempts to write out integration and analysis 
+results when catching an exception.
+@item @var{1} Sherpa does not attempt to write out integration and 
+analysis results when catching an exception.
+@item @var{2} Sherpa outputs the event counter continously, instead 
+of overwriting the previous one (default when using @ref{LOG_FILE}).
+@item @var{4} Sherpa increases the on-screen event counter in constant 
+steps of 100 instead of an increase relative to the current event 
+number. The interval length can be adjusted with @code{EVENT_DISPLAY_INTERVAL}.
+@end itemize
+The settings are additive such that multiple settings can be employed 
+at the same time.
+
+@emph{Note that when running the code on a cluster or in a grid environment, BATCH_MODE should always contain setting 1 (i.e. BATCH_MODE=[1|3|5|7]).}
+
+The command line option @option{-b} should therefore not be used in this case, see
+@ref{Command line}.
+
+@node NUM_ACCURACY
+@subsection NUM_ACCURACY
+@cindex NUM_ACCURACY
+The targeted numerical accuracy can be specified through NUM ACCURACY, e.g. for comparing
+two numbers. This might have to be reduced if gauge tests fail for numerical reasons.
+
+@node SHERPA_CPP_PATH
+@subsection SHERPA_CPP_PATH
+@cindex SHERPA_CPP_PATH
+The path in which Sherpa will eventually store dynamically created C++ source code.
+If not specified otherwise, sets @option{SHERPA_LIB_PATH} to 
+@samp{$SHERPA_CPP_PATH/Process/lib}. This value can also be set using the command line 
+option @option{-L}, see @ref{Command line}.
+
+@node SHERPA_LIB_PATH
+@subsection SHERPA_LIB_PATH
+@cindex SHERPA_LIB_PATH
+The path in which Sherpa looks for dynamically linked libraries from previously created
+C++ source code, cf. @ref{SHERPA_CPP_PATH}.
+
+
+@node Event output formats
+@subsection Event output formats
+@cindex HepMC_GenEvent
+@cindex HepMC_Short
+@cindex HEPEVT
+@cindex LHEF
+@cindex Root
+@cindex Delphes
+@cindex FILE_SIZE
+@cindex EVT_FILE_PATH
+@cindex OUTPUT_PRECISION
+@cindex EVENT_OUTPUT
+@cindex EVENT_INPUT
+
+Sherpa provides the possibility to output events in various formats, 
+e.g. the HepEVT common block structure or the HepMC format.
+The authors of Sherpa assume that the user is sufficiently acquainted with 
+these formats when selecting them.
+
+If the events are to be written to file, the parameter @option{EVENT_OUTPUT}
+must be specified together with a file name. An example would be
+@code{EVENT_OUTPUT=HepMC_GenEvent[MyFile]}, where @code{MyFile} stands
+for the desired file base name. The following formats are currently available:
+
+@table @option
+@item HepMC_GenEvent
+Generates output in HepMC::IO_GenEvent format. The HepMC::GenEvent::m_weights 
+weight vector stores the following items: @code{[0]} event weight, @code{[1]} 
+combined matrix element and phase space weight (missing only PDF information, 
+thus directly suitable for PDF reweighting), @code{[2]} event weight 
+normalisation (in case of unweighted events event weights of ~ +/-1 
+can be obtained by (event weight)/(event weight normalisation)), and 
+@code{[3]} number of trials. The total cross section of the simulated event sample
+can be computed as the sum of event weights divided by the sum of the number of trials.
+This value must agree with the total cross section quoted by Sherpa at the end of
+the event generation run, and it can serve as a cross-check on the consistency
+of the HepMC event file.  Note that Sherpa conforms to the Les Houches 2013
+suggestion (@url{http://phystev.in2p3.fr/wiki/2013:groups:tools:hepmc}) 
+of indicating interaction types through the GenVertex type-flag.  Multiple
+event weights will also be enabled as soon as a similar standard has been
+defined.
+@item HepMC_Short
+Generates output in HepMC::IO_GenEvent format, however, only incoming beams and 
+outgoing particles are stored. Intermediate and decayed particles are not 
+listed. The event weights stored as the same as above.
+@item Delphes_GenEvent
+Generates output in @url{http://root.cern.ch,,Root} format, which can be passed to
+@uref{http://cp3.irmp.ucl.ac.be/projects/delphes,,Delphes} for analyses.
+Input events are taken from the HepMC interface. Storage space can be reduced
+by up to 50% compared to gzip compressed HepMC. This output format is available 
+only if Sherpa was configured and installed with options @option{--enable-root} 
+and @option{--enable-delphes=/path/to/delphes}.
+@item Delphes_Short
+Generates output in @url{http://root.cern.ch,,Root} format, which can be passed to
+@uref{http://cp3.irmp.ucl.ac.be/projects/delphes,,Delphes} for analyses.
+Only incoming beams and outgoing particles are stored.
+@item PGS
+Generates output in @url{http://cepa.fnal.gov/psm/stdhep,,StdHEP} format, which can be 
+passed to @uref{http://www.physics.ucdavis.edu/~conway/research/software/pgs/pgs4-general.htm,,PGS} 
+for analyses. This output format is available only if Sherpa was configured and installed 
+with options @option{--enable-hepevtsize=4000} and @option{--enable-pgs=/path/to/pgs}.
+Please refer to the PGS documentation for how to pass StdHEP event files on to PGS.
+If you are using the LHC olympics executeable, you may run
+@option{./olympics --stdhep events.lhe <other options>}.
+
+@item PGS_Weighted
+Generates output in @url{http://cepa.fnal.gov/psm/stdhep,,StdHEP} format, which can be 
+passed to @uref{http://www.physics.ucdavis.edu/~conway/research/software/pgs/pgs4-general.htm,,PGS} 
+for analyses. Event weights in the HEPEV4 common block are stored in the event file.
+@item HEPEVT
+Generates output in HepEvt format.
+@item LHEF
+Generates output in Les Houches Event File format. This output format is 
+intended for output of @strong{matrix element configurations only}. Since the 
+format requires PDF information to be written out in the outdated 
+PDFLIB/LHAGLUE enumeration format this is only available automatically if 
+LHAPDF is used, the identification numbers otherwise have to be given 
+explicitly via @code{LHEF_PDF_NUMBER} (@code{LHEF_PDF_NUMBER_1} and 
+@code{LHEF_PDF_NUMBER_2} if both beams carry different structure functions). 
+This format currently outputs matrix element information only, no information 
+about the large-Nc colour flow is given as the LHEF output format is not 
+suited to communicate enough information for meaningful parton showering 
+on top of multiparton final states.
+@item Root
+Generates output in ROOT ntuple format @strong{for NLO event generation only}. 
+For details on the ntuple format, see @ref{Structure of ROOT NTuple Output}.
+This output option is available only if Sherpa was linked to ROOT during 
+installation by using the configure option @code{--enable-root=/path/to/root}.
+ROOT ntuples can be read back into Sherpa and analyzed using the option
+@option{EVENT_INPUT}. This feature is described in @ref{NTuple production}.
+@end table
+
+The output can be further customized using the following options:
+
+@table @option
+@item FILE_SIZE
+Number of events per file (default: 1000).
+@item NTUPLE_SIZE
+File size per NTuple file (default: unlimited).
+@item EVT_FILE_PATH
+Directory where the files will be stored.
+@item OUTPUT_PRECISION
+Steers the precision of all numbers written to file.
+@end table
+
+For all output formats except ROOT and Delphes, events can be written directly 
+to gzipped files instead of plain text. The option @option{--enable-gzip} 
+must be given during installation to enable this feature.
+
+@node MPI parallelization
+@subsection MPI parallelization
+MPI parallelization in Sherpa can be enabled using the configuration
+option @option{--enable-mpi}. Sherpa supports
+@uref{http://www.open-mpi.org/,,OpenMPI}
+and
+@uref{http://www.mcs.anl.gov/research/projects/mpich2/,,MPICH2}
+. For detailed instructions on how to run a parallel program, please refer
+to the documentation of your local cluster resources or the many excellent 
+introductions on the internet. MPI parallelization is mainly intended to speed up
+the integration process, as event generation can be parallelized trivially 
+by starting multiple instances of Sherpa with different random seed, cf.
+@ref{RANDOM_SEED}. However, both the internal analysis module and the Root
+NTuple writeout can be used with MPI. Note that these require substantial 
+data transfer.
+
+@node Multi-threading
+@subsection Multi-threading
+@cindex PG_THREADS
+@cindex COMIX_ME_THREADS
+@cindex COMIX_PS_THREADS
+
+Multi-threaded integration in Sherpa can be enabled using the configuration
+option @samp{--enable-multithread}. Subsequently the computation of amplitudes
+for large groups of processes is split into a number of threads which is limited 
+from above by the parameter @option{PG_THREADS}. This parameter can also
+be specified using the command line option @option{-j}, see @ref{Command line}.
+Additionally, matrix-element calculation and phase-space evaluation for a 
+single process with Comix can be distributed to different threads according to 
+@mycite{Gleisberg2008fv}. The number of threads is then specified using the 
+parameters @option{COMIX_ME_THREADS} and @option{COMIX_PS_THREADS}, respectively.
