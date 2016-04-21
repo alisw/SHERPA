@@ -20,7 +20,6 @@ SUBDIRS       = \
 		SHRiMPS \
 		SHERPA \
 		AddOns \
-		Manual \
 		Examples
 
 EXTRA_DIST = GUIDELINES
