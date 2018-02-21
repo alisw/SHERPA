@@ -4,6 +4,7 @@
 #include "MODEL/Main/Running_AlphaQED.H"
 #include "ATOOLS/Phys/Flow.H"
 #include "MODEL/Main/Model_Base.H"
+#include "MODEL/UFO/UFO_Model.H"
 
 #include "EXTRA_XS/Main/ME2_Base.H"
 
@@ -37,8 +38,7 @@ XS_PP_ffbar::XS_PP_ffbar(const Process_Info& pi, const Flavour_Vector& fl):
   m_sintt=2|4;
   m_r=fl[2].IsAnti();
   m_qcd=fl[2].StrongCharge();
-  m_cpl=sqr(4.*M_PI*MODEL::s_model->ScalarFunction(std::string("alpha_QED"),
-                                                   rpa->gen.CplScale()))
+  m_cpl=sqr(4.*M_PI*MODEL::s_model->ScalarConstant("alpha_QED"))
         *sqr(sqr(m_flavs[2].Charge()))
         *(m_flavs[2].Strong()?3.0:1.0);
   m_m2=sqr(m_flavs[2].Mass());
@@ -76,6 +76,7 @@ Tree_ME2_Base *ATOOLS::Getter<Tree_ME2_Base,Process_Info,XS_PP_ffbar>::
 operator()(const Process_Info &pi) const
 {
   return NULL;
+  if (dynamic_cast<UFO::UFO_Model*>(MODEL::s_model)) return NULL;
   if (pi.m_fi.m_nloewtype!=nlo_type::lo ||
       pi.m_fi.m_nloqcdtype!=nlo_type::lo) return NULL;
   Flavour_Vector fl=pi.ExtractFlavours();
@@ -83,7 +84,8 @@ operator()(const Process_Info &pi) const
   if (fl[0].IsPhoton() && fl[1].IsPhoton() &&
       fl[2].IsFermion() && fl[2].Charge() &&
       fl[3]==fl[2].Bar()) {
-    if (pi.m_oqcd==0 && pi.m_oew==2) {
+    if (pi.m_maxcpl[0]==0 && pi.m_maxcpl[1]==2 &&
+	pi.m_mincpl[0]==0 && pi.m_mincpl[1]==2) {
       return new XS_PP_ffbar(pi,fl);
     }
   }

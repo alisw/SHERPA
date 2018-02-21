@@ -58,28 +58,19 @@ void AMEGIC::Single_Process_MHV::PolarizationNorm() {
 }
 
 
-int AMEGIC::Single_Process_MHV::InitAmplitude(Model_Base * model,Topology* top,
+int AMEGIC::Single_Process_MHV::InitAmplitude(Amegic_Model * model,Topology* top,
 					 vector<Process_Base *> & links,
 					 vector<Process_Base *> & errs)
 {
   Init();
-  model->GetCouplings(m_cpls);
-  if (!model->CheckFlavours(m_nin,m_nout,&m_flavs.front())) return 0;
+  model->p_model->GetCouplings(m_cpls);
+  if (!model->p_model->CheckFlavours(m_nin,m_nout,&m_flavs.front())) return 0;
   m_newlib   = false;
   m_libnumb  = 0;
   m_pslibname = m_libname = ToString(m_nin)+"_"+ToString(m_nout);
   if (m_gen_str>1) m_ptypename = "P"+m_libname;
   else m_ptypename = "N"+m_libname;
   PolarizationNorm();
-  if (m_gen_str>1) {
-    ATOOLS::MakeDir(rpa->gen.Variable("SHERPA_CPP_PATH")+"/Process/Amegic/"+m_ptypename);
-  }
-  string newpath=rpa->gen.Variable("SHERPA_CPP_PATH");
-  ATOOLS::MakeDir(newpath);
-  if (!FileExists(newpath+"/makelibs")) {
-    Copy(rpa->gen.Variable("SHERPA_SHARE_PATH")+"/makelibs",
-	     newpath+"/makelibs");
-  }
 
   p_hel    = new Helicity(m_nin,m_nout,&m_flavs.front(),p_pl);
   p_BS     = new Basic_Sfuncs(m_nin+m_nout,m_nin+m_nout,&m_flavs.front(),p_b);  
@@ -96,17 +87,16 @@ int AMEGIC::Single_Process_MHV::InitAmplitude(Model_Base * model,Topology* top,
   int *plist = new int[m_nin+m_nout];
   for (size_t i=0;i<m_nin;i++) plist[i] = fl[i];
   for (size_t i=m_nin;i<m_nin+m_nout;i++) plist[i]=-fl[i];
-  p_MHVamp = FullAmplitude_MHV_Handler(model,&m_cpls,m_nin+m_nout,plist,p_momlist,m_ownamps); 
+  p_MHVamp = FullAmplitude_MHV_Handler(model->p_model,&m_cpls,m_nin+m_nout,plist,p_momlist,m_ownamps); 
 
   delete [] plist;
   //////////////////////////////////////////////
 
-  p_shand  = new String_Handler(m_gen_str,p_BS,model->GetVertex()->GetCouplings());
-  int oew(m_oew), oqcd(m_oqcd), ntchanmin(m_ntchanmin);
-  p_ampl   = new Amplitude_Handler(m_nin+m_nout,&m_flavs.front(),p_b,p_pinfo,model,top,oqcd,oew,ntchanmin,
-				   &m_cpls,p_BS,p_shand,m_print_graphs,0);
-  m_oew=oew;
-  m_oqcd=oqcd;
+  p_shand  = new String_Handler(m_gen_str,p_BS,model->p_model->GetCouplings());
+  p_ampl   = new Amplitude_Handler(m_nin+m_nout,&m_flavs.front(),p_b,p_pinfo,
+                                   model,top,m_maxcpl,m_mincpl,
+                                   m_ntchanmin,m_ntchanmax,
+                                   &m_cpls,p_BS,p_shand,m_print_graphs,0,true);
   if (p_ampl->GetGraphNumber()==0) {
     msg_Tracking()<<"AMEGIC::Single_Process_MHV::InitAmplitude : No diagrams for "<<m_name<<"."<<endl;
     return 0;
@@ -137,18 +127,6 @@ int AMEGIC::Single_Process_MHV::InitAmplitude(Model_Base * model,Topology* top,
   int result(Tests());
   switch (result) {
   case 1 :
-    for (size_t j=0;j<links.size();j++) if (Type()==links[j]->Type()) {
-      if (FlavCompare(links[j]) && ATOOLS::IsEqual(links[j]->Result(),Result())) {
-	if (CheckMapping(links[j])&&p_ampl->CheckEFMap()) {
-	  msg_Tracking()<<"AMEGIC::Single_Process_MHV::InitAmplitude : "<<std::endl
-			<<"   Found a partner for process "<<m_name<<" : "<<links[j]->Name()<<std::endl;
-	  p_mapproc = p_partner   = (Single_Process_MHV*)links[j];
-	  m_pslibname = links[j]->PSLibName();
-	  InitFlavmap(p_partner);
-	  break;
-	}
-      } 
-    }
     if (p_partner==this) links.push_back(this);
     msg_Info()<<".";
     
@@ -253,11 +231,13 @@ int AMEGIC::Single_Process_MHV::Tests()
     if (p_hel->On(i)) {
       for (size_t j=i+1;j<p_hel->MaxHel();j++) {
 	if (p_hel->On(j)) {
+#ifdef FuckUp_Helicity_Mapping
 	  if (ATOOLS::IsEqual(M_doub[i],M_doub[j])) {
 	    p_hel->SwitchOff(j);
 	    p_hel->SetPartner(i,j);
 	    p_hel->IncMultiplicity(i);
 	  }
+#endif
 	}
       }
     }
@@ -320,38 +300,23 @@ void AMEGIC::Single_Process_MHV::Minimize()
   if (p_ampl)     {delete p_ampl; p_ampl=0;}
   if (p_psgen)    {delete p_psgen; p_psgen=0;}
 
-  m_oqcd      = p_partner->OrderQCD();
-  m_oew       = p_partner->OrderEW();
+  m_maxcpl = p_partner->MaxOrders();
+  m_mincpl = p_partner->MinOrders();
 }
 
-double AMEGIC::Single_Process_MHV::Partonic(const Vec4D_Vector &_moms,const int mode) 
+double AMEGIC::Single_Process_MHV::Partonic(const Vec4D_Vector &moms,const int mode) 
 { 
-  if (mode==1) return m_lastxs;
-  if (!Selector()->Result()) return m_lastxs = 0.0;
+  if (mode==1) return m_mewgtinfo.m_B=m_lastxs;
+  if (!Selector()->Result()) return m_mewgtinfo.m_B=m_lastxs = 0.0;
   if (!(IsMapped() && LookUp())) {
-    p_partner->ScaleSetter()->CalculateScale(_moms,m_cmode);
+    p_partner->ScaleSetter()->CalculateScale(moms,m_cmode);
   }
-  Vec4D_Vector moms(_moms);
-  if (!(m_nin==2 && p_int->ISR() && p_int->ISR()->On())) {
-    Poincare cms(Vec4D(10.0,0.0,0.0,1.0));
-    for (size_t i(0);i<moms.size();++i) cms.Boost(moms[i]);
-  }
-  return DSigma(moms,m_lookup); 
+  return m_mewgtinfo.m_B=DSigma(moms,m_lookup);
 }
 
 double AMEGIC::Single_Process_MHV::DSigma(const ATOOLS::Vec4D_Vector &_moms,bool lookup)
 {
   m_lastxs = 0.;
-  if (m_nin==2) {
-    for (size_t i=0;i<m_nin+m_nout;i++) {
-      if (_moms[i][0]<m_flavs[i].Mass()) return 0.0;
-    }
-  }
-  if (m_nin==1) {
-    for (size_t i=m_nin;i<m_nin+m_nout;i++) {
-      if (_moms[i][0]<m_flavs[i].Mass()) return 0.0;
-    }
-  }
   if (p_partner == this) {
     m_lastxs = m_Norm * operator()((ATOOLS::Vec4D*)&_moms.front());
   }

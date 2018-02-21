@@ -35,6 +35,7 @@ namespace ATOOLS {
     Blob            * p_startblob, * p_endblob;
     Particle        * p_originalpart;
     double            m_dec_time, m_finalmass;
+    bool              m_fromdec;
     static int        s_totalnumber;
   public:
     Particle();
@@ -81,6 +82,8 @@ namespace ATOOLS {
     void   SetBeam(const int);
     void   SetOriginalPart(Particle*);
     bool operator==(Particle part);
+    inline void   SetFromDec(const bool &val){m_fromdec=val;}
+    inline bool   FromDec() const {return m_fromdec;}
     static void   ResetCounter(const int number=0)  { s_totalnumber = number; }
     static int    Counter()                         { return s_totalnumber; }
     inline static void Reset(const int number=0)    { s_currentnumber = number; }
@@ -98,6 +101,7 @@ namespace ATOOLS {
   typedef Part_List::const_iterator Part_Const_Iterator;
   typedef Particle_Vector::iterator PVIt;
 
+  std::ostream & operator<<(std::ostream &,const Particle &);
   std::ostream & operator<<(std::ostream & s, const Part_List & pl);
 
   typedef std::map<int,std::pair<ATOOLS::Particle *,bool> > Translation_Map;
@@ -118,6 +122,11 @@ namespace ATOOLS {
     \brief The particle's number (integer >0)
   */
   
+  /*!
+    \var   bool Particle::m_fromdec
+    \brief True, if this particle is emerged from a hard decay. This property is set in the Hard Decay Handler and propagated through the CSS Shower.
+  */
+
   /*! 
     \var   char Particle::info
     \brief What the particle really does and where it stems from.

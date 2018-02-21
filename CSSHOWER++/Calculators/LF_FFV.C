@@ -228,7 +228,7 @@ namespace CSSHOWER {
 
 }
 
-#include "MODEL/Interaction_Models/Single_Vertex.H"
+#include "MODEL/Main/Single_Vertex.H"
 #include "ATOOLS/Math/Random.H"
 
 using namespace CSSHOWER;
@@ -321,7 +321,7 @@ double LF_FFV_FI::OverIntegrated
 (const double zmin,const double zmax,const double scale,const double xbj)
 {
   m_zmin = zmin; m_zmax = zmax;
-  m_Jmax=m_flspec.Kfcode()<3?5.:1.;
+  m_Jmax=5.;
   return (2.0*p_cf->MaxCoupling(0)*(2.+CDISMax()) + 0.5*p_cf->MaxCoupling(1))*log((1.-zmin)/(1.-zmax)) * m_Jmax;
 }
 
@@ -487,7 +487,7 @@ double LF_FVF_FI::OverIntegrated
 (const double zmin,const double zmax,const double scale,const double xbj)
 {
   m_zmin = zmin; m_zmax = zmax;
-  m_Jmax=m_flspec.Kfcode()<3?5.:1.;
+  m_Jmax=5.;
   return (2.0*p_cf->MaxCoupling(0)*(2.+CDISMax()) + 0.5*p_cf->MaxCoupling(1)) * log(zmax/zmin) * m_Jmax;
 }
 
@@ -687,7 +687,7 @@ double LF_VFF_FI::OverIntegrated
 (const double zmin,const double zmax,const double scale,const double xbj)
 {
   m_zmin = zmin; m_zmax = zmax;
-  m_Jmax=m_flspec.Kfcode()<3?5.:1.;
+  m_Jmax=5.;
   return (2.0*p_cf->MaxCoupling(0)*(1.+CDISMax()) + 0.5*p_cf->MaxCoupling(1))* (m_zmax-m_zmin) * m_Jmax;
 }
 
@@ -779,7 +779,7 @@ double LF_VFF_II::Z()
   return m_zmin + (m_zmax-m_zmin)*ATOOLS::ran->Get();
 }
 
-DECLARE_GETTER(LF_FFV_FF,"Gamma",SF_Lorentz,SF_Key);
+DECLARE_GETTER(LF_FFV_FF,"FFV",SF_Lorentz,SF_Key);
 
 SF_Lorentz *ATOOLS::Getter<SF_Lorentz,SF_Key,LF_FFV_FF>::
 operator()(const Parameter_Type &args) const
@@ -832,6 +832,64 @@ operator()(const Parameter_Type &args) const
 }
 
 void ATOOLS::Getter<SF_Lorentz,SF_Key,LF_FFV_FF>::
+PrintInfo(std::ostream &str,const size_t width) const
+{
+  str<<"ffv lorentz functions";
+}
+
+DECLARE_GETTER(LF_FFV_II,"FFV1",SF_Lorentz,SF_Key);
+
+SF_Lorentz *ATOOLS::Getter<SF_Lorentz,SF_Key,LF_FFV_II>::
+operator()(const Parameter_Type &args) const
+{
+  if (args.m_col<0) return NULL;
+  if ((args.m_mode==0 &&
+       args.p_v->in[0].IntSpin()==1 &&
+       args.p_v->in[1].IntSpin()==1 &&
+       args.p_v->in[2].IntSpin()==2) ||
+      (args.m_mode==1 &&
+       args.p_v->in[0].IntSpin()==1 &&
+       args.p_v->in[2].IntSpin()==1 &&
+       args.p_v->in[1].IntSpin()==2)) {
+    switch (args.m_type) {
+    case cstp::FF: return new LF_FFV_FF(args);
+    case cstp::FI: return new LF_FFV_FI(args);
+    case cstp::IF: return new LF_FFV_IF(args);
+    case cstp::II: return new LF_FFV_II(args);
+    case cstp::none: break;
+    }
+  }
+  if ((args.m_mode==0 &&
+       args.p_v->in[0].IntSpin()==1 &&
+       args.p_v->in[1].IntSpin()==2 &&
+       args.p_v->in[2].IntSpin()==1) ||
+      (args.m_mode==1 &&
+       args.p_v->in[0].IntSpin()==1 &&
+       args.p_v->in[2].IntSpin()==2 &&
+       args.p_v->in[1].IntSpin()==1)) {
+    switch (args.m_type) {
+    case cstp::FF: return new LF_FVF_FF(args);
+    case cstp::FI: return new LF_FVF_FI(args);
+    case cstp::IF: return new LF_FVF_IF(args);
+    case cstp::II: return new LF_FVF_II(args);
+    case cstp::none: break;
+    }
+  }
+  if (args.p_v->in[0].IntSpin()==2 &&
+      args.p_v->in[1].IntSpin()==1 &&
+      args.p_v->in[2].IntSpin()==1) {
+    switch (args.m_type) {
+    case cstp::FF: return new LF_VFF_FF(args);
+    case cstp::FI: return new LF_VFF_FI(args);
+    case cstp::IF: return new LF_VFF_IF(args);
+    case cstp::II: return new LF_VFF_II(args);
+    case cstp::none: break;
+    }
+  }
+  return NULL;
+}
+
+void ATOOLS::Getter<SF_Lorentz,SF_Key,LF_FFV_II>::
 PrintInfo(std::ostream &str,const size_t width) const
 {
   str<<"ffv lorentz functions";

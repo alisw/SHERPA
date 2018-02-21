@@ -284,7 +284,7 @@ double LF_VVV1_FI::OverIntegrated
 (const double zmin,const double zmax,const double scale,const double xbj)
 {
   m_zmin = zmin; m_zmax = zmax;
-  m_Jmax=m_flspec.Kfcode()<3?5.:1.;
+  m_Jmax=5.;
   return 4.*p_cf->MaxCoupling(0) * log((1.-m_zmin)/(1.-m_zmax)) * m_Jmax;
 }
 
@@ -316,7 +316,7 @@ double LF_VVV2_FI::OverIntegrated
 (const double zmin,const double zmax,const double scale,const double xbj)
 {
   m_zmin = zmin; m_zmax = zmax;
-  m_Jmax=m_flspec.Kfcode()<3?5.:1.;
+  m_Jmax=5.;
   return 4.*p_cf->MaxCoupling(0) * log(m_zmax/m_zmin) * m_Jmax;
 }
 
@@ -484,7 +484,7 @@ double LF_VVV2_II::Z()
   return m_zmin*pow(m_zmax/m_zmin,ATOOLS::ran->Get());
 }
 
-DECLARE_GETTER(LF_VVV1_FF,"Gauge3",SF_Lorentz,SF_Key);
+DECLARE_GETTER(LF_VVV1_FF,"VVV",SF_Lorentz,SF_Key);
 
 SF_Lorentz *ATOOLS::Getter<SF_Lorentz,SF_Key,LF_VVV1_FF>::
 operator()(const Parameter_Type &args) const

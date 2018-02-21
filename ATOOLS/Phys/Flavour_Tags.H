@@ -44,9 +44,6 @@
 #define      kf_bjet                      97
 #define      kf_resummed                  99
 #define      kf_gluon_qgc                 921
-#define      kf_h0_qsc                    925
-#define      kf_Z_qgc                     923
-#define      kf_Wplus_qgc                 924
 // photons helpers for indeterminant resonances
 #define      kf_PhotonsHelperNeutral      931
 #define      kf_PhotonsHelperPlus         932
@@ -227,12 +224,12 @@
 #define      kf_K_4_star_2045             319
 #define      kf_K_4_star_2045_plus        329
 #define      kf_f_J_2220                  339
-#define      kf_a_0_980                   10111
-#define      kf_a_0_980_plus              10211
-#define      kf_f_0_980                   10221
+#define      kf_a_0_980                   9000111
+#define      kf_a_0_980_plus              9000211
+#define      kf_f_0_980                   9010221
 #define      kf_K_0_star_1430             10311
 #define      kf_K_0_star_1430_plus        10321
-#define      kf_f_0_1370                  10331
+#define      kf_f_0_1370                  10221
 #define      kf_D_0_star_plus             10411
 #define      kf_D_0_star                  10421
 #define      kf_D_s0_star                 10431
@@ -275,8 +272,8 @@
 #define      kf_B_1_H                     20513
 #define      kf_B_1_H_plus                20523
 #define      kf_B_s1_H                    20533
-#define      kf_B_c1_H                    20533
-#define      kf_chi_c1_1P                 20543
+#define      kf_B_c1_H                    20543
+#define      kf_chi_c1_1P                 20443
 #define      kf_chi_b1_1P                 20553
 #define      kf_K_2_1820                  20315
 #define      kf_K_2_1820_plus             20325
@@ -307,12 +304,12 @@
 #define      kf_chi_b1_2P                 120553
 #define      kf_Upsilon_3S                200553
 #define      kf_Upsilon_4S                300553
-#define      kf_a_0_1450                  9000111
-#define      kf_a_0_1450_plus             9000211
+#define      kf_a_0_1450                  10111
+#define      kf_a_0_1450_plus             10211
 #define      kf_f_0_600                   9000221
 #define      kf_psi_4040                  9000443
 #define      kf_Upsilon_10860             9000553
-#define      kf_f_0_1710                  9010221
+#define      kf_f_0_1710                  10331
 #define      kf_psi_4160                  9010443
 #define      kf_Upsilon_11020             9010553
 #define      kf_f_0_1500                  9020221

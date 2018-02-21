@@ -15,9 +15,9 @@ using namespace PDF;
 using namespace ATOOLS;
 
 PDF_Base::PDF_Base():
-  m_type("none"), m_member(0), m_exponent(1.),
-  m_rescale(1.) {
-
+  m_type("none"), m_set(""), m_member(0), m_exponent(1.),
+  m_rescale(1.)
+{
   Data_Reader dr(" ",";","!","=");
   m_lhef_number = dr.GetValue<int>("LHEF_PDF_NUMBER",-1);
 }
@@ -28,22 +28,14 @@ PDF_Base::~PDF_Base()
 
 double PDF_Base::AlphaSPDF(const double &q2)
 {
+  msg_Error()<<"USE_PDF_ALPHAS is not an allowed option without a PDF set"<<std::endl;
+  THROW(fatal_error,METHOD+" not implemented for this PDF set.") ;
   return -1.0;
-}
-
-bool PDF_Base::Collinear(const double kp2) const
-{
-  return true;
 }
 
 PDF_Base *PDF_Base::GetBasicPDF() 
 {
   return this;
-}
-
-double PDF_Base::Cut(const std::string &type)
-{
-  return 0.0;
 }
 
 void PDF_Base::SetBounds()
@@ -52,11 +44,15 @@ void PDF_Base::SetBounds()
   m_rq2max=m_q2max;
 }
 
+void PDF_Base::SetAlphaSInfo()
+{
+}
+
 void PDF_Base::SetPDFMember()
 {
 }
 
-void PDF_Base::Calculate(double x,double Q2) 
+void PDF_Base::Calculate(double x,double Q2)
 {
   if(Q2<m_q2min) {
     static double lasterr(-1.0);
@@ -97,7 +93,7 @@ void PDF_Base::Calculate(double x,double Q2)
   return CalculateSpec(x,Q2);
 }
 
-void PDF_Base::SingleExtract(const ATOOLS::Flavour flavour,const double x) 
+void PDF_Base::SingleExtract(const ATOOLS::Flavour& flavour,const double& x)
 {
   m_rescale-=x;
   m_extracted.push_back(std::pair<ATOOLS::Flavour,double>(flavour,x));

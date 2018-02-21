@@ -427,9 +427,9 @@ class DEta: public Variable_Base<ValueType> {
 public:
   DEta();
   ValueType Value(const Vec3D *vectors) const 
-  { return Vec4D(0.0,vectors[1]).DEta(Vec4D(0.0,vectors[0])); }
+  { return dabs(Vec4D(0.0,vectors[1]).DEta(Vec4D(0.0,vectors[0]))); }
   ValueType Value(const Vec4D *vectors,const int &n) const 
-  { return vectors[1].DEta(vectors[0]); }
+  { return dabs(vectors[1].DEta(vectors[0])); }
 };// end of class DEta
 template <class ValueType>
 DEta<ValueType>::DEta(): Variable_Base<ValueType>("DEta") {}
@@ -485,7 +485,7 @@ Theta2<ValueType>::Theta2(): Variable_Base<ValueType>("Theta2")
   this->m_selectorid="Angle"; 
 }
   
-template class Variable_Base<double>;
+template class ATOOLS::Variable_Base<double>;
 
 #define COMPILE__Getter_Function
 #define OBJECT_TYPE Variable_Base<double>

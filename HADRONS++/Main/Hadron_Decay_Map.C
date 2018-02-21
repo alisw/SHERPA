@@ -262,7 +262,7 @@ void Hadron_Decay_Map::ReadFixedTables(const string& path, const string& file)
       pair<SDtMMapIt, SDtMMapIt> found=m_fixed_tables.equal_range(table_id);
       for (SDtMMapIt it=found.first; it!=found.second; ++it) {
         if (it->second->Flav()==decayerflav) {
-          THROW(fatal_error, "Duplicate decayer "+ToString(decayerflav.HepEvt())
+          THROW(fatal_error, "Duplicate decayer "+ToString((long int)decayerflav)
                 +" for fixed decay table ID="+table_id);
         }
       }
@@ -349,4 +349,16 @@ void Hadron_Decay_Map::CreateBooklet(std::string & name)
   // end 
   f<<"\\end{document}"<<endl;
   f.close();
+}
+
+Decay_Table* Hadron_Decay_Map::FindDecay(const ATOOLS::Flavour & decayer)
+{
+  // first check, whether a fixed decaytable has been requested for this decayer
+  for (size_t i=0; i<m_fixed_next_tables.size(); ++i) {
+    if (m_fixed_next_tables[i]->Flav().Kfcode()==decayer.Kfcode()) {
+      return m_fixed_next_tables[i];
+    }
+  }
+
+  return Decay_Map::FindDecay(decayer);
 }

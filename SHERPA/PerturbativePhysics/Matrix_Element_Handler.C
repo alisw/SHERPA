@@ -8,7 +8,9 @@
 #include "ATOOLS/Org/Data_Reader.H"
 #include "ATOOLS/Org/MyStrStream.H"
 #include "ATOOLS/Org/Shell_Tools.H"
+#include "ATOOLS/Org/Return_Value.H"
 #include "SHERPA/PerturbativePhysics/Shower_Handler.H"
+#include "SHERPA/Tools/Variations.H"
 #include "ATOOLS/Org/CXXFLAGS.H"
 #include "PDF/Main/Shower_Base.H"
 #include "PDF/Main/NLOMC_Base.H"
@@ -17,6 +19,7 @@
 #include "PHASIC++/Process/ME_Generator_Base.H"
 #include "PHASIC++/Main/Process_Integrator.H"
 #include "PHASIC++/Main/Phase_Space_Handler.H"
+#include "ATOOLS/Org/My_MPI.H"
 #include "ATOOLS/Org/RUsage.H"
 #ifdef USING__GZIP
 #include "ATOOLS/Org/Gzip_Stream.H"
@@ -36,7 +39,8 @@ Matrix_Element_Handler::Matrix_Element_Handler
   p_proc(NULL), p_beam(NULL), p_isr(NULL), p_model(NULL),
   m_path(dir), m_file(file), m_processfile(processfile),
   m_selectorfile(selectorfile), m_eventmode(0), m_hasnlo(0),
-  p_shower(NULL), p_nlomc(NULL), m_sum(0.0), m_globalnlomode(0),
+  p_shower(NULL), p_nlomc(NULL), p_variationweights(NULL),
+  m_sum(0.0), m_globalnlomode(0),
   m_ranidx(0), m_fosettings(0), p_ranin(NULL), p_ranout(NULL)
 {
   Data_Reader read(" ",";","!","=");
@@ -45,7 +49,7 @@ Matrix_Element_Handler::Matrix_Element_Handler
   read.SetInputFile(m_file);
   if (!read.ReadFromFile(m_respath,"RESULT_DIRECTORY")) m_respath="Results";
   m_respath=ShortenPathName(m_respath);
-  if (rpa->gen.Variable("PATH_PIECE")!="")
+  if (m_respath[0]!='/' && rpa->gen.Variable("PATH_PIECE")!="")
     m_respath=rpa->gen.Variable("PATH_PIECE")+"/"+m_respath;
   std::string evtm;
   if (!read.ReadFromFile(evtm,"EVENT_GENERATION_MODE")) evtm="PartiallyUnweighted";
@@ -54,7 +58,7 @@ Matrix_Element_Handler::Matrix_Element_Handler
   else m_eventmode=0;
   //need for LHE-output
   rpa->gen.SetVariable("EVENT_GENERATION_MODE",ToString(m_eventmode));
-  if (!read.ReadFromFile(m_ovwth,"OVERWEIGHT_WARNING_THRESHOLD")) m_ovwth=10.0;
+  if (!read.ReadFromFile(m_ovwth,"OVERWEIGHT_THRESHOLD")) m_ovwth=1e12;
   if (!read.ReadFromFile(m_seedmode,"EVENT_SEED_MODE")) m_seedmode=0;
   else msg_Info()<<METHOD<<"(): Set seed mode "<<m_seedmode<<"."<<std::endl;
   if (!read.ReadFromFile(m_rsadd,"MEH_RSADD")) m_rsadd=1;
@@ -137,7 +141,6 @@ bool Matrix_Element_Handler::CalculateTotalXSecs()
   }
   bool okay(true);
   for (size_t i=0;i<m_procs.size();++i) {
-    m_procs[i]->SetUpThreading();
     m_procs[i]->SetLookUp(true);
     if (!m_procs[i]->CalculateTotalXSec(m_respath,false)) okay=false;
     m_procs[i]->SetLookUp(false);
@@ -167,6 +170,7 @@ void Matrix_Element_Handler::SetRandomSeed()
 
 bool Matrix_Element_Handler::GenerateOneEvent() 
 {
+  Return_Value::IncCall(METHOD);
   p_proc=NULL;
   if (m_seedmode!=3) SetRandomSeed();
   p_isr->SetPDFMember();
@@ -186,7 +190,10 @@ bool Matrix_Element_Handler::GenerateOneEvent()
       }
     }
     if (proc==NULL) THROW(fatal_error,"No process selected");
-    PHASIC::Weight_Info *info=proc->OneEvent(m_eventmode);
+    p_variationweights->Reset();
+    proc->SetVariationWeights(p_variationweights);
+    ATOOLS::Weight_Info *info=proc->OneEvent(m_eventmode);
+    proc->SetVariationWeights(NULL);
     p_proc=proc->Selected();
     if (p_proc->Generator()==NULL)
       THROW(fatal_error,"No generator for process '"+p_proc->Name()+"'");
@@ -200,12 +207,13 @@ bool Matrix_Element_Handler::GenerateOneEvent()
     if (m_eventmode!=0) {
       double max=p_proc->Integrator()->Max(), disc=max*ran->Get();
       if (dabs(m_evtinfo.m_weight)<disc) continue;
-      if (dabs(m_evtinfo.m_weight)>max*(1.0+m_ovwth))
-	  msg_Info()<<METHOD<<"(): Point for '"<<p_proc->Name()
-		    <<"' exceeds maximum by "
-		    <<dabs(m_evtinfo.m_weight)/max-1.0<<"."<<std::endl;
-      if (m_eventmode==1 && dabs(m_evtinfo.m_weight)>max*(100.0))
-        m_evtinfo.m_weight=100.0*max;
+      if (dabs(m_evtinfo.m_weight)>max*m_ovwth) {
+        Return_Value::IncWarning(METHOD);
+        msg_Info()<<METHOD<<"(): Point for '"<<p_proc->Name()
+                  <<"' exceeds maximum by "
+                  <<dabs(m_evtinfo.m_weight)/max-1.0<<"."<<std::endl;
+        m_evtinfo.m_weight=max*m_ovwth;
+      }
       m_weightfactor=dabs(m_evtinfo.m_weight)/max;
       wf/=Min(1.0,m_weightfactor);
     }
@@ -215,6 +223,7 @@ bool Matrix_Element_Handler::GenerateOneEvent()
       p_proc->GetSubevtList()->MultMEwgt(wf);
     }
     if (p_proc->GetMEwgtinfo()) (*p_proc->GetMEwgtinfo())*=wf;
+    (*p_variationweights)*=wf;
     m_evtinfo.m_ntrial=n;
     return true;
   }
@@ -222,6 +231,34 @@ bool Matrix_Element_Handler::GenerateOneEvent()
 }
 
 std::vector<Process_Base*> Matrix_Element_Handler::InitializeProcess
+(const Process_Info &pi,NLOTypeStringProcessMap_Map *&pmap)
+{
+  Process_Info cpi(pi);
+  std::set<Process_Info> trials;
+  std::vector<Process_Base*> procs;
+  std::vector<Flavour_Vector> fls(pi.ExtractMPL());
+  std::vector<int> fid(fls.size(),0);
+  Flavour_Vector fl(fls.size());
+  for (size_t i(0);i<fid.size();++i) fl[i]=fls[i][0];
+  for (size_t hc(fid.size()-1);fid[0]<fls[0].size();) {
+    if(fid[hc]==fls[hc].size()){fid[hc--]=0;++fid[hc];continue;}
+    fl[hc]=fls[hc][fid[hc]];if(hc<fid.size()-1){++hc;continue;}
+    Flavour_Vector cfl(fl);
+    size_t n(0);
+    cpi.m_ii.SetExternal(cfl,n);
+    cpi.m_fi.SetExternal(cfl,n);
+    Process_Base::SortFlavours(cpi,0);
+    if (trials.find(cpi)==trials.end()) {
+      trials.insert(cpi);
+      std::vector<Process_Base*> cp=InitializeSingleProcess(cpi,pmap);
+      procs.insert(procs.end(),cp.begin(),cp.end());
+    }
+    ++fid[hc];
+  }
+  return procs;
+}
+
+std::vector<Process_Base*> Matrix_Element_Handler::InitializeSingleProcess
 (const Process_Info &pi,NLOTypeStringProcessMap_Map *&pmap)
 {
   std::vector<Process_Base*> procs;
@@ -275,6 +312,7 @@ std::vector<Process_Base*> Matrix_Element_Handler::InitializeProcess
 	rpi.m_fi.SetNLOType(pi.m_fi.NLOType()&(nlo_type::real|nlo_type::rsub));
 	rpi.m_integrator=rpi.m_rsintegrator;
 	rpi.m_megenerator=rpi.m_rsmegenerator;
+	rpi.m_itmin=rpi.m_rsitmin;
 	if (m_rsadd) {
 	  if (pi.m_fi.m_nloqcdtype==nlo_type::lo) {
 	    rpi.m_fi.m_ps.push_back(Subprocess_Info(kf_photon,"",""));
@@ -336,7 +374,13 @@ int Matrix_Element_Handler::InitializeProcesses
   if (!m_gens.InitializeGenerators(model,beam,isr)) return false;
   double rbtime(ATOOLS::rpa->gen.Timer().RealTime());
   double btime(ATOOLS::rpa->gen.Timer().UserTime());
+#ifdef USING__MPI
+  if (MPI::COMM_WORLD.Get_rank()==0)
+#endif
+  MakeDir(rpa->gen.Variable("SHERPA_CPP_PATH")+"/Process",true);
+  My_In_File::OpenDB(rpa->gen.Variable("SHERPA_CPP_PATH")+"/Process/Sherpa/");
   BuildProcesses();
+  My_In_File::CloseDB(rpa->gen.Variable("SHERPA_CPP_PATH")+"/Process/Sherpa/");
   if (msg_LevelIsTracking()) msg_Info()<<"Process initialization";
   double retime(ATOOLS::rpa->gen.Timer().RealTime());
   double etime(ATOOLS::rpa->gen.Timer().UserTime());
@@ -346,6 +390,8 @@ int Matrix_Element_Handler::InitializeProcesses
 	    <<FormatTime(size_t(etime-btime))<<" )."<<std::endl;
   if (m_procs.empty() && m_gens.size()>0)
     THROW(normal_exit,"No hard process found");
+  if (m_gens.NewLibraries())
+    THROW(normal_exit,"Source code created. Run './makelibs' to compile.");
   msg_Info()<<METHOD<<"(): Performing tests "<<std::flush;
   rbtime=retime;
   btime=etime;
@@ -383,7 +429,7 @@ void Matrix_Element_Handler::BuildProcesses()
   std::string kfactor=read.GetValue<std::string>("KFACTOR","NO");
   // set scale scheme
   std::string scale=read.GetValue<std::string>
-    ("SCALES","METS{MU_F2}{MU_R2}{MU_Q2}");
+    ("SCALES","STRICT_METS{MU_F2}{MU_R2}{MU_Q2}");
   std::vector<std::string> helpsv;
   if (!read.VectorFromFile(helpsv,"COUPLINGS"))
     helpsv.push_back("Alpha_QCD 1");
@@ -402,6 +448,11 @@ void Matrix_Element_Handler::BuildProcesses()
     THROW(missing_input,"No data in "+m_path+m_processfile+"'.");
   for (size_t nf(0);nf<procdata.size();++nf) {
     std::vector<std::string> &cur(procdata[nf]);
+    if(cur.size()==0) continue;
+    if(cur[0].find("Order(")!=std::string::npos)
+      THROW(fatal_error,
+	    std::string("Syntax error in coupling order specification: '"+cur[0]+"'\n")
+	    +"   Whitespace between 'Order' and brackets is mandatory");
     if (cur.size()<2) continue;
     if (cur[0]=="Process") {
       Process_Info pi;
@@ -427,16 +478,35 @@ void Matrix_Element_Handler::BuildProcesses()
 	    long int kfc(ToType<long int>(cur[i]));
 	    pi.m_nodecs.push_back(Flavour(abs(kfc),kfc<0));
 	  }
+	if (cur[0]=="Order") {
+	  std::string cb(MakeString(cur,1));
+	  ExtractMPvalues(cb,pbi.m_vcpl,nf);
+        }
+	if (cur[0]=="Max_Order") {
+	  std::string cb(MakeString(cur,1));
+	  ExtractMPvalues(cb,pbi.m_vmaxcpl,nf);
+	}
+	if (cur[0]=="Min_Order") {
+	  std::string cb(MakeString(cur,1));
+	  ExtractMPvalues(cb,pbi.m_vmincpl,nf);
+	}
 	if (cur[0]=="Order_EW") {
-	  std::string cb(MakeString(cur,1));
-	  ExtractMPvalues(cb,pbi.m_voew,nf);
+          THROW(fatal_error,
+                std::string("You are using the obsolete setting:\n")
+                +"    'Order_EW "+MakeString(cur,1)+"'\n"+
+                +"  Please refer to the Sherpa manual for how to transition "
+                +"to the new 'Order (<qcd>, <ew>[, ...])' syntax, e.g. using:\n"
+                +"    'Order (*,"+MakeString(cur,1)+")'");
         }
-	if (cur[0]=="Order_QCD") {
-	  std::string cb(MakeString(cur,1));
-	  ExtractMPvalues(cb,pbi.m_voqcd,nf);
+	if (cur[0]=="Max_Order_EW" ||
+            cur[0]=="Max_Order_QCD" ||
+            cur[0]=="Order_QCD") {
+          THROW(fatal_error,
+                std::string("You are using an obsolete (Max_)Order_* setting) ")
+                +"in your processes section. Please refer to the Sherpa manual "
+                +"for how to transition to the new "
+                +"'Order (<qcd>, <ew>[, ...])' syntax.");
         }
-	if (cur[0]=="Max_Order_EW") pi.m_maxoew=ToType<int>(cur[1]);
-	if (cur[0]=="Max_Order_QCD") pi.m_maxoqcd=ToType<int>(cur[1]);
 	if (cur[0]=="Cut_Core") pbi.m_cutcore=ToType<int>(cur[1]);
 	if (cur[0]=="CKKW") {
 	  if (p_shower==NULL || p_shower->GetShower()==NULL)
@@ -476,17 +546,21 @@ void Matrix_Element_Handler::BuildProcesses()
 	  std::string cb(MakeString(cur,1));
 	  ExtractMPvalues(cb,pbi.m_vgpath,nf);
 	}
+	if (cur[0]=="Name_Suffix") {
+	  std::string cb(MakeString(cur,1));
+	  ExtractMPvalues(cb,pbi.m_vaddname,nf);
+	}
 	if (cur[0]=="Enable_MHV") {
 	  std::string cb(MakeString(cur,1));
 	  ExtractMPvalues(cb,pbi.m_vamegicmhv,nf);
 	}
 	if (cur[0]=="Min_N_TChannels") {
 	  std::string cb(MakeString(cur,1));
-	  ExtractMPvalues(cb,pbi.m_vntchan,nf);
+	  ExtractMPvalues(cb,pbi.m_vntchanmin,nf);
 	}
 	if (cur[0]=="Max_N_TChannels") {
 	  std::string cb(MakeString(cur,1));
-	  ExtractMPvalues(cb,pbi.m_vmtchan,nf);
+	  ExtractMPvalues(cb,pbi.m_vntchanmax,nf);
 	}
 	if (cur[0]=="Integration_Error") {
 	  std::string cb(MakeString(cur,1));
@@ -552,6 +626,14 @@ void Matrix_Element_Handler::BuildProcesses()
 	  std::string cb(MakeString(cur,1));
 	  ExtractMPvalues(cb,pbi.m_vrsint,nf);
 	}
+	if (cur[0]=="PSI_ItMin") {
+	  std::string cb(MakeString(cur,1));
+	  ExtractMPvalues(cb,pbi.m_vitmin,nf);
+        }
+	if (cur[0]=="RS_PSI_ItMin") {
+	  std::string cb(MakeString(cur,1));
+	  ExtractMPvalues(cb,pbi.m_vrsitmin,nf);
+        }
         pi.p_gens=&m_gens;
 	if (cur[0]=="End" && cur[1]=="process") break;
       }
@@ -669,8 +751,35 @@ void Matrix_Element_Handler::BuildSingleProcessList
 	cpi.m_fi.m_nloqcdtype=pi.m_fi.m_nloqcdtype;
 	cpi.m_fi.m_nloewtype=pi.m_fi.m_nloewtype;
 	cpi.m_fi.SetNMax(pi.m_fi);
-	if (GetMPvalue(pbi.m_voew,nfs,pnid,di)) cpi.m_oew=di;
-	if (GetMPvalue(pbi.m_voqcd,nfs,pnid,di)) cpi.m_oqcd=di;
+	if (GetMPvalue(pbi.m_vmaxcpl,nfs,pnid,ds)) {
+	  Data_Reader read(",",";",")","(");
+	  read.SetString(ds);
+	  read.VectorFromString(cpi.m_maxcpl,"");
+	}
+	if (GetMPvalue(pbi.m_vmincpl,nfs,pnid,ds)) {
+	  Data_Reader read(",",";",")","(");
+	  read.SetString(ds);
+	  read.VectorFromString(cpi.m_mincpl,"");
+	}
+	if (GetMPvalue(pbi.m_vcpl,nfs,pnid,ds)) {
+	  Data_Reader read(",",";",")","(");
+	  while (ds.find("*")!=std::string::npos) ds.replace(ds.find("*"),1,"-1");
+	  read.SetString(ds);
+	  read.VectorFromString(cpi.m_maxcpl,"");
+	  cpi.m_mincpl=cpi.m_maxcpl;
+	  for (size_t i(0);i<cpi.m_maxcpl.size();++i)
+	    if (cpi.m_maxcpl[i]<0) {
+	      cpi.m_mincpl[i]=0;
+	      cpi.m_maxcpl[i]=99;
+	    }
+	}
+	size_t maxsize(Min(cpi.m_mincpl.size(),cpi.m_maxcpl.size()));
+	for (size_t i(0);i<maxsize;++i)
+	  if (cpi.m_mincpl[i]>cpi.m_maxcpl[i]) {
+	    msg_Error()<<METHOD<<"(): Invalid coupling orders: "
+		       <<cpi.m_mincpl<<" .. "<<cpi.m_maxcpl<<"\n";
+	    THROW(inconsistent_option,"Please correct coupling orders");
+	  }
 	if (GetMPvalue(pbi.m_vscale,nfs,pnid,ds)) cpi.m_scale=ds;
 	if (GetMPvalue(pbi.m_vcoupl,nfs,pnid,ds)) cpi.m_coupling=ds;
 	if (GetMPvalue(pbi.m_vkfac,nfs,pnid,ds)) cpi.m_kfactor=ds;
@@ -678,9 +787,10 @@ void Matrix_Element_Handler::BuildSingleProcessList
 	if (GetMPvalue(pbi.m_vnmaxq,nfs,pnid,di)) cpi.m_nmaxq=di;
 	if (GetMPvalue(pbi.m_vnminq,nfs,pnid,di)) cpi.m_nminq=di;
 	if (GetMPvalue(pbi.m_vamegicmhv,nfs,pnid,di)) cpi.m_amegicmhv=di;
-	if (GetMPvalue(pbi.m_vntchan,nfs,pnid,di)) cpi.m_ntchan=di;
-	if (GetMPvalue(pbi.m_vmtchan,nfs,pnid,di)) cpi.m_mtchan=di;
+	if (GetMPvalue(pbi.m_vntchanmin,nfs,pnid,di)) cpi.m_ntchanmin=di;
+	if (GetMPvalue(pbi.m_vntchanmax,nfs,pnid,di)) cpi.m_ntchanmax=di;
 	if (GetMPvalue(pbi.m_vgpath,nfs,pnid,ds)) cpi.m_gpath=ds;
+	if (GetMPvalue(pbi.m_vaddname,nfs,pnid,ds)) cpi.m_addname=ds;
 	if (GetMPvalue(pbi.m_vnloqcdmode,nfs,pnid,ds)) {
 	  if      (ds=="Fixed_Order" || ds=="1") pi.m_nlomode=cpi.m_nlomode=1;
 	  else if (ds=="MC@NLO"      || ds=="3") pi.m_nlomode=cpi.m_nlomode=3;
@@ -713,10 +823,16 @@ void Matrix_Element_Handler::BuildSingleProcessList
 	if (GetMPvalue(pbi.m_vmegen,nfs,pnid,ds)) cpi.m_megenerator=ds;
 	if (GetMPvalue(pbi.m_vrsmegen,nfs,pnid,ds)) cpi.m_rsmegenerator=ds;
 	else cpi.m_rsmegenerator=cpi.m_megenerator;
-	if (GetMPvalue(pbi.m_vloopgen,nfs,pnid,ds)) cpi.m_loopgenerator=ds;
+	if (GetMPvalue(pbi.m_vloopgen,nfs,pnid,ds)) {
+	  m_gens.LoadGenerator(ds);
+	  cpi.m_loopgenerator=ds;
+	}
 	if (GetMPvalue(pbi.m_vint,nfs,pnid,ds)) cpi.m_integrator=ds;
 	if (GetMPvalue(pbi.m_vrsint,nfs,pnid,ds)) cpi.m_rsintegrator=ds;
 	else cpi.m_rsintegrator=cpi.m_integrator;
+	if (GetMPvalue(pbi.m_vitmin,nfs,pnid,di)) cpi.m_itmin=di;
+	if (GetMPvalue(pbi.m_vrsitmin,nfs,pnid,di)) cpi.m_rsitmin=di;
+	else cpi.m_rsitmin=cpi.m_itmin;
 	std::vector<Process_Base*> proc=InitializeProcess(cpi,pmap);
 	for (size_t i(0);i<proc.size();i++) {
 	  if (proc[i]==NULL)
@@ -743,8 +859,6 @@ void Matrix_Element_Handler::BuildSingleProcessList
       }
     }
   }
-  if (pi.m_ckkw && rpa->gen.NumberOfEvents()==0)
-    THROW(fatal_error,"Number of events cannot be zero in CKKW mode");
   for (size_t i(0);i<procs.size();++i) {
     Process_Info &cpi(procs[i]->Info());
     Selector_Key skey(NULL,new Data_Reader(),true);
@@ -786,11 +900,17 @@ size_t Matrix_Element_Handler::ExtractFlavours(Subprocess_Info &info,std::string
     std::string cur(buffer.substr(0,pos));
     buffer=buffer.substr(pos);
     pos=cur.find('(');
-    std::string polid;
+    std::string polid, mpl, rem;
     if (pos!=std::string::npos) {
       polid=cur.substr(pos);
+      rem=polid.substr(polid.find(')')+1);
       cur=cur.substr(0,pos);
       polid=polid.substr(1,polid.find(')')-1);
+    }
+    if (cur.length()==0 && polid.length()) {
+      cur="0"+rem;
+      mpl=polid;
+      polid="";
     }
     pos=cur.find('[');
     std::string decid;
@@ -811,7 +931,7 @@ size_t Matrix_Element_Handler::ExtractFlavours(Subprocess_Info &info,std::string
     if (kfc<0) cfl=cfl.Bar();
     if (n==-1) {
       for (size_t i(0);i<info.m_ps.size();++i)
-	info.m_ps[i].m_ps.push_back(Subprocess_Info(cfl,decid,polid));
+	info.m_ps[i].m_ps.push_back(Subprocess_Info(cfl,decid,polid,mpl));
     }
     else {
       size_t oldsize(info.m_ps.size());
@@ -819,7 +939,7 @@ size_t Matrix_Element_Handler::ExtractFlavours(Subprocess_Info &info,std::string
       for (int j(1);j<=n;++j) {
 	for (size_t i(0);i<oldsize;++i) {
 	  info.m_ps[j*oldsize+i]=info.m_ps[(j-1)*oldsize+i];
-	  info.m_ps[j*oldsize+i].m_ps.push_back(Subprocess_Info(cfl,"",polid));
+	  info.m_ps[j*oldsize+i].m_ps.push_back(Subprocess_Info(cfl,"",polid,mpl));
 	}
       }
     }
@@ -976,7 +1096,8 @@ std::string Matrix_Element_Handler::MakeString
 }
 
 double Matrix_Element_Handler::GetWeight
-(const Cluster_Amplitude &ampl,const nlo_type::code type) const
+(const Cluster_Amplitude &ampl,
+ const nlo_type::code type,const int mode) const
 {
   std::string name(Process_Base::GenerateName(&ampl));
   for (int i(0);i<m_pmaps.size();++i) {
@@ -988,7 +1109,10 @@ double Matrix_Element_Handler::GetWeight
       ci->GeneratePoint();
       for (size_t j(0);j<ampl.Legs().size();++j)
 	ampl.Leg(j)->SetCol(ColorID(ci->I()[j],ci->J()[j]));
-      return pit->second->Differential(ampl);
+      if (mode&1) ci->SetWOn(false);
+      double res(pit->second->Differential(ampl));
+      ci->SetWOn(true);
+      return res;
     }
   }
   return 0.0;

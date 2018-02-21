@@ -6,7 +6,7 @@
 The handler for decays of particles produced in the hard scattering process
 (e.g. W, Z, top, Higgs) can be enabled using the @option{HARD_DECAYS=1} switch.
 Which (anti)particles should be treated as unstable is determined by the
-@option{STABLE[<id>]} switch described in @ref{Model Parameters}.
+@option{STABLE[<id>]} switch described in @ref{Models}.
 
 This decay module can also be used on top of NLO matrix elements, but it does
 not include any NLO corrections in the decay matrix elements themselves.
@@ -21,8 +21,8 @@ Furthermore any cuts or scale definitions are not affected by decays
 and operate only on the inclusively produced particles before decays.
 
 @menu
-* HDH_NO_DECAY::
-* HDH_ONLY_DECAY::
+* HDH_STATUS::
+* HDH_WIDTH::
 * HARD_SPIN_CORRELATIONS::
 * STORE_DECAY_RESULTS::
 * DECAY_RESULT_DIRECTORY::
@@ -31,48 +31,109 @@ and operate only on the inclusively produced particles before decays.
 * HARD_MASS_SMEARING::
 * RESOLVE_DECAYS::
 * DECAY_TAU_HARD::
+* Decay table integration settings::
 @end menu
 
-@node HDH_NO_DECAY
-@subsection HDH_NO_DECAY
-@cindex HDH_NO_DECAY
+@node HDH_STATUS
+@subsection HDH_STATUS
+@cindex HDH_STATUS[<idcode>]
 
-This option allows to disable an explicit list of decay channels. For example,
-to disable the hadronic decay channels of the W boson one would use:
+This option allows to explicitly force or disable a decay channel identified
+by its ID code (which can be found in the decay table printed to screen during
+the run).
+The status can take the following values:
+@table @option
+@item HDH_STATUS[<idcode>]=-1
+Decay channel is disabled and does not contribute to total width.
+@item HDH_STATUS[<idcode>]=0
+Decay channel is disabled but contributes to total width.
+@item HDH_STATUS[<idcode>]=1 (default)
+Decay channel is enabled.
+@item HDH_STATUS[<idcode>]=2
+Decay channel is forced.
+@end table
+For example, to disable the hadronic decay channels of the W boson one would use:
 @verbatim
-HDH_NO_DECAY={24,2,-1}|{24,4,-3}|{-24,-2,1}|{-24,-4,3}
+HDH_STATUS[24,2,-1]=0
+HDH_STATUS[24,4,-3]=0
+HDH_STATUS[-24,-2,1]=0
+HDH_STATUS[-24,-4,3]=0
 @end verbatim
-Note that the ordering of the decay products in each channel is important and
+In the same way, the bottom decay mode of the Higgs could be forced using:
+@verbatim
+HDH_STATUS[25,5,-5]=2
+@end verbatim
+
+Note that the ordering of the decay products in @option{<idcode>} is important and
 has to be identical to the ordering in the decay table printed to screen.
 Multiple decay channels (also for different decaying particles and
-antiparticles) can be specified using the @option{|} (pipe) symbol as separator.
-Spaces are not allowed anywere in the list.
+antiparticles) can be specified as separate lines. It is also possible to
+request multiple forced decay channels for the same particle, all other channels
+will then automatically be disabled.
 
-@node HDH_ONLY_DECAY
-@subsection HDH_ONLY_DECAY
-@cindex HDH_ONLY_DECAY
 
-This option allows to restrict the decay channels of a particle to the
-explicitly given list. For example, to allow only the bottom-decay mode of the
-Higgs one would use
+@node HDH_WIDTH
+@subsection HDH_WIDTH
+@cindex HDH_WIDTH[<idcode>]
+
+This option allows to overwrite the calculated partial width (in GeV) of a given decay
+channel, and even to add new inactive channels which contribute to the total
+width. This is useful to adjust the branching ratios, which are used for the
+relative contributions of different channels and also influence the cross
+section during event generation, as well as the total width which is used for
+the lineshape of the resonance.
+
+An example to set (/add) the partial widths of the @code{H->ff}, @code{H->gg}
+and @code{H->yy} channels can be seen in the following. The values have been
+taken from
+@uref{https://twiki.cern.ch/twiki/bin/view/LHCPhysics/CERNYellowReportPageBR3,,LHCHXSWG})
+for @code{MASS[25]=125} and @code{WIDTH[25]=0.00407}:
+
 @verbatim
-HDH_ONLY_DECAY={25,5,-5}
+HDH_WIDTH[25,5,-5]=2.35e-3
+HDH_WIDTH[25,15,-15]=2.57e-4
+HDH_WIDTH[25,13,-13]=8.91e-7
+HDH_WIDTH[25,4,-4]=1.18e-4
+HDH_WIDTH[25,3,-3]=1.00e-6
+HDH_WIDTH[25,21,21]=3.49e-4
+HDH_WIDTH[25,22,22]=9.28e-6
 @end verbatim
-Note that the ordering of the decay products in each channel is important and
-has to be identical to the ordering in the decay table printed to screen.
-Multiple decay channels (also for different decaying particles and
-antiparticles) can be specified using the @option{|} (pipe) symbol as separator.
-Spaces are not allowed anywere in the list.
+
+Another example, setting the leptonic and hadronic decay channels of W and Z
+bosons to the PDG values, would be specified as follows:
+@verbatim
+HDH_WIDTH[24,2,-1]=0.7041
+HDH_WIDTH[24,4,-3]=0.7041
+HDH_WIDTH[24,12,-11]=0.2256
+HDH_WIDTH[24,14,-13]=0.2256
+HDH_WIDTH[24,16,-15]=0.2256
+HDH_WIDTH[-24,-2,1]=0.7041
+HDH_WIDTH[-24,-4,3]=0.7041
+HDH_WIDTH[-24,-12,11]=0.2256
+HDH_WIDTH[-24,-14,13]=0.2256
+HDH_WIDTH[-24,-16,15]=0.2256
+HDH_WIDTH[23,1,-1]=0.3828
+HDH_WIDTH[23,2,-2]=0.2980
+HDH_WIDTH[23,3,-3]=0.3828
+HDH_WIDTH[23,4,-4]=0.2980
+HDH_WIDTH[23,5,-5]=0.3828
+HDH_WIDTH[23,11,-11]=0.0840
+HDH_WIDTH[23,12,-12]=0.1663
+HDH_WIDTH[23,13,-13]=0.0840
+HDH_WIDTH[23,14,-14]=0.1663
+HDH_WIDTH[23,15,-15]=0.0840
+HDH_WIDTH[23,16,-16]=0.1663
+@end verbatim
+
 
 @node HARD_SPIN_CORRELATIONS
 @subsection HARD_SPIN_CORRELATIONS
 @cindex HARD_SPIN_CORRELATIONS
 
-By default, all decays are done in a factorised manner, i.e. there are no
-correlations between the production and decay matrix elements of an unstable
-particle. It is possible to enable spin correlations by specifying
-@option{HARD_SPIN_CORRELATIONS=1}, which might come with a small performance
-penalty in more complicated processes.
+Spin correlations between the hard scattering process and the following decay
+processes are enabled by default. If you want to disable them, e.g. for spin
+correlation studies, you can specify the option
+@option{HARD_SPIN_CORRELATIONS=0}.
 
 @node STORE_DECAY_RESULTS
 @subsection STORE_DECAY_RESULTS
@@ -131,10 +192,11 @@ BR, you can set the option @option{HDH_BR_WEIGHTS=0}.
 @subsection HARD_MASS_SMEARING
 @cindex HARD_MASS_SMEARING
 
-If @option{HARD_MASS_SMEARING=1} is specified, the kinematic mass of the unstable
+With the default of @option{HARD_MASS_SMEARING=1} the kinematic mass of the unstable
 propagator is distributed according to a Breit-Wigner shape a posteriori. All
 matrix elements are still calculated in the narrow-width approximation with
 onshell particles. Only the kinematics are affected.
+To keep all intermediate particles onshell use @option{HARD_MASS_SMEARING=0}.
 
 @node RESOLVE_DECAYS
 @subsection RESOLVE_DECAYS
@@ -163,3 +225,19 @@ also the hadronic modes. If @option{DECAY_TAU_HARD=1} is specified, the tau
 lepton will be decayed in the hard decay handler, which only takes leptonic and
 partonic decay modes into account. Note, that in this case the tau needs to also
 be set massive with @option{MASSIVE[15]=1}.
+
+@node Decay table integration settings
+@subsection Decay table integration settings
+@cindex HDH_INT_ACCURACY
+@cindex HDH_INT_TARGET_MODE
+@cindex HDH_INT_NITER
+
+Three parameters can be used to steer the accuracy and time consumption of the
+calculation of the partial widths in the decay table:
+@option{HDH_INT_ACCURACY=0.01} specifies a relative accuracy for the
+integration. The corresponding target reference is either the given total width
+of the decaying particle (@option{HDH_INT_TARGET_MODE=0}, default) or the
+calculated partial decay width (@option{HDH_INT_TARGET_MODE=1}).
+The option @option{HDH_INT_NITER=2500} can be used to change the number of
+points per integration iteration, and thus also the minimal number of points to
+be used in an integration.

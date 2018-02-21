@@ -15,10 +15,11 @@ libPhasicScales_la_SOURCES    =	\
 				Variable_Scale_Setter.C \
 				Variable_Core_Scale.C \
 				Fastjet_Scale_Setter.C \
-				MPI_Scale_Setter.C \
 				QCD_Scale_Setter.C \
 				QCD_Core_Scale.C \
 				TTBar_Core_Scale.C \
+				TZj_Core_Scale.C \
+				SingleTop_Core_Scale.C \
 				WBF_Core_Scale.C \
 				QQSinglet_Core_Scale.C \
 				HTPrime_Core_Scale.C \
@@ -34,4 +35,4 @@ localinc_HEADERS      =	\
 
 libPhasicScales_la_LIBADD     =	@CONDITIONAL_FASTJETLIBS@
 
-INCLUDES      =	@CONDITIONAL_FASTJETINCS@
+libPhasicScales_la_CPPFLAGS   =	$(AM_CPPFLAGS) @CONDITIONAL_FASTJETINCS@

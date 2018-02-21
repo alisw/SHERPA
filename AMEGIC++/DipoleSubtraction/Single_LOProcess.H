@@ -22,7 +22,6 @@ namespace AMEGIC {
     Polarisation            m_pol;
     bool                    m_newlib;
     double                  m_iresult;
-    int                     m_libnumb;
     int                     m_emit,m_spect,m_type;
 
     Helicity              * p_hel;
@@ -35,6 +34,8 @@ namespace AMEGIC {
     std::vector<int>        m_rsmap,m_srmap;
 
     std::vector<ATOOLS::Vec4D> m_epol;
+
+    ATOOLS::NLO_subevt *p_sub;
 
     Combination_Set m_ccombs;
     CFlavVector_Map m_cflavs;
@@ -75,7 +76,6 @@ namespace AMEGIC {
     void                WriteLibrary();
     bool                FoundLib(std::string& pID);
   protected:
-    std::string         CreateLibName();
     void                CreateMappingFile(Single_LOProcess*);
     void                UpdateMappingFile(std::string,std::map<std::string,Complex> &); 
     void                WriteAlternativeName(std::string aname);
@@ -83,18 +83,21 @@ namespace AMEGIC {
 					  std::string procname);
     bool                CompareTestMoms(const ATOOLS::Vec4D*);
   public:
+    std::string         CreateLibName();
     void                AddChannels(std::list<std::string>*);
     bool                NewLibs() {return m_newlib;}
     bool                FoundMappingFile(std::string &,std::string &);
-    virtual int         InitAmplitude(MODEL::Model_Base *,Topology *,
+    int                 InitAmplitude(Amegic_Model *,Topology *,
 				      std::vector<Process_Base *> &,
 				      std::vector<Process_Base *> &);
-    virtual int         InitAmplitude(MODEL::Model_Base *,Topology *,
+    virtual int         InitAmplitude(Amegic_Model *,Topology *,
+				      std::vector<Process_Base *> &,
+				      std::vector<Process_Base *> &,int);
+    virtual int         InitAmplitude(Amegic_Model *,Topology *,
 				      std::vector<Process_Base *> &,
 				      std::vector<Process_Base *> &,
 				      std::vector<ATOOLS::Vec4D>*,std::vector<double>*);
     bool                SetUpIntegrator();
-    void                WriteMomFlavs(std::ofstream& to) { p_BS->WriteMomFlavs(to); }
     String_Handler    * GetStringHandler();
     Amplitude_Handler * GetAmplitudeHandler();
     Helicity *          GetHelicity();
@@ -110,6 +113,7 @@ namespace AMEGIC {
     inline size_t       GetEmit()  { return m_emit; }
     inline size_t       GetSpect() { return m_spect; }
     int                 PerformTests();
+    inline void         SetSubEvt(ATOOLS::NLO_subevt *sub) { p_sub=sub; }
     /*------------------------------------------------------------------------------
 
       Process management

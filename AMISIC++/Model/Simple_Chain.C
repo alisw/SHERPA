@@ -5,6 +5,7 @@
 #include "MODEL/Main/Running_AlphaS.H"
 #include "EXTRA_XS/Main/Single_Process.H"
 #include "AMISIC++/Tools/Semihard_QCD.H"
+#include "AMISIC++/Tools/MPI_KFactor_Setter.H"
 #include "ATOOLS/Phys/Particle.H"
 #include "ATOOLS/Math/Random.H"
 #include "ATOOLS/Org/My_Limits.H"
@@ -16,6 +17,7 @@
 #include "ATOOLS/Org/Data_Reader.H"
 #include "ATOOLS/Org/MyStrStream.H"
 #include "PDF/Main/ISR_Handler.H"
+#include "ATOOLS/Phys/Weight_Info.H"
 
 // #define DEBUG__Simple_Chain
 
@@ -175,7 +177,7 @@ bool Simple_Chain::ReadInData()
   m_heavy_flavour = reader->GetValue<int>("MI_HEAVY_FLAVOUR",1);
   if (!reader->ReadFromFile(m_error,"PS_ERROR")) m_error=1.e-2;
   if (!reader->ReadFromFile(m_pathextra,"PATH_EXTRA")) m_pathextra="";
-  m_sigma_nd_fac = reader->GetValue<double>("SIGMA_ND_FACTOR",0.335);
+  m_sigma_nd_fac = reader->GetValue<double>("SIGMA_ND_FACTOR", 0.3142);
   m_resdir = reader->GetValue<std::string>("MI_RESULT_DIRECTORY","");
   m_ressuffix = reader->GetValue<std::string>("MI_RESULT_DIRECTORY_SUFFIX","");
   GeneratePathName();
@@ -234,17 +236,19 @@ void Simple_Chain::InitializeProcessList(const Flavour& in1,
                                          const Flavour& out1,
                                          const Flavour& out2)
 {
+  My_In_File::OpenDB(rpa->gen.Variable("SHERPA_CPP_PATH")+"/Process/Sherpa/");
   PHASIC::Process_Info pi;
   pi.m_ii.m_ps.push_back(PHASIC::Subprocess_Info(in1,"",""));
   pi.m_ii.m_ps.push_back(PHASIC::Subprocess_Info(in2,"",""));
   pi.m_fi.m_ps.push_back(PHASIC::Subprocess_Info(out1,"",""));
   pi.m_fi.m_ps.push_back(PHASIC::Subprocess_Info(out2,"",""));
-  pi.m_oew=0;
-  pi.m_oqcd=2;
-  pi.m_scale="MPI";
+  pi.m_maxcpl[1]=pi.m_mincpl[1]=0;
+  pi.m_maxcpl[0]=pi.m_mincpl[0]=2;
+  pi.m_scale=p_read->GetValue<std::string>("MPI_SCALE","MPI");
+  pi.m_kfactor=p_read->GetValue<std::string>("MPI_KFACTOR","MPI");
   pi.m_coupling="Alpha_QCD 1";
-  pi.m_kfactor="NO";
   pi.m_mpiprocess=true;
+  pi.m_addname="__MPI";
   p_processes.push_back(new Semihard_QCD(p_read));
   p_processes.back()->Init(pi,p_beam,p_isr);
   msg_Info()<<METHOD<<"(): Init processes ";
@@ -258,6 +262,7 @@ void Simple_Chain::InitializeProcessList(const Flavour& in1,
   p_processes.back()->SetGenerator(p_processes.back());
   for (size_t i(0);i<p_processes.back()->Size();++i)
     m_processmap[(*p_processes.back())[i]->Name()]=(*p_processes.back())[i];
+  My_In_File::CloseDB(rpa->gen.Variable("SHERPA_CPP_PATH")+"/Process/Sherpa/");
 }
 
 bool Simple_Chain::SetUpInterface()
@@ -284,7 +289,7 @@ bool Simple_Chain::SetUpInterface()
 void Simple_Chain::CalculateSigmaND()
 {
   if(s_kftable.find(111)==s_kftable.end()) // if not initialized yet
-    s_kftable[111]=new Particle_Info(111,0.134976,7.8486e-09,0,0,0,1,0,"pi","pi");
+    s_kftable[111]=new Particle_Info(111,0.134976,7.8486e-09,0,0,1,0,"pi","pi");
   double eps=0.0808, eta=-0.4525, X=21.70, Y=56.08, b=2.3;
   if (p_isr->Flav(0).IsAnti()^p_isr->Flav(1).IsAnti()) Y=98.39;
   double s=sqr(rpa->gen.Ecms());
@@ -406,10 +411,13 @@ bool Simple_Chain::Initialize()
   std::string xsfile=std::string("XS.dat");
   p_read->ReadFromFile(xsfile,"XS_FILE");
   SetInputFile(xsfile,1);
-  double stop, exponent, scale;
-  if (!p_read->ReadFromFile(stop,"SCALE_MIN")) stop=2.44;
+  double stop, exponent, scale, pt0, pt0exp;
+  if (!p_read->ReadFromFile(pt0,"TURNOFF")) pt0=0.7549;
+  if (!p_read->ReadFromFile(stop,"SCALE_MIN")) stop=2.895;
+  if (!p_read->ReadFromFile(pt0exp,"TURNOFF_EXPONENT")) pt0exp=0.244;
   if (!p_read->ReadFromFile(exponent,"RESCALE_EXPONENT")) exponent=0.244;
   if (!p_read->ReadFromFile(scale,"REFERENCE_SCALE")) scale=1800.0;
+  MPI_KFactor_Setter::SetPT0(pt0*pow(m_ecms/scale,pt0exp));
   stop*=pow(m_ecms/scale,exponent);
   SetStop(stop,0);
   SetStop(stop,4); 
@@ -427,8 +435,8 @@ bool Simple_Chain::Initialize()
   if (!p_read->ReadFromFile(function,"PROFILE_FUNCTION")) {
     function="Double_Gaussian";
     if (!p_read->VectorFromFile(parameters,"PROFILE_PARAMETERS")) {
-      parameters.push_back(0.76);
-      parameters.push_back(0.58);
+      parameters.push_back(0.8243);
+      parameters.push_back(0.9515);
     }
   }
   else {
@@ -513,7 +521,7 @@ bool Simple_Chain::CreateMomenta()
     if (fsr==NULL) THROW(fatal_error, "Internal error.");
     fsr->SetTrigger(false);
     while (++pstrials<m_maxtrials) {
-      PHASIC::Weight_Info *data=p_xs->
+      ATOOLS::Weight_Info *data=p_xs->
 	OneEvent(0,PHASIC::psm::no_lim_isr);
       if (data!=NULL) {
 	weight=data->m_weight;
@@ -571,7 +579,7 @@ bool Simple_Chain::CreateMomenta()
 		SetISRRange();
 		p_isr->SetLimits(m_spkey.Doubles(),m_ykey.Doubles(),
 				 m_xkey.Doubles());
-		PHASIC::Weight_Info *info=
+		ATOOLS::Weight_Info *info=
 		  p_xs->OneEvent(0,PHASIC::psm::no_lim_isr|
 				 PHASIC::psm::no_gen_isr);
 		if (info) delete info;

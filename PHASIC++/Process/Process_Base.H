@@ -7,6 +7,7 @@
 #include "PHASIC++/Scales/Scale_Setter_Base.H"
 #include "PHASIC++/Scales/KFactor_Setter_Base.H"
 #include "ATOOLS/Phys/NLO_Subevt.H"
+#include "ATOOLS/Phys/Weight_Info.H"
 
 namespace ATOOLS { 
   class Cluster_Leg;
@@ -23,6 +24,10 @@ namespace PDF {
   class Shower_Base;
 }
 
+namespace SHERPA {
+  class Variation_Weights;
+}
+
 namespace METOOLS { class Spin_Amplitudes; }
 
 namespace PHASIC {
@@ -33,8 +38,6 @@ namespace PHASIC {
   class Phase_Space_Handler;
   class Combined_Selector;
   class ME_Generator_Base;
-
-  struct Weight_Info;
 
   class Process_Base;
   class BBar_Multi_Channel;
@@ -49,25 +52,31 @@ namespace PHASIC {
   class Process_Base {
   protected:
 
-    Process_Base       *p_parent, *p_selected, *p_mapproc, *p_sproc;
+    Process_Base       *p_parent, *p_selected, *p_mapproc, *p_sproc, *p_proc;
     Process_Integrator *p_int;
     Combined_Selector  *p_selector;
     Cut_Data           *p_cuts;
     ME_Generator_Base  *p_gen;
 
     PDF::Shower_Base   *p_shower;
+    SHERPA::Variation_Weights *p_variationweights;
+    bool m_variationweightsowned;
     BBar_Multi_Channel *p_mc;
 
 
     Scale_Setter_Base   *p_scale;
     KFactor_Setter_Base *p_kfactor;
 
-    size_t      m_nin, m_nout, m_oqcd, m_oew, m_tinfo, m_mcmode, m_cmode;
+    size_t      m_nin, m_nout, m_tinfo, m_mcmode, m_cmode;
     std::string m_name;
+
+    std::vector<double> m_maxcpl, m_mincpl;
 
     ATOOLS::Flavour_Vector m_flavs;
     Process_Info           m_pinfo;
     ATOOLS::DecayInfo_Vector m_decins;
+
+    ATOOLS::ME_Weight_Info m_mewgtinfo;
 
     double m_last, m_lastb, m_symfac;
     bool   m_lookup, m_use_biweight;
@@ -75,6 +84,8 @@ namespace PHASIC {
     MODEL::Coupling_Map m_cpls;
 
     NLOTypeStringProcessMap_Map *p_apmap;
+
+    static int s_usefmm;
 
     static void SortFlavours(Subprocess_Info &info,FMMap *const fmm=0);
     static void SortFlavours(std::vector<ATOOLS::Cluster_Leg*> &legs,
@@ -97,6 +108,10 @@ namespace PHASIC {
     void SetSProc(Process_Base *sproc);
     void SetBBarMC(BBar_Multi_Channel *mc);
 
+    int NaiveMapping(Process_Base *proc) const;
+
+    std::string ShellName(std::string name="") const;
+
     virtual void FillProcessMap(NLOTypeStringProcessMap_Map *apmap);
 
     virtual void SetScale(const Scale_Setter_Arguments &args) = 0;
@@ -112,7 +127,7 @@ namespace PHASIC {
     virtual size_t Size() const = 0;
     virtual Process_Base *operator[](const size_t &i) = 0;
 
-    virtual Weight_Info *OneEvent(const int wmode,const int mode=0) = 0;
+    virtual ATOOLS::Weight_Info *OneEvent(const int wmode,const int mode=0) = 0;
 
     virtual double Differential(const ATOOLS::Vec4D_Vector &p) = 0;
     virtual double Differential(const ATOOLS::Cluster_Amplitude &ampl,
@@ -123,7 +138,9 @@ namespace PHASIC {
     virtual bool ReadIn(const std::string &pid);
     virtual void WriteOut(const std::string &pid);
     virtual void EndOptimize();
-    virtual void MPISync();
+    virtual void MPICollect(std::vector<double> &sv,size_t &i);
+    virtual void MPIReturn(std::vector<double> &sv,size_t &i);
+    virtual void MPISync(const int mode=0);
 
     virtual bool IsGroup() const;
 
@@ -141,8 +158,10 @@ namespace PHASIC {
 
     virtual void SetGenerator(ME_Generator_Base *const gen);
     virtual void SetShower(PDF::Shower_Base *const ps);
+    virtual void SetVariationWeights(SHERPA::Variation_Weights *const);
+    void SetOwnedVariationWeights(SHERPA::Variation_Weights *);
+    SHERPA::Variation_Weights *VariationWeights() const { return p_variationweights; }
     virtual void SetSelector(const Selector_Key &key);
-    virtual void SetUpThreading();
 
     virtual void InitCuts(Cut_Data *const cuts);
     virtual void BuildCuts(Cut_Data *const cuts);
@@ -151,7 +170,6 @@ namespace PHASIC {
 
     virtual ATOOLS::NLO_subevtlist *GetSubevtList();
     virtual ATOOLS::NLO_subevtlist *GetRSSubevtList();
-    virtual ATOOLS::ME_wgtinfo     *GetMEwgtinfo();
 
     virtual void SetRBMap(ATOOLS::Cluster_Amplitude *ampl);
     virtual void InitPSHandler(const double &maxerror,
@@ -182,11 +200,19 @@ namespace PHASIC {
 
     inline const std::string &Name() const { return m_name; }
 
-    inline void SetOrderQCD(const size_t &oqcd) { m_oqcd=oqcd; }
-    inline void SetOrderEW(const size_t &oew)   { m_oew=oew;   }
+    inline void SetMaxOrders(const std::vector<double> &o) { m_maxcpl=o; }
+    inline void SetMinOrders(const std::vector<double> &o) { m_mincpl=o; }
 
-    inline size_t OrderQCD() const { return m_oqcd; }
-    inline size_t OrderEW() const  { return m_oew;  }
+    inline void SetMaxOrder(const size_t &id,const double o)
+    { if (m_maxcpl.size()<=id) m_maxcpl.resize(id+1,0); m_maxcpl[id]=o; }
+    inline void SetMinOrder(const size_t &id,const double o)
+    { if (m_mincpl.size()<=id) m_mincpl.resize(id+1,0); m_mincpl[id]=o; }
+
+    inline const std::vector<double> &MaxOrders() const { return m_maxcpl; }
+    inline const std::vector<double> &MinOrders() const { return m_mincpl; }
+
+    inline double MaxOrder(const size_t &id) const { return m_maxcpl[id]; }
+    inline double MinOrder(const size_t &id) const { return m_mincpl[id]; }
 
     PDF::Shower_Base *Shower() const { return p_shower; }
 
@@ -195,6 +221,10 @@ namespace PHASIC {
 
     inline ATOOLS::DecayInfo_Vector       &DecayInfos()       {return m_decins;}
     inline const ATOOLS::DecayInfo_Vector &DecayInfos() const {return m_decins;}
+
+    inline ATOOLS::ME_Weight_Info *GetMEwgtinfo() { return &m_mewgtinfo; }
+    inline void SetMEwgtinfo(const ATOOLS::ME_Weight_Info i) { m_mewgtinfo=i; }
+
 
     inline Process_Integrator *Integrator() const { return p_int; }
 
@@ -223,6 +253,7 @@ namespace PHASIC {
     inline ME_Generator_Base *Generator() const { return p_gen; }
 
     inline Process_Base *MapProc() const  { return p_mapproc; }
+    inline Process_Base *Proc() const     { return p_proc;    }
 
     inline Cut_Data          * Cuts() const { return p_cuts; }
     inline Combined_Selector * Selector() const 

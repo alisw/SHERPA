@@ -8,6 +8,7 @@
 #include "PHASIC++/Process/Process_Base.H"
 #include "PHASIC++/Process/ME_Generators.H"
 #include "ATOOLS/Org/CXXFLAGS_PACKAGES.H"
+#include "ATOOLS/Phys/Weight_Info.H"
 
 #include <map> 
 
@@ -48,9 +49,9 @@ namespace SHERPA {
       MPSV_Map m_veobs, m_vefunc, m_vycut, m_vscale, m_vcoupl, m_vkfac,
 	m_vsfile, m_vnloqcdmode, m_vnloqcdpart, m_vnloewmode, m_vnloewpart,
 	m_vnlosubv, m_vmegen, m_vrsmegen, m_vloopgen, m_vint, m_vrsint,
-	 m_vgpath;
+	m_vgpath, m_vcpl, m_vmaxcpl, m_vmincpl, m_vaddname;
       MPIV_Map m_vnmaxq, m_vnminq, m_vamegicmhv,
-	m_vntchan, m_vmtchan, m_voqcd, m_voew;
+        m_vntchanmin, m_vntchanmax, m_vitmin, m_vrsitmin;
 
       std::string m_gycut;
       int m_cutcore;
@@ -71,10 +72,11 @@ namespace SHERPA {
     std::string m_path, m_file, m_processfile, m_selectorfile, m_respath;
     int         m_eventmode, m_seedmode, m_hasnlo, m_rsadd;
 
-    PHASIC::Weight_Info m_evtinfo;
+    ATOOLS::Weight_Info m_evtinfo;
 
-    Shower_Handler   *p_shower;
-    PDF::NLOMC_Base  *p_nlomc;
+    Shower_Handler    *p_shower;
+    Variation_Weights *p_variationweights;
+    PDF::NLOMC_Base   *p_nlomc;
 
     double m_sum, m_ovwth, m_weightfactor;
     size_t m_globalnlomode, m_ranidx, m_fosettings;
@@ -116,6 +118,8 @@ namespace SHERPA {
 
     std::vector<PHASIC::Process_Base*> InitializeProcess
     (const PHASIC::Process_Info &pi,PHASIC::NLOTypeStringProcessMap_Map *&pmap);
+    std::vector<PHASIC::Process_Base*> InitializeSingleProcess
+    (const PHASIC::Process_Info &pi,PHASIC::NLOTypeStringProcessMap_Map *&pmap);
 
     void BuildProcesses();
 
@@ -146,12 +150,13 @@ namespace SHERPA {
 
     inline int EventGenerationMode() const { return m_eventmode; }
 
-    inline PHASIC::Weight_Info WeightInfo() const { return m_evtinfo; }
+    inline ATOOLS::Weight_Info WeightInfo() const { return m_evtinfo; }
 
     inline BEAM::Beam_Spectra_Handler *GetBeam() const { return p_beam; }
     inline PDF::ISR_Handler           *GetISR() const  { return p_isr;  }
 
-    inline void SetShowerHandler(Shower_Handler *const sh) { p_shower=sh; }
+    inline void SetShowerHandler(Shower_Handler *const sh)       { p_shower=sh;           }
+    inline void SetVariationWeights(Variation_Weights *const vw) { p_variationweights=vw; }
 
     inline Shower_Handler *Shower() const { return p_shower; }
 
@@ -165,7 +170,8 @@ namespace SHERPA {
     inline int HasNLO() const  { return m_hasnlo;  }
 
     double GetWeight(const ATOOLS::Cluster_Amplitude &ampl,
-		     const PHASIC::nlo_type::code type) const;
+		     const PHASIC::nlo_type::code type,
+		     const int mode) const;
 
   };// end of class Matrix_Element_Handler
 

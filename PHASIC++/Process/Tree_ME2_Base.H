@@ -2,6 +2,7 @@
 #define PHASIC_Process_Tree_ME2_Base_H
 
 #include "PHASIC++/Process/Process_Info.H"
+#include "METOOLS/Loops/Divergence_Array.H"
 #include "ATOOLS/Math/Vector.H"
 #include "MODEL/Main/Model_Base.H"
 
@@ -24,7 +25,10 @@ namespace PHASIC {
     MODEL::Coupling_Data* p_aqcd, * p_aqed;
 
     size_t m_namps;
-
+    double m_norm;
+    METOOLS::DivArrD m_res;
+    double m_born, m_mur2;
+    
   public:
 
     Tree_ME2_Base(const PHASIC::Process_Info &pi,
@@ -33,7 +37,7 @@ namespace PHASIC {
     virtual ~Tree_ME2_Base();
 
     virtual double Calc(const ATOOLS::Vec4D_Vector &p) = 0;
-
+    
     virtual void SetCouplings(const MODEL::Coupling_Map& cpls);
     virtual double AlphaQCD() const;
     virtual double AlphaQED() const;
@@ -60,6 +64,8 @@ namespace PHASIC {
                                     const PHASIC::Process_Info& pi);
 
     inline size_t NAmps() const { return m_namps; }
+
+    inline void SetNorm(const double &norm) { m_norm=norm; }
 
   };
 

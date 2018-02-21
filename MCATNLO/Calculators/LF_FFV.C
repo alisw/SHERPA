@@ -228,7 +228,7 @@ namespace MCATNLO {
 
 }
 
-#include "MODEL/Interaction_Models/Single_Vertex.H"
+#include "MODEL/Main/Single_Vertex.H"
 #include "ATOOLS/Math/Random.H"
 
 using namespace MCATNLO;
@@ -322,7 +322,7 @@ double LF_FFV_FI::OverIntegrated
 (const double zmin,const double zmax,const double scale,const double xbj)
 {
   m_zmin = zmin; m_zmax = zmax;
-  m_Jmax=m_flspec.Kfcode()<3?5.:1.;
+  m_Jmax=5.;
   return (2.0*p_cf->MaxCoupling(0)*(2.+CDISMax()) + 0.5*p_cf->MaxCoupling(1))*log((1.-zmin)/(1.-zmax)) * m_Jmax;
 }
 
@@ -488,7 +488,7 @@ double LF_FVF_FI::OverIntegrated
 (const double zmin,const double zmax,const double scale,const double xbj)
 {
   m_zmin = zmin; m_zmax = zmax;
-  m_Jmax=m_flspec.Kfcode()<3?5.:1.;
+  m_Jmax=5.;
   return (2.0*p_cf->MaxCoupling(0)*(2.+CDISMax()) + 0.5*p_cf->MaxCoupling(1)) * log(zmax/zmin) * m_Jmax;
 }
 
@@ -687,7 +687,7 @@ double LF_VFF_FI::OverIntegrated
 (const double zmin,const double zmax,const double scale,const double xbj)
 {
   m_zmin = zmin; m_zmax = zmax;
-  m_Jmax=m_flspec.Kfcode()<3?5.:1.;
+  m_Jmax=5.;
   return (2.0*p_cf->MaxCoupling(0)*(1.+CDISMax()) + 0.5*p_cf->MaxCoupling(1))* (m_zmax-m_zmin) * m_Jmax;
 }
 
@@ -779,7 +779,7 @@ double LF_VFF_II::Z()
   return m_zmin + (m_zmax-m_zmin)*ATOOLS::ran->Get();
 }
 
-DECLARE_GETTER(LF_FFV_FF,"Gamma",SF_Lorentz,SF_Key);
+DECLARE_GETTER(LF_FFV_FF,"FFV",SF_Lorentz,SF_Key);
 
 SF_Lorentz *ATOOLS::Getter<SF_Lorentz,SF_Key,LF_FFV_FF>::
 operator()(const Parameter_Type &args) const

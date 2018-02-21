@@ -1,3 +1,3 @@
 #include "ATOOLS/Org/SVN_Info.H"
 static ATOOLS::SVN_Info initializer
-("PHASIC++/Scales","branches/rel-2-1-1","24084","35c7e4f5d47c30feda7315bdb56f4986");
+("PHASIC++/Scales","branches/rel-2-2-4","30888","eb9b6806fb59b97a5d16d09928c8d7ac");

@@ -1,7 +1,6 @@
 (run){
   % general setting
   EVENTS 1M; ERROR 0.99;
-  MASSIVE_PS 4 5;
 
   % scales, tags for scale variations
   FSF:=1.; RSF:=1.; QSF:=1.;
@@ -25,7 +24,7 @@
 
 (processes){
   Process 93 93 -> 90 90 93{NJET};
-  Order_EW 2; CKKW sqr(QCUT/E_CMS);
+  Order (*,2); CKKW sqr(QCUT/E_CMS);
   NLO_QCD_Mode MC@NLO {LJET};
   ME_Generator Amegic {LJET};
   RS_ME_Generator Comix {LJET};

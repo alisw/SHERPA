@@ -24,6 +24,7 @@
 #include "MODEL/Main/Model_Base.H"
 #include "ATOOLS/Org/Smart_Pointer.C"
 #include "ATOOLS/Org/My_MPI.H"
+#include "ATOOLS/Phys/Weight_Info.H"
 
 using namespace PHASIC;
 using namespace ATOOLS;
@@ -38,6 +39,7 @@ namespace ATOOLS { template class SP(Phase_Space_Handler); }
 Phase_Space_Handler::Phase_Space_Handler(Process_Integrator *proc,double error): 
   m_name(proc->Process()->Name()), p_process(proc), p_active(proc), p_integrator(NULL), p_cuts(NULL),
   p_enhancefunc(NULL), p_enhancehisto(NULL), p_enhancehisto_current(NULL),
+  p_variationweights(NULL),
   p_beamhandler(proc->Beam()), p_isrhandler(proc->ISR()), p_fsrchannels(NULL),
   p_isrchannels(NULL), p_beamchannels(NULL), p_massboost(NULL),
   m_nin(proc->NIn()), m_nout(proc->NOut()), m_nvec(0), m_dmode(1), m_initialized(0), m_sintegrator(0),
@@ -85,9 +87,6 @@ Phase_Space_Handler::Phase_Space_Handler(Process_Integrator *proc,double error):
     m_beamykey.Assign("y beam",3,0,p_info);
     p_beamhandler->AssignKeys(p_info);
   }
-#ifdef USING__Threading
-  m_uset=0;
-#endif
   m_nvec=m_nin+m_nout;
   p_lab.resize(m_nvec);
 }
@@ -137,13 +136,14 @@ void Phase_Space_Handler::CheckSinglePoint()
   read.SetInputFile(rpa->gen.Variable("RUN_DATA_FILE"));
   std::string file=read.GetValue<std::string>("PS_PT_FILE","");
   if (file!="") {
-    read.SetAddCommandLine(false);
-    read.SetInputFile(file);
-    read.AddIgnore("Vec4D");
-    read.RereadInFile();
+    Data_Reader read_mom(" ",";","#","=");
+    read_mom.SetAddCommandLine(false);
+    read_mom.SetInputFile(file);
+    read_mom.AddIgnore("Vec4D");
+    read_mom.RereadInFile();
     for (size_t i(0);i<p_lab.size();++i) {
       std::vector<std::string> vec;
-      if (!read.VectorFromFile(vec,"p_lab["+ToString(i)+"]"))
+      if (!read_mom.VectorFromFile(vec,"p_lab["+ToString(i)+"]"))
 	THROW(fatal_error,"No ps points in file");
       if (vec.front()=="-") p_lab[i]=-ToType<Vec4D>(vec.back());
       else p_lab[i]=ToType<Vec4D>(vec.front());
@@ -175,7 +175,7 @@ double Phase_Space_Handler::Integrate()
       (p_process->TotalError()<dabs(m_error*p_process->TotalXS()) ||
        p_process->TotalError()<m_abserror)) 
     return p_process->TotalXS()*rpa->Picobarn();
-  p_integrator = new Phase_Space_Integrator();
+  p_integrator = new Phase_Space_Integrator(this);
   if (!InitIncoming()) return 0;
   if (MODEL::s_model->Name()==std::string("ADD") && p_isrhandler->On()==0 && p_beamhandler->On()==0) {
     if (rpa->gen.Ecms()>MODEL::s_model->ScalarConstant(std::string("M_cut"))) {
@@ -198,65 +198,14 @@ double Phase_Space_Handler::Integrate()
   }
   msg_Debugging()<<"  FSR    : "<<p_fsrchannels->Name()<<" ("<<p_fsrchannels<<") "
 		 <<"  ("<<p_fsrchannels->Number()<<","<<p_fsrchannels->N()<<")"<<std::endl;
-#ifdef USING__Threading
-  if (m_nout>3 && (p_process->Process()->ThreadInfo()&1)) {
-  pthread_cond_init(&m_sme_cnd,NULL);
-  pthread_cond_init(&m_tme_cnd,NULL);
-  pthread_mutex_init(&m_sme_mtx,NULL);
-  pthread_mutex_init(&m_tme_mtx,NULL);
-  pthread_mutex_lock(&m_sme_mtx);
-  pthread_mutex_lock(&m_tme_mtx);
-  pthread_cond_init(&m_sps_cnd,NULL);
-  pthread_cond_init(&m_tps_cnd,NULL);
-  pthread_mutex_init(&m_sps_mtx,NULL);
-  pthread_mutex_init(&m_tps_mtx,NULL);
-  pthread_mutex_lock(&m_sps_mtx);
-  pthread_mutex_lock(&m_tps_mtx);
-  m_uset=1;
-  m_sig=1;
-  int tec(0);
-  if ((tec=pthread_create(&m_met,NULL,&CalculateME,(void*)this))) {
-    THROW(fatal_error,"Cannot create matrix element thread");
-  }
-  if ((tec=pthread_create(&m_pst,NULL,&CalculatePS,(void*)this)))
-    THROW(fatal_error,"Cannot create phase space thread");
-  }
-#endif
   if (p_beamchannels) p_beamchannels->Print();
   if (p_isrchannels) p_isrchannels->Print();
   p_fsrchannels->Print();
   m_dmode=0;
   double res(0.0);
-  if (m_nin==2) res=p_integrator->Calculate(this,m_error,m_abserror,m_fin_opt);
-  if (m_nin==1) res=p_integrator->CalculateDecay(this,m_error);
+  if (m_nin==2) res=p_integrator->Calculate(m_error,m_abserror,m_fin_opt);
+  if (m_nin==1) res=p_integrator->CalculateDecay(m_error);
   m_dmode=1;
-#ifdef USING__Threading
-  if (m_uset) {
-  m_uset=0;
-  m_sig=0;
-  int tec(0);
-  // terminate ps calc thread
-  pthread_cond_wait(&m_sps_cnd,&m_sps_mtx);
-  if ((tec=pthread_join(m_pst,NULL)))
-    THROW(fatal_error,"Cannot join phase space thread");
-  pthread_mutex_unlock(&m_tps_mtx);
-  pthread_mutex_unlock(&m_sps_mtx);
-  pthread_mutex_destroy(&m_tps_mtx);
-  pthread_mutex_destroy(&m_sps_mtx);
-  pthread_cond_destroy(&m_tps_cnd);
-  pthread_cond_destroy(&m_sps_cnd);
-  // terminate me calc thread
-  pthread_cond_wait(&m_sme_cnd,&m_sme_mtx);
-  if ((tec=pthread_join(m_met,NULL)))
-    THROW(fatal_error,"Cannot join matrix element thread");
-  pthread_mutex_unlock(&m_tme_mtx);
-  pthread_mutex_unlock(&m_sme_mtx);
-  pthread_mutex_destroy(&m_tme_mtx);
-  pthread_mutex_destroy(&m_sme_mtx);
-  pthread_cond_destroy(&m_tme_cnd);
-  pthread_cond_destroy(&m_sme_cnd);
-  }
-#endif
   return res;
 }
 
@@ -328,40 +277,6 @@ void Phase_Space_Handler::CalculatePS()
   m_psweight*=p_fsrchannels->Weight();
 }
 
-#ifdef USING__Threading
-void *Phase_Space_Handler::CalculateME(void *arg)
-{
-  Phase_Space_Handler *psh((Phase_Space_Handler*)arg);
-  while (true) {
-    // wait for psh to signal
-    pthread_mutex_lock(&psh->m_sme_mtx);
-    pthread_mutex_unlock(&psh->m_sme_mtx);
-    pthread_cond_signal(&psh->m_sme_cnd);
-    if (psh->m_sig==0) return NULL;
-    psh->CalculateME();
-    // signal psh to continue
-    pthread_cond_wait(&psh->m_tme_cnd,&psh->m_tme_mtx);
-  }
-  return NULL;
-}
-
-void *Phase_Space_Handler::CalculatePS(void *arg)
-{
-  Phase_Space_Handler *psh((Phase_Space_Handler*)arg);
-  while (true) {
-    // wait for psh to signal
-    pthread_mutex_lock(&psh->m_sps_mtx);
-    pthread_mutex_unlock(&psh->m_sps_mtx);
-    pthread_cond_signal(&psh->m_sps_cnd);
-    if (psh->m_sig==0) return NULL;
-    psh->CalculatePS();
-    // signal psh to continue
-    pthread_cond_wait(&psh->m_tps_cnd,&psh->m_tps_mtx);
-  }
-  return NULL;
-}
-#endif
-
 double Phase_Space_Handler::Differential(Process_Integrator *const process,
 					 const psm::code mode) 
 { 
@@ -420,31 +335,9 @@ double Phase_Space_Handler::Differential(Process_Integrator *const process,
   m_result=0.0;
   if (process->Process()->Trigger(p_lab)) {
     Check4Momentum(p_lab);
-#ifdef USING__Threading
-    if (m_uset) {
-      // start me calc
-      pthread_cond_wait(&m_sme_cnd,&m_sme_mtx);
-      // start ps calc
-      pthread_cond_wait(&m_sps_cnd,&m_sps_mtx);
-      // wait for ps calc to finish
-      pthread_mutex_lock(&m_tps_mtx);
-      pthread_mutex_unlock(&m_tps_mtx);
-      pthread_cond_signal(&m_tps_cnd);
-      // wait for me calc to finish
-      pthread_mutex_lock(&m_tme_mtx);
-      pthread_mutex_unlock(&m_tme_mtx);
-      pthread_cond_signal(&m_tme_cnd);
-    }
-    else {
-      CalculatePS();
-      CalculateME();
-      if (m_result==0.) { return 0.;}
-    }
-#else
     CalculatePS();
     CalculateME();
     if (m_result==0.) { return 0.;}
-#endif
     if (m_printpspoint || msg_LevelIsDebugging()) {
       size_t precision(msg->Out().precision());
       msg->SetPrecision(15);
@@ -454,9 +347,10 @@ double Phase_Space_Handler::Differential(Process_Integrator *const process,
                <<m_result*m_psweight<<std::endl;
       if (p_active->Process()->GetSubevtList()) {
         NLO_subevtlist * subs(p_active->Process()->GetSubevtList());
-        for (size_t i(0);i<subs->size();++i) msg_Out()<<(*(*subs)[i]);
+        for (size_t i(0);i<subs->size();++i) msg_Out()<<(*(*subs)[i])<<"\n";
       }
-      for (size_t i(0);i<p_lab.size();++i) msg_Out()<<"  p_lab["<<i<<"]=Vec4D"<<p_lab[i]<<";"<<std::endl;
+      for (size_t i(0);i<p_lab.size();++i)
+        msg_Out()<<"  p_lab["<<i<<"]=Vec4D"<<p_lab[i]<<";"<<std::endl;
       msg_Out()<<"==========================================================\n";
       msg->SetPrecision(precision);
     }
@@ -504,10 +398,10 @@ Weight_Info *Phase_Space_Handler::OneEvent(Process_Base *const proc,int mode)
   cur->SetMomenta(p_lab);
   int fl1(0), fl2(0);
   double x1(0.0), x2(0.0), xf1(0.0), xf2(0.0), mu12(0.0), mu22(0.0), dxs(0.0);
-  ME_wgtinfo* wgtinfo=p_active->Process()->GetMEwgtinfo();
+  ME_Weight_Info* wgtinfo=p_active->Process()->GetMEwgtinfo();
   dxs=m_result/m_psweight;
-  fl1=p_active->Process()->Flavours()[0].HepEvt();
-  fl2=p_active->Process()->Flavours()[1].HepEvt();
+  fl1=(long int)p_active->Process()->Flavours()[0];
+  fl2=(long int)p_active->Process()->Flavours()[1];
   x1=p_isrhandler->X1();
   x2=p_isrhandler->X2();
   xf1=p_isrhandler->XF1(0);
@@ -516,6 +410,9 @@ Weight_Info *Phase_Space_Handler::OneEvent(Process_Base *const proc,int mode)
   mu22=p_isrhandler->MuF2(1);
   if (wgtinfo) {
     (*wgtinfo)*=m_psweight;
+    if (p_variationweights) {
+      (*p_variationweights)*=m_psweight;
+    }
     wgtinfo->m_x1=x1;
     wgtinfo->m_x2=x2;
   }
@@ -876,13 +773,3 @@ void Phase_Space_Handler::AddStats(const std::vector<double> &stats)
   m_stats.push_back(nstats); 
 }
 
-template Weight_Info &ATOOLS::Blob_Data_Base::Get<Weight_Info>();
-template PDF_Info &ATOOLS::Blob_Data_Base::Get<PDF_Info>();
-
-namespace ATOOLS {
-  template <> Blob_Data<Weight_Info>::~Blob_Data() {}
-  template class Blob_Data<Weight_Info>;
-
-  template <> Blob_Data<PDF_Info>::~Blob_Data() {}
-  template class Blob_Data<PDF_Info>;
-}

@@ -8,7 +8,8 @@ namespace AHADIC {
   class Cluster_Splitter : public Splitter_Base {
   private:
     size_t m_nmax;
-    double m_etax, m_etax_lead, m_etay, m_etay_lead;
+    double m_etax, m_etax_lead, m_etay, m_etay_lead, m_pt2min;
+    bool   m_added;
 
     size_t m_pairs;
     double m_alphanew,m_betanew;
@@ -17,6 +18,8 @@ namespace AHADIC {
     std::list<PoppedPair *>::iterator m_popsplit, m_popspect;
     size_t m_popspliti, m_popspecti;
     Proto_Particle * p_trip, * p_anti;
+
+    long int m_fourmom_err, m_kt2_err, m_LC_err, m_flav_err;
 
     size_t SelectNumberOfPairs(const size_t & nmax);
     bool   SelectSplitter(Proto_Particle * part1,Proto_Particle * part2);

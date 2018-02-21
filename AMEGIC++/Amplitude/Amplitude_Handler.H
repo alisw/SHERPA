@@ -1,9 +1,10 @@
 #ifndef AMEGIC_Amplitude_Amplitude_Handler_H
 #define AMEGIC_Amplitude_Amplitude_Handler_H
 
-#include "MODEL/Main/Model_Base.H"
+#include "AMEGIC++/Main/Tools.H"
 #include "ATOOLS/Phys/Flavour.H"
 #include "AMEGIC++/Main/Polarisation.H"
+#include "AMEGIC++/Amplitude/Vertex.H"
 #include "AMEGIC++/Amplitude/Zfunctions/Basic_Sfuncs.H"
 #include "AMEGIC++/String/String_Handler.H"
 #include "ATOOLS/Math/MyComplex.H"
@@ -23,6 +24,7 @@ namespace AMEGIC {
   //! This is the master class for the generation and calculation of an amplitude.
   class Process_Tags;
   class Amplitude_Handler : public Amplitude_Group {
+    bool m_cutvecprop;
     String_Handler* shand;
     CFColor              * CFCol_Matrix;   
     CFC_map                CFCol_MMatrixMap;   
@@ -37,6 +39,10 @@ namespace AMEGIC {
 
     std::map<std::string,ATOOLS::Flavour> m_flavourmap;
     std::vector<size_t> m_hm;
+    std::vector<double> m_maxcpl, m_mincpl;
+    std::vector<int> m_aon;
+    std::vector<std::vector<std::vector<int> > > m_cplmatrix;
+    std::vector<std::vector<int> > m_on;
 
     int  PropProject(Amplitude_Base*,int);
     int  CompareZfunc(Amplitude_Base*,Zfunc*,Amplitude_Base*,Zfunc*);
@@ -54,8 +60,12 @@ namespace AMEGIC {
     
   public:
     Amplitude_Handler(int,ATOOLS::Flavour *,int *,Process_Tags*,
-		      MODEL::Model_Base *,Topology *,int &,int &,int &,MODEL::Coupling_Map *const cpls,
-		      Basic_Sfuncs *,String_Handler *,std::string print_graph="", bool create_4V=true);
+		      Amegic_Model *,Topology *,
+		      std::vector<double> &,std::vector<double> &,
+                      size_t &,size_t &,
+                      MODEL::Coupling_Map *const cpls,
+		      Basic_Sfuncs *,String_Handler *,std::string print_graph="", bool create_4V=true,
+		      bool cutvecprop=true);
     ~Amplitude_Handler();
     void ConstructSignalAmplitudes(int N,ATOOLS::Flavour* fl,int* b,
 				   Process_Tags* pinfo,Single_Amplitude** sglist,

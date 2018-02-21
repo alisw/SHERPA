@@ -3,7 +3,7 @@
 #include "MCATNLO/Showers/Splitting_Function_Base.H"
 #include "MCATNLO/Tools/Singlet.H"
 #include "MCATNLO/Showers/Shower.H"
-#include "MODEL/Interaction_Models/Single_Vertex.H"
+#include "MODEL/Main/Single_Vertex.H"
 #include "MODEL/Main/Model_Base.H"
 #include "ATOOLS/Math/Random.H"
 #include "ATOOLS/Org/My_Limits.H"
@@ -17,7 +17,7 @@ Sudakov::Sudakov(PDF::ISR_Handler *isr,const int qed) :
   p_rms(NULL)
 {
   m_ewmode=qed;
-  //int hadron = rpa->gen.Beam1().Strong()==1?0:1;
+  p_pdf = new PDF::PDF_Base*[2];
   for (int i=0;i<2; i++) p_pdf[i] = isr->PDF(i);
 
   Data_Reader read(" ",";","#","=");
@@ -27,6 +27,7 @@ Sudakov::Sudakov(PDF::ISR_Handler *isr,const int qed) :
 
 Sudakov::~Sudakov() 
 {
+  delete [] p_pdf;
   for (size_t i(0);i<m_addsplittings.size();++i) delete m_addsplittings[i];
   for (size_t i(0);i<m_cgets.size();++i) delete m_cgets[i];
 }
@@ -66,35 +67,35 @@ void Sudakov::InitSplittingFunctions(MODEL::Model_Base *md,const int kfmode)
   msg_Debugging()<<METHOD<<"(): Init splitting functions {\n";
   msg_Indent();
   std::set<FTrip> sfs;
-  Vertex_Table *vtab(md->GetVertexTable());
+  const Vertex_Table *vtab(md->VertexTable());
   for (Vertex_Table::const_iterator
 	 vlit=vtab->begin();vlit!=vtab->end();++vlit) {
     for (Vertex_List::const_iterator 
 	   vit=vlit->second.begin();vit!=vlit->second.end();++vit) {
       Single_Vertex *v(*vit);
-      if (v->nleg>3 || !v->on) continue;
-      if (sfs.find(FTrip(v->in[0],v->in[1],v->in[2]))!=sfs.end()) continue;
+      if (v->NLegs()>3) continue;
+      if (sfs.find(FTrip(v->in[0].Bar(),v->in[1],v->in[2]))!=sfs.end()) continue;
       bool skip(false);
       for (size_t i(0);i<m_disallowflav.size();++i)
         for (size_t j(0);j<3;++j)
           if (v->in[j].Kfcode()==m_disallowflav[i]) skip=true;
-      if (skip) msg_Debugging()<<"Manually removing "<<v->in[0]<<" -> "
+      if (skip) msg_Debugging()<<"Manually removing "<<v->in[0].Bar()<<" -> "
                                <<v->in[1]<<" "<<v->in[2]<<".\n";
       if (skip) continue;
-      sfs.insert(FTrip(v->in[0],v->in[1],v->in[2]));
-      sfs.insert(FTrip(v->in[0],v->in[2],v->in[1]));
-      msg_Debugging()<<"Add "<<v->in[0]<<" -> "<<v->in[1]<<" "<<v->in[2]<<" {\n";
+      sfs.insert(FTrip(v->in[0].Bar(),v->in[1],v->in[2]));
+      sfs.insert(FTrip(v->in[0].Bar(),v->in[2],v->in[1]));
+      msg_Debugging()<<"Add "<<v->in[0].Bar()<<" -> "<<v->in[1]<<" "<<v->in[2]<<" {\n";
       {
 	msg_Indent();
 	int dmode(0);
-	if (v->in[2]==v->in[0]) dmode=1;
-	else if (v->in[1]!=v->in[0] && 
+	if (v->in[2]==v->in[0].Bar()) dmode=1;
+	else if (v->in[1]!=v->in[0].Bar() && 
 		 v->in[1].IsAnti() && !v->in[2].IsAnti()) dmode=1;
 	Add(new Splitting_Function_Base(SF_Key(p_rms,v,dmode,cstp::FF,kfmode,m_ewmode,1)));
 	Add(new Splitting_Function_Base(SF_Key(p_rms,v,dmode,cstp::FF,kfmode,m_ewmode,-1)));
 	Add(new Splitting_Function_Base(SF_Key(p_rms,v,dmode,cstp::FI,kfmode,m_ewmode,1)));
 	Add(new Splitting_Function_Base(SF_Key(p_rms,v,dmode,cstp::FI,kfmode,m_ewmode,-1)));
-	if (v->in[0].Mass()<100.0) {
+	if (v->in[0].Bar().Mass()<100.0) {
   	  Add(new Splitting_Function_Base(SF_Key(p_rms,v,dmode,cstp::IF,kfmode,m_ewmode,1)));
   	  Add(new Splitting_Function_Base(SF_Key(p_rms,v,dmode,cstp::IF,kfmode,m_ewmode,-1)));
  	  Add(new Splitting_Function_Base(SF_Key(p_rms,v,dmode,cstp::II,kfmode,m_ewmode,1)));
@@ -105,7 +106,7 @@ void Sudakov::InitSplittingFunctions(MODEL::Model_Base *md,const int kfmode)
 	  AddToMaps(new Splitting_Function_Base(SF_Key(p_rms,v,1-dmode,cstp::FF,kfmode,m_ewmode,-1)));
 	  AddToMaps(new Splitting_Function_Base(SF_Key(p_rms,v,1-dmode,cstp::FI,kfmode,m_ewmode,1)));
 	  AddToMaps(new Splitting_Function_Base(SF_Key(p_rms,v,1-dmode,cstp::FI,kfmode,m_ewmode,-1)));
-	  if (v->in[0].Mass()<100.0) {
+	  if (v->in[0].Bar().Mass()<100.0) {
   	    Add(new Splitting_Function_Base(SF_Key(p_rms,v,1-dmode,cstp::IF,kfmode,m_ewmode,1)));
   	    Add(new Splitting_Function_Base(SF_Key(p_rms,v,1-dmode,cstp::IF,kfmode,m_ewmode,-1)));
  	    Add(new Splitting_Function_Base(SF_Key(p_rms,v,1-dmode,cstp::II,kfmode,m_ewmode,1)));
@@ -292,7 +293,7 @@ bool Sudakov::Generate(Parton * split)
   m_lastint=m_partint.back();
 
   m_kperp2       = split->KtStart();
-  double x(0.); 
+  m_x = 0.0;
   
   bool success(false);
   while (m_kperp2>=m_k0sqf) {
@@ -318,9 +319,9 @@ bool Sudakov::Generate(Parton * split)
       m_y = p_shower->KinFF()->GetY(Q2,m_kperp2,m_z,mi2,mj2,mk2,
 				    (*m_splitter)->GetFlavourA(),
 				    (*m_splitter)->GetFlavourC());
+      m_x   = 0.;
       if (m_y<0.0 || m_y>1.0) continue;
-      x   = 0.;
-    }    
+    }
       break; 
     case (cstp::FI) : {
       double mi2 = sqr(p_rms->Mass(((*m_splitter)->GetFlavourB())));
@@ -332,8 +333,8 @@ bool Sudakov::Generate(Parton * split)
 				    (*m_splitter)->GetFlavourA(),
 				    (*m_splitter)->GetFlavourC());
       m_y = 1.0-m_y*(-Q2-mij2-ma2)/(-Q2-mi2-mj2-ma2);
-      x   = split->GetSpect()->Xbj();
-      if (m_y<0.0 || m_y>1.0-x) continue;
+      m_x   = split->GetSpect()->Xbj();
+      if (m_y<0.0 || m_y>1.0-m_x) continue;
     }
       break; 
     case (cstp::IF) : {
@@ -344,8 +345,8 @@ bool Sudakov::Generate(Parton * split)
       m_y = p_shower->KinIF()->GetY(-Q2,m_kperp2,m_z,ma2,mi2,mk2,
 				    (*m_splitter)->GetFlavourB(),
 				    (*m_splitter)->GetFlavourC());
-      x   = split->Xbj();
-      if (m_y<0.0 || m_y>1.0 || m_z<x) continue;
+      m_x   = split->Xbj();
+      if (m_y<0.0 || m_y>1.0 || m_z<m_x) continue;
     }
       break;
     case (cstp::II) : {
@@ -356,21 +357,136 @@ bool Sudakov::Generate(Parton * split)
       m_y = p_shower->KinII()->GetY(Q2,m_kperp2,m_z,ma2,mi2,mb2,
 				    (*m_splitter)->GetFlavourB(),
 				    (*m_splitter)->GetFlavourC());
-      x   = split->Xbj();
-      if (m_y<0.0 || m_y>1.0-m_z || m_z<x) continue;
+      m_x   = split->Xbj();
+      if (m_y<0.0 || m_y>1.0-m_z || m_z<m_x) continue;
     }
       break;
   default:
       msg_Error()<<"Error in Sudakov::Generate!"<<std::endl;
       abort();
     }
-    if (Veto(Q2,x)) { 
-      success=true; 
-      break; 
-    } 
+    const bool veto(Veto(Q2, m_x));
+    if (p_variationweights && (m_reweightpdfs || m_reweightalphas)) {
+      p_variationweights->UpdateOrInitialiseWeights(&Sudakov::Reweight, *this, veto);
+    }
+    if (veto) {
+      success = true;
+      break;
+    }
   }
   m_phi = 2.0*M_PI*ran->Get();
   return success;
+}
+
+
+double Sudakov::Reweight(SHERPA::Variation_Parameters * varparams,
+                         SHERPA::Variation_Weights * varweights,
+                         const bool &success)
+{
+  // retrieve and validate acceptance weight of the last emission
+  const double accwgt(Selected()->LastAcceptanceWeight());
+  std::string error;
+  if (accwgt > 1.0) {
+    error = "MCatNLO emission acceptance weight exceeds one";
+  } else if (accwgt < 0.0) {
+    error = "MCatNLO emission acceptance weight is below zero";
+  } else if (accwgt == 0.0) {
+    // This can be due to a Jacobian being 0 (mostly), or by delta in a massive
+    // case dropping below 0. In the latter case, last values for JXX/Coupling
+    // might not be valid. In any case, the (1 - rejwgt) factor for rejections
+    // will lead to weight factor of 1.
+    error = "MCatNLO emission acceptance weight is zero";
+  }
+  if (error != "") {
+    return 1.0;
+  }
+
+  const double rejwgt(1.0 - accwgt);
+
+  double rewfactor(1.0);
+  double accrewfactor(1.0);
+
+  // depending on the scale scheme, the input scale for the PDFs and the
+  // coupling can be different from m_kperp2
+  const double lastscale(Selected()->LastScale());
+
+  // PDF reweighting
+  if (m_reweightpdfs) {
+    if (m_type == cstp::II || m_type == cstp::FI || m_type == cstp::IF) {
+      // note that also the Jacobians depend on the Running_AlphaS class, but
+      // only through the number of flavours, which should not vary between
+      // AlphaS variations anyway; therefore we do not insert AlphaS for the
+      // PDF reweighting
+
+      // insert new PDF
+      const int beam(Selected()->Lorentz()->GetBeam());
+      PDF::PDF_Base * swappedpdf = p_pdf[beam];
+      p_pdf[beam] = (beam == 0) ? varparams->p_pdf1 : varparams->p_pdf2;
+
+      // calculate new J
+      const double lastJ(Selected()->Lorentz()->LastJ());
+      double newJ;
+      switch (m_type) {
+        case cstp::II:
+          newJ = Selected()->Lorentz()->JII(m_z, m_y, m_x, lastscale, NULL);
+          break;
+        case cstp::IF:
+          newJ = Selected()->Lorentz()->JIF(m_z, m_y, m_x, lastscale, NULL);
+          break;
+        case cstp::FI:
+          newJ = Selected()->Lorentz()->JFI(m_y, m_x, lastscale, NULL);
+          break;
+        case cstp::FF:
+        case cstp::none:
+          THROW(fatal_error, "Unexpected splitting configuration");
+      }
+
+      // clean up
+      p_pdf[beam] = swappedpdf;
+      Selected()->Lorentz()->SetLastJ(lastJ);
+
+      // validate
+      if (newJ == 0.0) {
+        return 1.0;
+      } else {
+        const double pdfrewfactor(newJ / lastJ);
+        if (pdfrewfactor < 0.25 || pdfrewfactor > 4.0) {
+          varparams->IncrementOrInitialiseWarningCounter("MCatNLO large PDF reweighting factor");
+        }
+        accrewfactor *= pdfrewfactor;
+      }
+    }
+  }
+
+  // AlphaS reweighting
+  if (m_reweightalphas) {
+    if (Selected()->Coupling()->AllowsAlternativeCouplingUsage()) {
+      const double lastcpl(Selected()->Coupling()->Last());
+      Selected()->Coupling()->SetAlternativeUnderlyingCoupling(varparams->p_alphas);
+      double newcpl(Selected()->Coupling()->Coupling(lastscale, 0, NULL));
+      Selected()->Coupling()->SetAlternativeUnderlyingCoupling(NULL); // reset AlphaS
+      Selected()->Coupling()->SetLast(lastcpl); // reset last coupling
+      const double alphasrewfactor(newcpl / lastcpl);
+      if (alphasrewfactor < 0.5 || alphasrewfactor > 2.0) {
+        varparams->IncrementOrInitialiseWarningCounter("MCatNLO large AlphaS reweighting factor");
+      }
+      accrewfactor *= alphasrewfactor;
+    }
+  }
+
+  // calculate and apply overall factor
+  if (success) {
+    // accepted emission
+    rewfactor = accrewfactor;
+  } else {
+    // rejected emission
+    rewfactor = 1.0 + (1.0 - accrewfactor) * (1.0 - rejwgt) / rejwgt;
+  }
+  if (rewfactor < -9.0 || rewfactor > 11.0) {
+    varparams->IncrementOrInitialiseWarningCounter("MCatNLO vetoed large reweighting factor");
+    return 1.0;
+  }
+  return rewfactor;
 }
 
 bool Sudakov::DefineFFBoundaries(double Q2,double x)

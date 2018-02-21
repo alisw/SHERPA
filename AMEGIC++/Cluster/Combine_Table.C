@@ -170,7 +170,7 @@ Combine_Table::Combine_Table(AMEGIC::Process_Base *const proc,
 			     PDF::Cluster_Definitions_Base *clus,
 			     Vec4D *moms, Combine_Table *up,
 			     ATOOLS::DecayInfo_Vector *const decids):
-  p_ms(ms), m_nstrong(proc->OrderQCD()), m_nlegs(0), m_nampl(0),
+  p_ms(ms), m_nstrong(proc->MaxOrder(0)), m_nlegs(0), m_nampl(0),
   m_graph_winner(0), 
   p_up(up), p_legs(0), p_clus(clus), p_moms(moms),
   p_hard(NULL), p_hardc(NULL), p_channel(NULL), p_scale(NULL), m_rscale(-1.0),
@@ -215,8 +215,8 @@ void Leg::DetermineCouplings(const int type)
   else ++m_pqed;
   if (m_pqcd==3) ++m_nqcd;
   else ++m_nqed;
-  if (p->Lorentz->Type()=="Triangle" ||
-      p->Lorentz->Type()=="Box" ||
+  if (p->Lorentz->Type()=="HVV" ||
+      p->Lorentz->Type()=="HVVV" ||
       p->Lorentz->Type()=="C4GS") m_nqcd+=2;
   m_type=p->Lorentz->Type();
   /*
@@ -421,7 +421,7 @@ bool Combine_Table::Combinable(const Leg &a,const Leg &b,const int i,const int j
   Leg tmp1 = a;
   Leg tmp2 = b;
 
-  if ((i<2 || j<2) && (tmp1.Flav().IsSusy() || tmp2.Flav().IsSusy())) {
+  if ((i<2 || j<2) && (IsSusy(tmp1.Flav()) || IsSusy(tmp2.Flav()))) {
     return 0;
   }
 
@@ -548,7 +548,7 @@ CD_List::iterator Combine_Table::CalcPropagator(CD_List::iterator &cit,int mode)
        (mode&1024)||((mode&4096)&&p_up==NULL)?1:-1,
        (cit->second.m_dec>10||!cit->second.m_mo.Strong()?1:0)|
        (p_proc->Parent()->Info().m_fi.m_nloqcdtype!=PHASIC::nlo_type::lo?16:0)|
-       ((mode&4096)&&p_up==NULL?4:0));
+       ((mode&4096)&&p_up==NULL?32:0));
     msg_Debugging()<<"Calculate m_perp("<<cit->first.m_i<<"["
 		   <<p_legs[0][cit->first.m_i].Flav()<<"],"
 		   <<cit->first.m_j<<"["<<p_legs[0][cit->first.m_j].Flav()<<"],"

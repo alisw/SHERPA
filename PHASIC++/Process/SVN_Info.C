@@ -1,3 +1,3 @@
 #include "ATOOLS/Org/SVN_Info.H"
 static ATOOLS::SVN_Info initializer
-("PHASIC++/Process","branches/rel-2-1-1","24084","57513173b63d373356dc36677fadc82f");
+("PHASIC++/Process","branches/rel-2-2-4","30888","1228f1fe2aa00306f749806f297b9183");

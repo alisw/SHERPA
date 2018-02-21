@@ -45,7 +45,6 @@ namespace HIGGS {
 
 #include "Wrappers.H"
 #include "MODEL/Main/Model_Base.H"
-#include "MODEL/Interaction_Models/Interaction_Model_Base.H"
 #include "PHASIC++/Main/Phase_Space_Handler.H"
 #include "ATOOLS/Org/Data_Reader.H"
 #include "ATOOLS/Org/Message.H"
@@ -76,16 +75,14 @@ bool Higgs_Interface::Initialize
   s_mc=p_model->GetScalarFunction("m"+Flavour(kf_c).IDName());
   G_F=1.0/sqrt(2.0)/std::abs(sqr(model->ComplexConstant("cvev")));
   DEBUG_VAR(model->ComplexConstant("cvev")<<" "<<G_F);
-  s2W=model->ScalarConstant(std::string("sin2_thetaW"));
-  if (model->ScalarNumber(std::string("WidthScheme"))==1)
-    s2W=std::abs(model->ComplexConstant(std::string("csin2_thetaW")));
+  s2W=std::abs(model->ComplexConstant(std::string("csin2_thetaW")));
   c2W=1.0-s2W;
   sW=sqrt(s2W);
   cW=sqrt(c2W);
   // double ehc_scale2=p_model->ScalarConstant("EHC_SCALE2");
   // DEBUG_VAR(sqrt(ehc_scale2));
   // alpha0=p_model->ScalarFunction("alpha_QED",ehc_scale2);
-  // alpha0=p_model->GetInteractionModel()->ScalarFunction("alpha_QED",rpa->gen.CplScale());
+  // alpha0=p_model->GetInteractionModel()->ScalarConstant("alpha_QED");
   // DEBUG_VAR(1.0/alpha0);
   m_u=Flavour(kf_u).Mass(true);
   m_d=Flavour(kf_d).Mass(true);

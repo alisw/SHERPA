@@ -11,6 +11,7 @@
 #include "SHERPA/SoftPhysics/Soft_Photon_Handler.H"
 #include "SHERPA/LundTools/Lund_Interface.H"
 #include "SHERPA/Tools/Event_Reader_Base.H"
+#include "SHERPA/Tools/Variations.H"
 #include "PHASIC++/Scales/Core_Scale_Setter.H"
 #include "MODEL/Main/Model_Base.H"
 #include "MODEL/Main/Running_AlphaS.H"
@@ -56,9 +57,10 @@ Initialization_Handler::Initialization_Handler(int argc,char * argv[]) :
   m_savestatus(false), p_model(NULL), p_beamspectra(NULL), 
   p_mehandler(NULL), p_harddecays(NULL), p_beamremnants(NULL),
   p_fragmentation(NULL), p_softcollisions(NULL), p_hdhandler(NULL), 
-  p_mihandler(NULL), p_softphotons(NULL), p_evtreader(NULL)
+  p_mihandler(NULL), p_softphotons(NULL), p_evtreader(NULL),
+  p_variations(NULL)
 {
-  m_path=std::string("./");
+  m_path=std::string("");
   m_file=std::string("Run.dat");
 
   ExtractCommandLineParameters(argc, argv);
@@ -73,6 +75,7 @@ Initialization_Handler::Initialization_Handler(int argc,char * argv[]) :
   ATOOLS::s_loader->SetCheck(p_dataread->GetValue<int>("CHECK_LIBLOCK",0));
 
   rpa->Init(m_path,m_file,argc,argv);
+  CheckVersion();
   LoadLibraries();
   ShowParameterSyntax();
   ran->InitExternal(m_path,m_file);
@@ -105,14 +108,13 @@ void Initialization_Handler::SetFileNames()
   m_softcollisiondat = p_dataread->GetValue<string>("SOFTCOLLISIONS_DATA_FILE",string("SoftCollisions.dat"));
   m_hadrondecaysdat  = p_dataread->GetValue<string>("FRAGMENTATION_DATA_FILE",fname+"|(fragmentation){|}(fragmentation)");
   m_softphotonsdat   = p_dataread->GetValue<string>("SOFT_PHOTON_DATA_FILE",fname+"|(fragmentation){|}(fragmentation)");
-  m_analysisdat      = p_dataread->GetValue<string>("ANALYSIS_DATA_FILE",fname+"|(analysis){|}(analysis)");
-  if (FileExists("Analysis.dat")) m_analysisdat="Analysis.dat"; 
-  std::string integrationdat=p_dataread->GetValue<string>
-    ("INTEGRATION_DATA_FILE",fname+"|(integration){|}(integration)");
-  m_processesdat=p_dataread->GetValue<string>
-    ("PROCESSFILE",fname+"|(processes){|}(processes)");
-  m_selectordat=p_dataread->
-    GetValue<string>("SELECTORFILE",fname+"|(selector){|}(selector)");
+  m_processesdat     = p_dataread->GetValue<string>("PROCESSFILE",fname+"|(processes){|}(processes)");
+  m_selectordat      = p_dataread->GetValue<string>("SELECTORFILE",fname+"|(selector){|}(selector)");
+  m_analysisdat      = p_dataread->GetValue<string>("ANALYSIS_DATA_FILE",FileExists("Analysis.dat")?
+						    "Analysis.dat":fname+"|(analysis){|}(analysis)");
+  std::string integrationdat = p_dataread->GetValue<string>("INTEGRATION_DATA_FILE",fname+"|(integration){|}(integration)");
+  std::string momentadat     = p_dataread->GetValue<string>("MOMENTA_DATA_FILE",fname+"|(momenta){|}(momenta)");
+  if (FileExists("Momenta.dat")) momentadat="Momenta.dat";
 
   rpa->gen.SetVariable("MODEL_DATA_FILE",m_modeldat);
   rpa->gen.SetVariable("ME_DATA_FILE",m_medat);
@@ -120,6 +122,7 @@ void Initialization_Handler::SetFileNames()
   rpa->gen.SetVariable("SHOWER_DATA_FILE",m_showerdat);
   rpa->gen.SetVariable("INTEGRATION_DATA_FILE",integrationdat);
   rpa->gen.SetVariable("FRAGMENTATION_DATA_FILE",m_fragmentationdat);
+  rpa->gen.SetVariable("MOMENTA_DATA_FILE",momentadat);
 }
 
 
@@ -143,6 +146,7 @@ Initialization_Handler::~Initialization_Handler()
   if (p_beamspectra)   { delete p_beamspectra;   p_beamspectra   = NULL; }
   if (p_model)         { delete p_model;         p_model         = NULL; }
   if (p_dataread)      { delete p_dataread;      p_dataread      = NULL; }
+  if (p_variations)    { delete p_variations;    p_variations    = NULL; }
   while (m_analyses.size()>0) {
     delete m_analyses.back();
     m_analyses.pop_back();
@@ -165,11 +169,63 @@ Initialization_Handler::~Initialization_Handler()
        ++pdflib) {
     if (*pdflib=="None") continue;
     void *exit(s_loader->GetLibraryFunction(*pdflib,"ExitPDFLib"));
-    if (exit==NULL) THROW(fatal_error,"Cannot unload PDF library "+*pdflib);
-    ((PDF_Exit_Function)exit)();
+    if (exit==NULL)
+      PRINT_INFO("Error: Cannot unload PDF library "+*pdflib);
+    else ((PDF_Exit_Function)exit)();
   }
-  String_Vector dummy;
-  Read_Write_Base::SetCommandLine(dummy);
+}
+
+void Initialization_Handler::CheckVersion()
+{
+  std::vector<std::string> versioninfo;
+  p_dataread->VectorFromFile(versioninfo,"SHERPA_VERSION");
+  if (!versioninfo.size()) return;
+  std::string currentversion(ToString(SHERPA_VERSION)+"."
+                                      +ToString(SHERPA_SUBVERSION));
+  if (versioninfo.size()==1 && versioninfo[0]!=currentversion) {
+    THROW(normal_exit,"Run card request Sherpa "+versioninfo[0]
+                      +". This is Sherpa "+currentversion);
+  }
+  else if (versioninfo.size()==2) {
+    if (versioninfo[0]==currentversion || versioninfo[1]==currentversion) return;
+    size_t min1(versioninfo[0].find(".",0)),
+           min2(versioninfo[0].find(".",min1+1)),
+           max1(versioninfo[1].find(".",0)),
+           max2(versioninfo[1].find(".",max1+1)),
+           cur1(currentversion.find(".",0)),
+           cur2(currentversion.find(".",max1+1));
+    size_t minmajvers(ToType<size_t>(versioninfo[0].substr(0,min1))),
+           minminvers(ToType<size_t>(versioninfo[0].substr(min1+1,min2))),
+           minbugvers(ToType<size_t>(versioninfo[0].substr(min2+1))),
+           maxmajvers(ToType<size_t>(versioninfo[1].substr(0,max1))),
+           maxminvers(ToType<size_t>(versioninfo[1].substr(max1+1,max2))),
+           maxbugvers(ToType<size_t>(versioninfo[1].substr(max2+1))),
+           curmajvers(ToType<size_t>(currentversion.substr(0,max1))),
+           curminvers(ToType<size_t>(currentversion.substr(max1+1,max2))),
+           curbugvers(ToType<size_t>(currentversion.substr(max2+1)));
+    if (!(CompareVersions(minmajvers,minminvers,minbugvers,
+                          curmajvers,curminvers,curbugvers)
+          *CompareVersions(curmajvers,curminvers,curbugvers,
+                           maxmajvers,maxminvers,maxbugvers)))
+      THROW(normal_exit,"Run card request Sherpa "+versioninfo[0]
+                        +"-"+versioninfo[1]
+                        +". This is Sherpa "+currentversion);
+  }
+  else THROW(not_implemented,"SHERPA_VERSION information not recognised.");
+}
+
+bool Initialization_Handler::CompareVersions
+(const size_t& a1,const size_t& b1,const size_t& c1,
+ const size_t& a2,const size_t& b2,const size_t& c2)
+{
+  if (a1<a2) return true;
+  if (a1==a2) {
+    if (b1<b2) return true;
+    if (b1==b2) {
+      if (c1<=c2) return true;
+    }
+  }
+  return false;
 }
 
 void Initialization_Handler::LoadLibraries() const
@@ -347,8 +403,10 @@ bool Initialization_Handler::InitializeTheFramework(int nr)
     return true;
   }
   PHASIC::Phase_Space_Handler::GetInfo();
+  if (rpa->gen.NumberOfEvents()>0) {
   okay = okay && InitializeTheFragmentation();
   okay = okay && InitializeTheSoftCollisions();
+  }
   okay = okay && InitializeTheShowers();
   okay = okay && InitializeTheMatrixElements();
   okay = okay && InitializeTheBeamRemnants();
@@ -359,6 +417,7 @@ bool Initialization_Handler::InitializeTheFramework(int nr)
     okay = okay && InitializeTheUnderlyingEvents();
     okay = okay && InitializeTheSoftPhotons();
     okay = okay && InitializeTheIO();
+    okay = okay && InitializeTheReweighting();
   }
   return okay;
 }
@@ -463,7 +522,6 @@ bool Initialization_Handler::InitializeTheModel()
   if (!beamer.VectorFromFile(_beam2,"BEAM_2")) _beam2.resize(2,0.0);
   double beam1 = beamer.GetValue<double>("BEAM_ENERGY_1",_beam1[1]);
   double beam2 = beamer.GetValue<double>("BEAM_ENERGY_2",_beam2[1]);
-  rpa->gen.SetCplScale(4.*beam1*beam2);
   Data_Reader read(" ",";","!","=");
   read.AddWordSeparator("\t");
   read.SetInputPath(m_path);
@@ -472,6 +530,12 @@ bool Initialization_Handler::InitializeTheModel()
   if (!read.ReadFromFile(name,"MODEL")) name="SM";
   p_model=Model_Base::Model_Getter_Function::
     GetObject(name,Model_Arguments(m_path,m_modeldat,true));
+  if (p_model==NULL) {
+    if (!s_loader->LoadLibrary("Sherpa"+name))
+      THROW(missing_module,"Cannot load model library Sherpa"+name+".");
+    p_model=Model_Base::Model_Getter_Function::
+      GetObject(name,Model_Arguments(m_path,m_modeldat,true));
+  }
   if (p_model==NULL) THROW(not_implemented,"Model not implemented");
   MODEL::s_model=p_model;
   return 1;
@@ -487,7 +551,8 @@ bool Initialization_Handler::InitializeTheBeams()
   dataread.SetInputPath(m_path);
   dataread.SetInputFile(m_beamdat);
   p_beamspectra        = new Beam_Spectra_Handler(&dataread);
-  msg_Info()<<"Initialized the beams "<<p_beamspectra->Type()<<endl;
+  p_beamspectra->Output();
+  
   return 1;
 }
 
@@ -504,8 +569,8 @@ bool Initialization_Handler::InitializeThePDFs()
   for (int beam(0);beam<=1;++beam) {
     std::string deflib("None");
     if (p_beamspectra->GetBeam(beam)->Bunch().Kfcode()==kf_p_plus) {
-      deflib="CT10Sherpa";
-      defset[beam]="ct10";
+      deflib="NNPDFSherpa";
+      defset[beam]="NNPDF30NNLO";
     }
     else if (p_beamspectra->GetBeam(beam)->Bunch().Kfcode()==kf_e) {
       deflib="PDFESherpa";
@@ -515,8 +580,11 @@ bool Initialization_Handler::InitializeThePDFs()
       deflib="GRVSherpa";
       defset[beam]="GRV";
     }
-    m_pdflibs.insert(dataread.GetValue<std::string>("PDF_LIBRARY",deflib));
+    std::vector<std::string> pdflibs;
     std::string mpilib, beamlib;
+    dataread.VectorFromFile(pdflibs,"PDF_LIBRARY");
+    if (pdflibs.size()==0) m_pdflibs.insert(deflib);
+    for (size_t i(0);i<pdflibs.size();++i) m_pdflibs.insert(pdflibs[i]);
     if (dataread.ReadFromFile(mpilib,"PDF_LIBRARY_MPI"))
       m_pdflibs.insert(mpilib);
     if (dataread.ReadFromFile(beamlib,"PDF_LIBRARY_"+ToString(beam+1)))
@@ -565,14 +633,17 @@ bool Initialization_Handler::InitializeThePDFs()
       std::string specialset;
       if (dataread.ReadFromFile(specialset,"PDF_SET_"+ToString(j+1)))
 	set=specialset;
+      int member = dataread.GetValue<int>("PDF_SET_VERSION",0);
+      member = dataread.GetValue<int>("PDF_SET_VERSION_"+ToString(j+1),member);
       if (id==isr::hard_subprocess) {
         std::string mpiset;
         if (dataread.ReadFromFile(mpiset,"PDF_SET_MPI")) {
           set=mpiset;
+          member=0;
         }
       }
       pdfbase = PDF_Base::PDF_Getter_Function::GetObject
-	(set,PDF_Arguments(m_bunch_particles[j],&dataread, j));
+        (set,PDF_Arguments(m_bunch_particles[j],&dataread, j, set, member));
       if (i==0) rpa->gen.SetPDF(j,pdfbase);
       if (m_bunch_particles[j].IsHadron() && pdfbase==NULL)
 	THROW(critical_error,"PDF '"+set+"' does not exist in any of the loaded"
@@ -653,7 +724,7 @@ bool Initialization_Handler::InitializeTheShowers()
     Shower_Handler_Map::iterator it=m_showerhandlers.find(isrtypes[i]);
     if (it!=m_showerhandlers.end()) delete it->second;
     m_showerhandlers[isrtypes[i]]=new Shower_Handler
-        (m_path, m_showerdat, p_model, m_isrhandlers[isrtypes[i]]);
+      (m_path, m_showerdat, p_model, m_isrhandlers[isrtypes[i]],i);
   }
   as->SetActiveAs(isr::hard_process);
   msg_Info()<<"Initialized the Shower_Handler."<<endl;
@@ -703,7 +774,9 @@ bool Initialization_Handler::InitializeTheHadronDecays()
   std::string frag=dr.GetValue<string>("FRAGMENTATION",string("Ahadic"));
   if (frag=="Off" || frag=="None" || frag=="0") return true;
 
-  string decmodel = dr.GetValue<string>("DECAYMODEL",string("Hadrons"));
+  std::string defdecmodel("Hadrons");
+  if (frag=="Lund") defdecmodel="Lund";
+  string decmodel = dr.GetValue<string>("DECAYMODEL",defdecmodel);
   msg_Tracking()<<"Decaymodel = "<<decmodel<<std::endl;
   if (decmodel=="Off" || decmodel=="None" || decmodel=="0") return true;
   else if (decmodel==std::string("Hadrons")) {
@@ -740,7 +813,7 @@ bool Initialization_Handler::InitializeTheHadronDecays()
 bool Initialization_Handler::InitializeTheSoftPhotons()
 {
   if (p_softphotons) { delete p_softphotons; p_softphotons = NULL; }
-  p_softphotons = new Soft_Photon_Handler(m_path,m_softphotonsdat);
+  p_softphotons = new Soft_Photon_Handler(m_path,m_softphotonsdat,p_mehandler);
   if (p_harddecays) p_harddecays->SetSoftPhotonHandler(p_softphotons);
   if (p_hdhandler)  p_hdhandler->SetSoftPhotonHandler(p_softphotons);
   msg_Info()<<"Initialized the Soft_Photon_Handler."<<endl;
@@ -778,6 +851,19 @@ bool Initialization_Handler::InitializeTheAnalyses()
     }
     m_analyses.push_back(ana);
   }
+  return true;
+}
+
+bool Initialization_Handler::InitializeTheReweighting()
+{
+  if (p_variations) {
+    delete p_variations;
+  }
+  Data_Reader dataread(" ",";","!","=");
+  dataread.AddComment("#");
+  dataread.AddWordSeparator("\t");
+  dataread.SetInputPath(m_path);
+  p_variations = new Variations(&dataread);
   return true;
 }
 
@@ -829,9 +915,9 @@ void Initialization_Handler::SetGlobalVariables()
   int kfmode = sdr.GetValue<int>("CSS_KFACTOR_SCHEME",1);
   int scs = sdr.GetValue<int>("CSS_SCALE_SCHEME",0);
   double k0sqf = sdr.GetValue<double>("CSS_FS_PT2MIN",1.0);
-  double k0sqi = sdr.GetValue<double>("CSS_IS_PT2MIN",4.78);
-  double fs_as_fac = sdr.GetValue<double>("CSS_FS_AS_FAC",0.66);
-  double is_as_fac = sdr.GetValue<double>("CSS_IS_AS_FAC",0.50);
+  double k0sqi = sdr.GetValue<double>("CSS_IS_PT2MIN",2.00);
+  double fs_as_fac = sdr.GetValue<double>("CSS_FS_AS_FAC",1.0);
+  double is_as_fac = sdr.GetValue<double>("CSS_IS_AS_FAC",0.5);
   double mth = sdr.GetValue<double>("CSS_MASS_THRESHOLD",0.0);
   rpa->gen.SetVariable("CSS_EVOLUTION_SCHEME",ToString(evol));
   rpa->gen.SetVariable("CSS_KFACTOR_SCHEME",ToString(kfmode));
@@ -927,7 +1013,6 @@ void Initialization_Handler::ExtractCommandLineParameters(int argc,char * argv[]
     else if (ExtractValArg(helpsv,oit,"-O","OUTPUT"));
     else if (ExtractValArg(helpsv,oit,"-o","EVT_OUTPUT"));
     else if (ExtractValArg(helpsv,oit,"-l","LOG_FILE"));
-    else if (ExtractValArg(helpsv,oit,"-j","PG_THREADS"));
     else if (ExtractValArg(helpsv,oit,"-g","GENERATE_RESULT_DIRECTORY","0"));
     else if (ExtractValArg(helpsv,oit,"-V","PRINT_VERSION_INFO","1"));
     else if (par=="--version" || par=="-v"){
@@ -956,7 +1041,6 @@ void Initialization_Handler::ExtractCommandLineParameters(int argc,char * argv[]
       msg_Out()<<"\t\t-O <level>        set general output level <level>"<<endl;
       msg_Out()<<"\t\t-o <level>        set output level for event generation"<<endl;
       msg_Out()<<"\t\t-l <logfile>      set log file name <logfile>"<<endl;
-      msg_Out()<<"\t\t-j <threads>      set number of threads <threads>"<<endl;
       msg_Out()<<"\t\t-g                do not create result directory"<<endl;
       msg_Out()<<"\t\t-b                run in non-batch mode"<<endl;
       msg_Out()<<"\t\t-V                print version info during runtime"<<endl;
@@ -977,27 +1061,14 @@ void Initialization_Handler::ExtractCommandLineParameters(int argc,char * argv[]
   m_path="";
 
   std::vector<std::string> helpsv2;
-  // Add parameters from possible global.dat to command line
   Data_Reader dr(" ",";","!","=");
   dr.AddWordSeparator("\t");
   dr.AddComment("#");
-  dr.SetInputPath(rpa->gen.Variable("HOME")+"/.sherpa/");
-  dr.SetInputFile("global.dat");
-  std::vector<std::vector<std::string> > helpsvv;
-  if (dr.MatrixFromFile(helpsvv,"")) {
-    msg_Out()<<METHOD<<"(): Reading parameters from '"
-	     <<rpa->gen.Variable("HOME")<<"/.sherpa/global.dat'."<<std::endl;
-    helpsv2.resize(helpsvv.size());
-    for (size_t i(0);i<helpsvv.size();++i) {
-      helpsv2[i]=helpsvv[i][0];
-      for (size_t j(1);j<helpsvv[i].size();++j) helpsv2[i]+=" "+helpsvv[i][j];
-    }
-  }
   // Add parameters from Run.dat to command line
   // (this makes it possible to overwrite particle properties in Run.dat)
   dr.SetInputPath(m_path);
   dr.SetInputFile(m_file);
-  dr.RereadInFile();
+  std::vector<std::vector<std::string> > helpsvv;
   if (dr.MatrixFromFile(helpsvv,"")) {
     size_t oldsize(helpsv2.size());
     helpsv2.resize(oldsize+helpsvv.size());
@@ -1023,7 +1094,8 @@ void Initialization_Handler::ExtractCommandLineParameters(int argc,char * argv[]
         Read_Write_Base::AddCommandLine(key+" = "+value+"; ");
       }
       if (key=="TUNE") {
-        SetTuneParameters(value);
+        THROW(not_implemented,"Currently TUNE is not supported.");
+        //SetTuneParameters(value);
       }
     }
     else {
@@ -1033,6 +1105,7 @@ void Initialization_Handler::ExtractCommandLineParameters(int argc,char * argv[]
   rpa->gen.SetVariable("RUN_DATA_FILE",m_file);
 }
 
+/// Disabled for release 2.2.0
 void Initialization_Handler::SetTuneParameters(const std::string tune)
 {
   std::vector<std::string> tuneparams;

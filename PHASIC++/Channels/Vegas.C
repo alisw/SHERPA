@@ -25,9 +25,9 @@ Vegas::Vegas(int dim,int ndx,const std::string & name,int opt)
     dr.AddWordSeparator("\t");
     dr.SetInputPath(rpa->GetPath());
     dr.SetInputFile(rpa->gen.Variable("INTEGRATION_DATA_FILE"));
-    s_on = dr.GetValue<std::string>("VEGAS","On")=="On"?1:0;
+    s_on = dr.GetValue<int>("VEGAS_MODE",2);
   }
-  m_on=s_on;
+  m_on=s_on?1:0;
   if (s_onext>-1) m_on=s_onext;
   m_dim  = dim;
   m_nopt = 0;
@@ -38,8 +38,9 @@ Vegas::Vegas(int dim,int ndx,const std::string & name,int opt)
   m_mcevt = 0;
   m_name = name;
   m_mode=0;
-  m_nd = ndx;
-  m_sint=m_scnt=0;
+  m_nd=(s_on&2)?10:ndx;
+  m_sint=(s_on&2)?1:0;
+  m_scnt=0;
   m_alpha = 1.;
   m_autooptimize = -1;
   m_cmode = m_omode = 1;
@@ -152,79 +153,27 @@ void Vegas::MPISync()
 #ifdef USING__MPI
   int size=MPI::COMM_WORLD.Get_size();
   if (size>1) {
-    int rank=mpi->HasMPISend()?mpi->MPISend().Get_rank():0;
     int cn=3*m_dim*m_nd+2;
     double *values = new double[cn];
-    if (mpi->HasMPIRecv()) {
-      for (int tag=1;tag<mpi->MPIRecv().Get_size();++tag) {
-	mpi->MPIRecv().Recv(values,cn,MPI::DOUBLE,MPI::ANY_SOURCE,tag);
-	for (int i=0;i<m_dim;i++) {
-	  for (int j=0;j<m_nd;j++) {
-	    p_md[i][j]+=values[i*m_nd+j];
-	    p_mdi[i][j]+=values[(m_dim+i)*m_nd+j];
-	    p_mhit[i][j]+=values[(2*m_dim+i)*m_nd+j];
-	  }
-	}
-	m_mnevt+=values[cn-2];
-	m_mcevt+=values[cn-1];
-      }
-      if (rank) {
-	for (int i=0;i<m_dim;i++) {
-	  for (int j=0;j<m_nd;j++) {
-	    values[i*m_nd+j]=p_md[i][j];
-	    values[(m_dim+i)*m_nd+j]=p_mdi[i][j];
-	    values[(2*m_dim+i)*m_nd+j]=p_mhit[i][j];
-	  }
-	}
-	values[cn-2]=m_mnevt;
-	values[cn-1]=m_mcevt;
-	mpi->MPISend().Send(values,cn,MPI::DOUBLE,0,rank);
-	mpi->MPISend().Recv(values,cn,MPI::DOUBLE,0,size+rank);
-	for (int i=0;i<m_dim;i++) {
-	  for (int j=0;j<m_nd;j++) {
-	    p_md[i][j]=values[i*m_nd+j];
-	    p_mdi[i][j]=values[(m_dim+i)*m_nd+j];
-	    p_mhit[i][j]=values[(2*m_dim+i)*m_nd+j];
-	  }
-	}
-	m_mnevt=values[cn-2];
-	m_mcevt=values[cn-1];
-      }
-      for (int i=0;i<m_dim;i++) {
-	for (int j=0;j<m_nd;j++) {
-	  values[i*m_nd+j]=p_md[i][j];
-	  values[(m_dim+i)*m_nd+j]=p_mdi[i][j];
-	  values[(2*m_dim+i)*m_nd+j]=p_mhit[i][j];
-	}
-      }
-      values[cn-2]=m_mnevt;
-      values[cn-1]=m_mcevt;
-      for (int tag=1;tag<mpi->MPIRecv().Get_size();++tag) {
-	mpi->MPIRecv().Send(values,cn,MPI::DOUBLE,tag,size+tag);
+    for (int i=0;i<m_dim;i++) {
+      for (int j=0;j<m_nd;j++) {
+	values[i*m_nd+j]=p_md[i][j];
+	values[(m_dim+i)*m_nd+j]=p_mdi[i][j];
+	values[(2*m_dim+i)*m_nd+j]=p_mhit[i][j];
       }
     }
-    else {
-      for (int i=0;i<m_dim;i++) {
-	for (int j=0;j<m_nd;j++) {
-	  values[i*m_nd+j]=p_md[i][j];
-	  values[(m_dim+i)*m_nd+j]=p_mdi[i][j];
-	  values[(2*m_dim+i)*m_nd+j]=p_mhit[i][j];
-	}
+    values[cn-2]=m_mnevt;
+    values[cn-1]=m_mcevt;
+    mpi->MPIComm()->Allreduce(MPI_IN_PLACE,values,cn,MPI::DOUBLE,MPI::SUM);
+    for (int i=0;i<m_dim;i++) {
+      for (int j=0;j<m_nd;j++) {
+	p_md[i][j]=values[i*m_nd+j];
+	p_mdi[i][j]=values[(m_dim+i)*m_nd+j];
+	p_mhit[i][j]=values[(2*m_dim+i)*m_nd+j];
       }
-      values[cn-2]=m_mnevt;
-      values[cn-1]=m_mcevt;
-      mpi->MPISend().Send(values,cn,MPI::DOUBLE,0,rank);
-      mpi->MPISend().Recv(values,cn,MPI::DOUBLE,0,size+rank);
-      for (int i=0;i<m_dim;i++) {
-	for (int j=0;j<m_nd;j++) {
-	  p_md[i][j]=values[i*m_nd+j];
-	  p_mdi[i][j]=values[(m_dim+i)*m_nd+j];
-	  p_mhit[i][j]=values[(2*m_dim+i)*m_nd+j];
-	}
-      }
-      m_mnevt=values[cn-2];
-      m_mcevt=values[cn-1];
     }
+    m_mnevt=values[cn-2];
+    m_mcevt=values[cn-1];
     delete [] values;
   }
   for (int i=0;i<m_dim;i++) {

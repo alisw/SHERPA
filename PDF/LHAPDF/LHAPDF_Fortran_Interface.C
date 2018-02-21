@@ -32,8 +32,9 @@ using namespace ATOOLS;
 
 LHAPDF_Fortran_Interface::LHAPDF_Fortran_Interface(const ATOOLS::Flavour _bunch,
 						   const std::string _set,const int _member) :
-  m_set(_set), m_anti(1)
+  m_anti(1)
 {
+  m_set=_set;
   m_smember=_member;
   m_type="LHA["+m_set+"]";
 
@@ -46,14 +47,37 @@ LHAPDF_Fortran_Interface::LHAPDF_Fortran_Interface(const ATOOLS::Flavour _bunch,
     LHAPDF::initPDFSet(m_set);
     LHAPDF::initPDF(m_member);
     m_asinfo.m_order=LHAPDF::getOrderAlphaS();
-    if (LHAPDF::getNf()<0) m_asinfo.m_flavs.resize(5);
+    m_asinfo.m_allflavs.resize(6);
+    if (LHAPDF::getNf()<0) {
+      Data_Reader read(" ",";","#","=");
+      int nf(read.GetValue<int>("LHAPDF_NUMBER_OF_FLAVOURS",5));
+      msg_Info()<<METHOD<<"(): No nf info. Set nf = "<<nf<<"\n";
+      m_asinfo.m_flavs.resize(nf);
+    }
     else m_asinfo.m_flavs.resize(LHAPDF::getNf());
     for (size_t i(0);i<m_asinfo.m_flavs.size();++i) {
       m_asinfo.m_flavs[i]=PDF_Flavour((kf_code)i+1);
-      m_asinfo.m_flavs[i].m_mass=LHAPDF::getQMass(i+1);
+      //      m_asinfo.m_flavs[i].m_mass=LHAPDF::getQMass(i+1);
       m_asinfo.m_flavs[i].m_thres=LHAPDF::getThreshold(i+1);
     }
-    m_asinfo.m_asmz=AlphaSPDF(sqr(Flavour(kf_Z).Mass()));
+    for (size_t i(0);i<6;++i) 
+      m_asinfo.m_allflavs[i].m_mass=LHAPDF::getQMass(i+1);
+    if (m_asinfo.m_allflavs[3].m_mass<m_asinfo.m_allflavs[2].m_mass){
+	msg_Out()<<"WARNING: M_CHARM="<<m_asinfo.m_allflavs[3].m_mass<<"  replacing with SHERPA charm mass: M_CHARM="<<ATOOLS::Flavour(kf_c).Mass()<<std::endl;
+	m_asinfo.m_allflavs[3].m_mass=ATOOLS::Flavour(kf_c).Mass();
+    }
+    if (m_asinfo.m_allflavs[4].m_mass<m_asinfo.m_allflavs[3].m_mass){
+	msg_Out()<<"WARNING: M_BOTTOM="<<m_asinfo.m_allflavs[4].m_mass<<"  replacing with SHERPA bottom mass: M_BOTTOM="<<ATOOLS::Flavour(kf_b).Mass()<<std::endl;
+	m_asinfo.m_allflavs[4].m_mass=ATOOLS::Flavour(kf_b).Mass();
+    }
+    if (m_asinfo.m_allflavs[5].m_mass<1 || m_asinfo.m_allflavs[5].m_mass>1000){
+	msg_Out()<<"WARNING: M_TOP="<<m_asinfo.m_allflavs[5].m_mass<<"  replacing with SHERPA top mass: M_TOP="<<ATOOLS::Flavour(kf_t).Mass()<<std::endl;
+	m_asinfo.m_allflavs[5].m_mass=ATOOLS::Flavour(kf_t).Mass();
+    }
+      
+    // m_Z cannot be queried, use Sherpa's
+    m_asinfo.m_mz2=sqr(Flavour(kf_Z).Mass());
+    m_asinfo.m_asmz=AlphaSPDF(m_asinfo.m_mz2);
   }
 
   m_xmin=LHAPDF::getXmin(m_member);
@@ -61,7 +85,7 @@ LHAPDF_Fortran_Interface::LHAPDF_Fortran_Interface(const ATOOLS::Flavour _bunch,
   m_q2min=LHAPDF::getQ2min(m_member);
   m_q2max=LHAPDF::getQ2max(m_member);
   
-  for (int i=1;i<6;i++) {
+  for (int i=1;i<=m_asinfo.m_flavs.size();i++) {
     m_partons.insert(Flavour((kf_code)(i)));
     m_partons.insert(Flavour((kf_code)(i)).Bar());
   }
@@ -95,19 +119,35 @@ void LHAPDF_Fortran_Interface::SetPDFMember()
   }
 }
 
-void LHAPDF_Fortran_Interface::CalculateSpec(double x,double Q2) {
-  x/=m_rescale;
+void LHAPDF_Fortran_Interface::CalculateSpec(const double& ix,const double& Q2) {
+  double x=ix/m_rescale;
   double Q = sqrt(Q2);
   if (LHAPDF::hasPhoton()) m_fv=LHAPDF::xfxphoton(x,Q);
   else                     m_fv=LHAPDF::xfx(x,Q);
 }
 
-double LHAPDF_Fortran_Interface::GetXPDF(const ATOOLS::Flavour infl) {
-  int kfc = m_anti*int(infl);
-  if (LHAPDF::hasPhoton() && kfc == kf_photon) kfc=7;
-  else if (kfc == kf_gluon) kfc=0;
-  else if (kfc<-6 || kfc>6) {
-    msg_Out()<<"WARNING in LHAPDF_Fortran_Interface::GetXPDF("<<infl<<") not supported by this PDF!"<<std::endl;
+double LHAPDF_Fortran_Interface::GetXPDF(const ATOOLS::Flavour& infl) {
+  int kfc;
+  if (int(infl) == kf_gluon) {
+    kfc=0;
+  } else if (LHAPDF::hasPhoton() && int(infl) == kf_photon) {
+    kfc=7;
+  } else {
+    kfc=m_anti*int(infl);
+    if (kfc<-6 || kfc>6) {
+      msg_Out()<<"WARNING in "<<METHOD<<"("<<infl<<") not supported by this PDF!"<<std::endl;
+      return 0.;
+    }
+  }
+  return m_rescale*m_fv[6+kfc];
+}
+
+double LHAPDF_Fortran_Interface::GetXPDF(const kf_code& kf, bool anti) {
+  int kfc(m_anti*(anti?-kf:kf));
+  if (kf == kf_gluon) kfc=0;
+  else if (LHAPDF::hasPhoton() && kf == kf_photon) kfc=7;
+  if (kfc<-6 || kfc>(LHAPDF::hasPhoton()?7:6)) {
+    msg_Out()<<"WARNING in "<<METHOD<<"("<<kf<<") not supported by this PDF!"<<std::endl;
     return 0.;
   }
   return m_rescale*m_fv[6+kfc];
@@ -119,10 +159,7 @@ PDF_Base *LHAPDF_Getter::operator()
   (const Parameter_Type &args) const
 {
   if (!args.m_bunch.IsHadron()) return NULL;
-  int mode=args.p_read->GetValue<int>("PDF_SET_VERSION",0);
-  int ibeam=args.m_ibeam;
-  mode=args.p_read->GetValue<int>("PDF_SET_VERSION_"+ToString(ibeam+1),mode);
-  return new LHAPDF_Fortran_Interface(args.m_bunch,m_key,mode);
+  return new LHAPDF_Fortran_Interface(args.m_bunch,args.m_set,args.m_member);
 }
 
 void LHAPDF_Getter::PrintInfo

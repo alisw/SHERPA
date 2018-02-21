@@ -2,7 +2,7 @@
 
 #include "METOOLS/Explicit/Current.H"
 #include "METOOLS/Explicit/Vertex.H"
-#include "MODEL/Interaction_Models/Single_Vertex.H"
+#include "MODEL/Main/Single_Vertex.H"
 
 #define COMPILE__Getter_Function
 #define PARAMETER_TYPE METOOLS::Vertex_Key
@@ -16,7 +16,9 @@ Dipole_Color::Dipole_Color(const Vertex_Key &key):
   Color_Calculator(key), p_dinfo(key.p_dinfo), p_kt(key.p_kt)
 {
   std::string ctag(ToString(key.p_mv->Color[key.m_n].PID()));
+  key.m_d=1;
   p_cc = CC_Getter::GetObject(ctag,key);
+  key.m_d=0;
   if (p_cc==NULL) {
     msg_Info()<<*key.p_mv<<std::endl;
     THROW(fatal_error,"Color calculator not implemented '"+

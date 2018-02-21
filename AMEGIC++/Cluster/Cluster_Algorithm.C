@@ -12,6 +12,7 @@
 #include "ATOOLS/Org/Message.H"
 
 #include <algorithm>
+#include <cassert>
 
 using namespace AMEGIC;
 using namespace PHASIC;
@@ -53,8 +54,8 @@ bool Cluster_Algorithm::Cluster
     p_ampl->SetMS(p_ms);
     p_ampl->SetJF(p_proc->Selector()->GetSelector("Jetfinder"));
     p_ampl->SetNIn(p_proc->NIn());
-    p_ampl->SetOrderEW(p_proc->OrderEW());
-    p_ampl->SetOrderQCD(p_proc->OrderQCD());
+    p_ampl->SetOrderEW(p_proc->MaxOrder(1));
+    p_ampl->SetOrderQCD(p_proc->MaxOrder(0));
     std::vector<size_t> tids, atids;
     for (int i(0);i<pb->NIn()+pb->NOut();++i) {
       Flavour flav(i<pb->NIn()?p_proc->Flavours()[i].Bar():
@@ -93,21 +94,27 @@ bool Cluster_Algorithm::Cluster
     SetNMax(p_ampl,(1<<(p_proc->NIn()+p_proc->NOut()))-1,
             p_proc->Info().m_fi.NMaxExternal());
 
+    // Ad-Hoc clustering for loop-induced gg -> non-coloured particles
     size_t np=p_proc->Flavours().size();
-    if (
-        (np==7 && p_proc->OrderQCD()==3 && p_proc->OrderEW()==4 &&
-         p_proc->Flavours()[2].IsLepton() && p_proc->Flavours()[3].IsLepton() &&
-         p_proc->Flavours()[4].IsLepton() && p_proc->Flavours()[5].IsLepton())
-        &&
-        ((p_proc->Flavours()[0].IsGluon() && p_proc->Flavours()[1].IsGluon() &&
-          p_proc->Flavours()[np-1].IsGluon()) ||
-         (p_proc->Flavours()[0].IsGluon() && p_proc->Flavours()[1].IsQuark() &&
-          p_proc->Flavours()[np-1].IsQuark()) ||
-         (p_proc->Flavours()[0].IsQuark() && p_proc->Flavours()[1].IsGluon() &&
-          p_proc->Flavours()[np-1].IsQuark())
-         )) {
+    bool non_col(true);
+    for(size_t i(2); i<np-1; i++){
+      if(p_proc->Flavours()[i].StrongCharge()){
+	non_col = false;
+	break;
+      }
+    }
+    bool gg((p_proc->Flavours()[0].IsGluon() && p_proc->Flavours()[1].IsGluon() &&
+	     p_proc->Flavours().back().IsGluon()) ||
+	    (p_proc->Flavours()[0].IsGluon() && p_proc->Flavours()[1].IsQuark() &&
+	     p_proc->Flavours().back().IsQuark()) ||
+	    (p_proc->Flavours()[0].IsQuark() && p_proc->Flavours()[1].IsGluon() &&
+	     p_proc->Flavours().back().IsQuark()));
+    bool loop_ind((p_proc->MaxOrder(0)+p_proc->MaxOrder(1))==np);
+    if (non_col && gg && loop_ind){
       ClusterSpecial4lLoop2();
     }
+    // End Ad-Hoc clustering
+    
     msg_Debugging()<<*p_ampl<<"\n";
     while (p_ampl->Prev()) {
       p_ampl=p_ampl->Prev();
@@ -115,16 +122,6 @@ bool Cluster_Algorithm::Cluster
     }
     msg_Debugging()<<"}\n";
     return true;
-  }
-  if (p_ct->NLegs()==4) {
-  Vec4D_Vector moms(4);
-  ATOOLS::Flavour_Vector fl(4);
-  for (int i(0);i<4;++i) {
-    moms[i]=p_ct->Momentum(i);
-    fl[i]=p_ct->Flav(i);
-  }
-  p_xs=GetXS(fl);
-  SetColours(p_xs,moms,&fl.front());
   }
   Convert();
   return true;
@@ -201,7 +198,7 @@ void Cluster_Algorithm::CreateTables
     m_decids=p_proc->DecayInfos();
     p_combi = new Combine_Table(p_proc,p_ms,p_clus,amoms,0,&m_decids);
     p_combi->FillTable(legs,nlegs,nampl);   
-    p_ct = p_combi->CalcJet(nlegs,NULL,mode,(mode&512)?1:((mode&16384)?1:0)); 
+    p_ct = p_combi->CalcJet(nlegs,NULL,mode,(mode&512)?1:0); 
     if (p_ct==NULL && !(mode&512)) {
       msg_Debugging()<<"trying unordered configuration (top level)\n";
       p_ct = p_combi->CalcJet(nlegs,NULL,mode,0); 
@@ -209,304 +206,13 @@ void Cluster_Algorithm::CreateTables
   }
   else {
     // use the existing combination table and determine best combination sheme
-    p_ct = p_combi->CalcJet(nlegs,amoms,mode,(mode&512)?1:((mode&16384)?1:0));
+    p_ct = p_combi->CalcJet(nlegs,amoms,mode,(mode&512)?1:0);
     if (p_ct==NULL && !(mode&512)) {
       msg_Debugging()<<"trying unordered configuration (top level)\n";
       p_ct = p_combi->CalcJet(nlegs,NULL,mode,0); 
     }
   }
   //  delete [] amoms;
-}
-
-int Cluster_Algorithm::SetDecayColours(const Vec4D_Vector& p, Flavour * fl,int col1,int col2)
-{
-  int ncol   = 0;
-  int nquark = 0;
-  int ngluon = 0;
-  for (int i=0; i<3; ++i) {
-    if (fl[i].Strong()) {
-      ++ncol;
-      if (abs(fl[i].StrongCharge())==3) ++nquark;
-      if (fl[i].StrongCharge()==8) ++ngluon;
-    }
-  }  
-  m_colors[0][0] = col1; m_colors[0][1] = col2; 
-  for (int i=1; i<3; ++i) m_colors[i][0] = m_colors[i][1] = 0;
-  switch (ncol) {
-  case 0: 
-    // no colours at all.
-    return 0;
-  case 2:
-    //3->31 8->81
-    if (fl[0].Strong()) {
-      for (short int i=1;i<3;i++) {
-	if (fl[i].Strong()) {
-	  for (short int j=0;j<2;j++) m_colors[i][j] = m_colors[0][j];
-	  return 0;
-	}
-      }
-    }
-    // 1->33 1->88
-    if (col1==0 && col2==0) {
-      if (abs(fl[1].StrongCharge())==3 && abs(fl[2].StrongCharge())==3) {
-	if (fl[1].IsAnti() && !(fl[2].IsAnti())) {
-	  m_colors[1][1] = m_colors[2][0] = ATOOLS::Flow::Counter();
-	  return 0;
-	}
-	if (fl[2].IsAnti() && !(fl[1].IsAnti())) {
-	  m_colors[1][0] = m_colors[2][1] = ATOOLS::Flow::Counter();
-	  return 0;
-	}
-      }
-      if (fl[1].StrongCharge()==8 && fl[2].StrongCharge()==8) {
-	m_colors[1][1] = m_colors[2][0] = ATOOLS::Flow::Counter();
-	m_colors[1][0] = m_colors[2][1] = ATOOLS::Flow::Counter();
-	return 0;
-      }
-    }
-  case 3:
-  default :
-    msg_Error()<<"Error in Cluster_Algorithm::SetDecayColours:"<<std::endl
-	       <<"   Cannot handle single color in 1 -> 2 process :"
-               <<"   "<<fl[0]<<" "<<fl[1]<<" "<<fl[2]<<std::endl
-	       <<"   Will abort the run."<<std::endl;
-    abort();
-  }
-}
-
-int Cluster_Algorithm::SetColours(const Vec4D_Vector& p,Flavour * fl)
-{
-  // *** 2 -> 2 processes with unambiguous coulor structure
-  // (a) no colors
-  // (b) two (s)quarks
-  // (c) two (s)quarks and one gluon/gluino
-  // (d) two gluons (ADD-Model) 
-  // (e) three gluons (ADD-Model)
-
-  int ncol   = 0;
-  int nquark = 0;
-  int ngluon = 0;
-  for (int i=0; i<4; ++i) {
-    if (fl[i].Strong()) {
-      ++ncol;
-      if (abs(fl[i].StrongCharge())==3) ++nquark;
-      if (fl[i].StrongCharge()==8) ++ngluon;
-    }
-    m_colors[i][0]=m_colors[i][1]=0;
-  }
-
-  switch (ncol) {
-  case 4:
-    return Set4Colours(nquark,ngluon,p,fl);
-  case 3:
-    return Set3Colours(nquark,ngluon,p,fl);
-  case 2:
-    return Set2Colours(nquark,ngluon,p,fl);
-  case 1:
-    msg_Out()<<"Error in Cluster_Algorithm::SetColours() : called for 1 coloured object. \n"
-	     <<"   Don't know how to handle this ! Abort the run."<<std::endl;
-    for (int i=0; i<4; ++i) msg_Out()<<i<<" : "<<fl[i]<<std::endl;
-    abort();
-  case 0:
-    return 0;
-  }
-  return 1;
-}
-
-int Cluster_Algorithm::Set4Colours(const int nquark,const int ngluon,
-                                   const Vec4D_Vector& p,Flavour * fl)
-{
-  double scale;
-  int prop(p_ct->IdentifyHardPropagator(scale));
-  if (fl[0].StrongCharge()==8 && fl[1].StrongCharge()==8 &&
-      fl[2].StrongCharge()!=8 && fl[3].StrongCharge()!=8) {
-    int ri(fl[2].StrongCharge()>0?2:3);
-    switch (prop) {
-    case 1: {
-      int ni(Min(1,(int)(2.0*ran->Get())));
-      m_colors[ni][0]=m_colors[1-ni][1]=500;
-      m_colors[ri][0]=m_colors[1-ni][0]=501;
-      m_colors[5-ri][1]=m_colors[ni][1]=502;
-      break;
-    }
-    case 2:
-      m_colors[ri-2][1]=m_colors[3-ri][0]=500;
-      m_colors[ri][0]=m_colors[ri-2][0]=501;
-      m_colors[5-ri][1]=m_colors[3-ri][1]=502;
-      break;
-    case 3:
-      m_colors[ri-2][0]=m_colors[3-ri][1]=500;
-      m_colors[ri][0]=m_colors[3-ri][0]=501;
-      m_colors[5-ri][1]=m_colors[ri-2][1]=502;
-      break;
-    }    
-    return true;
-  }
-  if (fl[0].StrongCharge()==8 || fl[1].StrongCharge()==8 || 
-      fl[2].StrongCharge()==8 || fl[3].StrongCharge()==8) {
-
-    msg_Out()<<METHOD<<"(): Cannot set colours for "<<std::endl;
-    Combine_Table *ct(p_ct);
-    while (ct->Up()!=NULL) ct=ct->Up();
-    msg_Error()<<*ct<<std::endl;
-    return false;
-  }
-  switch (prop) {
-  case 1:
-    if (!fl[0].IsAnti()) m_colors[0][0]=m_colors[1][1]=500;
-    else m_colors[0][1]=m_colors[1][0]=500;
-    if (!fl[2].IsAnti()) m_colors[2][0]=m_colors[3][1]=501;
-    else m_colors[2][1]=m_colors[3][0]=501;
-    break;
-  case 2:
-    if (!fl[0].IsAnti()) m_colors[0][0]=m_colors[2][0]=500;
-    else m_colors[0][1]=m_colors[2][1]=500;
-    if (!fl[1].IsAnti()) m_colors[1][0]=m_colors[3][0]=501;
-    else m_colors[1][1]=m_colors[3][1]=501;
-    break;
-  case 3:
-    if (!fl[0].IsAnti()) m_colors[0][0]=m_colors[3][0]=500;
-    else m_colors[0][1]=m_colors[3][1]=500;
-    if (!fl[1].IsAnti()) m_colors[1][0]=m_colors[2][0]=501;
-    else m_colors[1][1]=m_colors[2][1]=501;
-    break;
-  }
-  return true;
-}
-
-int Cluster_Algorithm::Set2Colours(const int nquark,const int ngluon,
-                                   const Vec4D_Vector& p,Flavour * fl)
-{
-  if (nquark+ngluon>2) {
-    msg_Error()<<"ERROR in Cluster_Algorithm::Set2Colours("<<nquark<<","<<ngluon<<")"<<std::endl
-	       <<"   Wrong number of colours, abort."<<std::endl;
-    abort();
-  }
-  int connected[2] = {-1,-1};
-  int j(0);
-  for (int i=0;i<4;i++) {
-    if (!fl[i].Strong()) continue;
-    if (abs(fl[i].StrongCharge())==3) {
-      m_colors[i][0+int(fl[i].IsAnti())] = 500;
-    }
-    else if (fl[i].StrongCharge()==8) {
-      m_colors[i][j] = 500; m_colors[i][1-j] = 501;
-    }
-    connected[j++]=i;
-  }    
-  return 0;
-}
-
-int Cluster_Algorithm::Set3Colours(const int nquark,const int ngluon,
-                                   const Vec4D_Vector& p,Flavour * fl)
-{
-  int connected[3] = {-1,-1,-1};
-  int singlet      = -1;
-  int j(0);
-  if (ngluon==3) {
-    for (int i=0;i<4;i++) {
-      if (!fl[i].Strong()) { 
-	singlet = i; 
-	continue; 
-      }
-      if (fl[i].StrongCharge()==8) {
-	connected[j] = i;
-	m_colors[i][0+(i>1)] = 500+j; 
-	if (j==2) j=-1;
-	m_colors[i][1-(i>1)] = 501+j;
-	j++;
-      }    
-    }
-  }
-  else if (ngluon==1) {
-    for (int i=0;i<4;i++) {
-      if (!fl[i].Strong()) { 
-	singlet = i; 
-	continue; 
-      }
-      if (abs(fl[i].StrongCharge())==3) {
-	connected[j] = i;
-	m_colors[i][0+int(fl[i].IsAnti())] = 500+j;
-	j++;
-      }
-    }
-    bool tmode = (connected[0]<2) ^ (connected[1]<2);
-    for (int i=0;i<4;i++) {
-      if (fl[i].StrongCharge()==8) {
-	if (tmode) {
-	  if (i<2) {
-	    m_colors[i][1-int(fl[connected[1]].IsAnti())] = 500;
-	    m_colors[i][0+int(fl[connected[0]].IsAnti())] = 501;
-	  }
-	  else {
-	    m_colors[i][1-int(fl[connected[0]].IsAnti())] = 501;
-	    m_colors[i][0+int(fl[connected[1]].IsAnti())] = 500;
-	  }
-	}
-	else {
-	  for (int j=0;j<2;j++) {
-	    m_colors[i][j] += m_colors[connected[0]][j] + 
-	      m_colors[connected[1]][j];
-	  }
-	}
-      }
-    }    
-  }
-  for (int i=0;i<4;i++) {
-    msg_Debugging()<<METHOD<<" "<<i<<" "<<p_ct->GetLeg(i).Point()->fl<<" "
-		   <<m_colors[i][0]<<" "<<m_colors[i][1]<<std::endl;
-  }
-  return 0;
-}
-
-ME2_Base *Cluster_Algorithm::GetXS(const ATOOLS::Flavour_Vector &fl)
-{
-  Flav_ME_Map::const_iterator xit(m_xsmap.find(fl));
-  if (xit!=m_xsmap.end()) return xit->second;
-  Process_Info pi;
-  pi.m_oqcd=2;
-  pi.m_oew=0;
-  pi.m_ii.m_ps.push_back(Subprocess_Info(fl[0]));
-  pi.m_ii.m_ps.push_back(Subprocess_Info(fl[1]));
-  pi.m_fi.m_ps.push_back(Subprocess_Info(fl[2]));
-  pi.m_fi.m_ps.push_back(Subprocess_Info(fl[3]));
-  ME2_Base* me2=dynamic_cast<ME2_Base*>(PHASIC::Tree_ME2_Base::GetME2(pi));
-  m_xsmap[fl]=me2;
-  return me2;
-}
-
-int Cluster_Algorithm::SetColours(EXTRAXS::ME2_Base * xs, 
-				  const Vec4D_Vector& p, ATOOLS::Flavour * fl)
-{
-  p_xs=xs;
-  if (!p_xs) return SetColours(p,fl);
-  bool test(p_xs->SetColours(p)), check(true);
-  for (int i=0; i<4; ++i) {
-    if (abs(fl[i].StrongCharge())==3) {
-      if ( fl[i].IsAnti() && 
-	   (p_xs->Colours()[i][0]!=0 || p_xs->Colours()[i][1]==0)) check=false;
-      if (!fl[i].IsAnti() && 
-	  (p_xs->Colours()[i][0]==0 || p_xs->Colours()[i][1]!=0)) check=false;
-    }
-    if (fl[i].StrongCharge()==8 && 
-	(p_xs->Colours()[i][0]==0 || p_xs->Colours()[i][1]==0))   check=false;
-    if (!check) {
-      msg_Error()<<"Cluster_Algorithm::SetColours(..): \n"
-		 <<"Colour check failed for the following combination:"
-		 <<std::endl;
-      for (int i=0; i<4; ++i) 
-	msg_Error()<<"   "<<i<<" : "<<fl[i]<<" ("
-		   <<p_xs->Colours()[i][0]<<","
-		   <<p_xs->Colours()[i][1]<<")"<<std::endl;
-      msg_Error()<<"Abort."<<std::endl;
-      abort();
-    }
-  }
-  for (int i=0;i<4;i++) {
-    m_colors[i][0] = p_xs->Colours()[i][0];
-    m_colors[i][1] = p_xs->Colours()[i][1];
-  }
-  return test;
 }
 
 void Cluster_Algorithm::Convert()
@@ -521,8 +227,8 @@ void Cluster_Algorithm::Convert()
   p_ampl->SetMS(p_ms);
   p_ampl->SetJF(jf);
   p_ampl->SetNIn(p_proc->NIn());
-  p_ampl->SetOrderEW(p_proc->OrderEW());
-  p_ampl->SetOrderQCD(p_proc->OrderQCD());
+  p_ampl->SetOrderEW(p_proc->MaxOrder(1));
+  p_ampl->SetOrderQCD(p_proc->MaxOrder(0));
   PHASIC::Process_Base *pb(p_proc->IsMapped()?
 			   p_proc->MapProc():p_proc);
   double muf2(pb->ScaleSetter()->Scale(stp::fac));
@@ -552,6 +258,7 @@ void Cluster_Algorithm::Convert()
     p_ampl->SetNIn(ampl->NIn());
     ampl->SetKT2(kt2qcd);
     ampl->SetMu2(mu2);
+    ampl->SetIdNew(ampl->Leg(jwin)->Id());
     for (int i(0);i<ct_tmp->NLegs();++i) {
       size_t id(ampl->Leg(i<jwin?i:i+1)->Id());
       Flavour flav(i<pb->NIn()?ct_tmp->Flav(i).Bar():ct_tmp->Flav(i));
@@ -590,57 +297,9 @@ void Cluster_Algorithm::Convert()
   size_t nmax(p_proc->Info().m_fi.NMaxExternal());
   p_ampl->Decays()=p_proc->Info().m_fi.GetDecayInfos();
   SetNMax(p_ampl,(1<<(p_proc->NIn()+p_proc->NOut()))-1,nmax);
-  if (p_ampl->Legs().size()==4) {
-  for (size_t i(0);i<2;++i)
-    p_ampl->Leg(i)->SetCol(ColorID(m_colors[i][1],m_colors[i][0]));
-  for (size_t i(2);i<4;++i)
-    p_ampl->Leg(i)->SetCol(ColorID(m_colors[i][0],m_colors[i][1]));
-  }
-  else {
-    std::vector<int> tids, atids;
-    for (size_t i(0);i<p_ampl->Legs().size();++i)
-      if (p_ampl->Leg(i)->Flav().StrongCharge()>0) {
-	tids.push_back(i);
-	if (p_ampl->Leg(i)->Flav().StrongCharge()==8)
-	  atids.push_back(i);
-      }
-      else if (p_ampl->Leg(i)->Flav().StrongCharge()<0) {
-	atids.push_back(i);
-      }
-    while (true) {
-      std::random_shuffle(atids.begin(),atids.end(),*ran);
-      size_t i(0);
-      for (;i<atids.size();++i) if (atids[i]==tids[i]) break;
-      if (i==atids.size()) break;
-    }
-    for (size_t i(0);i<tids.size();++i) {
-      int cl(Flow::Counter());
-      p_ampl->Leg(tids[i])->SetCol(ColorID(cl,p_ampl->Leg(tids[i])->Col().m_j));
-      p_ampl->Leg(atids[i])->SetCol(ColorID(p_ampl->Leg(atids[i])->Col().m_i,cl));
-    }
-  }
   while (p_ampl->Prev()) {
     Cluster_Amplitude *ampl(p_ampl->Prev());
     ampl->Decays()=p_proc->Info().m_fi.GetDecayInfos();
-    size_t jwin(std::numeric_limits<size_t>::max());
-    for (size_t i(0);i<ampl->Legs().size();++i) {
-      if (i==jwin) continue;
-      Cluster_Leg *li(ampl->Leg(i));
-      Cluster_Leg *lij(p_ampl->Leg(i<jwin?i:i-1));
-      if (li->Id()==lij->Id()) {
-	li->SetCol(lij->Col());
-      }
-      else {
-	for (size_t k(i+1);k<ampl->Legs().size();++k) {
-	  Cluster_Leg *lk(ampl->Leg(k));
-	  if (lk->Id()&lij->Id()) {
-	    Cluster_Amplitude::SetColours(lij,li,lk);
-	    jwin=k;
-	    break;
-	  }
-	}
-      }
-    }
     msg_Debugging()<<*p_ampl<<"\n";
     p_ampl=p_ampl->Prev();
   }
@@ -682,15 +341,18 @@ void Cluster_Algorithm::ClusterSpecial4lLoop2()
   p_ampl->SetMS(p_ms);
   p_ampl->SetJF(p_proc->Selector()->GetSelector("Jetfinder"));
   p_ampl->SetNIn(p_proc->NIn());
-  p_ampl->SetOrderEW(p_proc->OrderEW());
-  p_ampl->SetOrderQCD(p_proc->OrderQCD()-1);
+  p_ampl->SetOrderEW(p_proc->MaxOrder(1));
+  p_ampl->SetOrderQCD(p_proc->MaxOrder(0)-1);
   ampl->SetKT2(win.m_kt2);
   ampl->SetMu2(win.m_mu2);
 
   Vec4D_Vector clustered_moms=p_clus->Combine
     (*ampl, winner, emitted_idx, 1-winner, Flavour(kf_gluon),p_ms);
 
-  int color[2] = { Flow::Counter(), Flow::Counter() };
+  int color[2] = { ampl->Leg(winner)->Col().m_i,ampl->Leg(winner)->Col().m_j };
+  assert(color[0] >= 0 || color[1] >= 0);
+  if (color[0]==0) color[0] = ampl->Leg(emitted_idx)->Col().m_i;
+  if (color[1]==0) color[1] = ampl->Leg(emitted_idx)->Col().m_j;
   for (int i=0;i<2; ++i) {
     size_t id=(1<<i);
     if (i==winner) id+=(1<<emitted_idx);

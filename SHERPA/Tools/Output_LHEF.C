@@ -19,22 +19,20 @@ using namespace ATOOLS;
 using namespace std;
 
 Output_LHEF::Output_LHEF(const Output_Arguments &args):
-  Output_Base("LHEF")
+  Output_Base("LHEF"), m_xs(1.0), m_xserr(1.0), m_max(1.0)
 {
   m_basename=args.m_outpath+"/"+args.m_outfile;
   m_ext=".lhe";
   int precision       = args.p_reader->GetValue<int>("OUTPUT_PRECISION",12);
-#ifdef USING__GZIP
-  m_ext += ".gz";
-#endif
+  m_bntp=args.p_reader->GetValue<int>("LHEF_BNTP",0);
 #ifdef USING__MPI
   if (MPI::COMM_WORLD.Get_size()>1)
     m_basename+="_"+rpa->gen.Variable("RNG_SEED");
 #endif
   m_outstream.open((m_basename+m_ext).c_str());
-  if (!m_outstream.good())
+  if (!m_outstream.stream()->good())
     THROW(fatal_error, "Could not open event file "+m_basename+m_ext+".");
-  m_outstream.precision(precision);
+  m_outstream.stream()->precision(precision);
 }
 
 Output_LHEF::~Output_LHEF()
@@ -61,11 +59,12 @@ void Output_LHEF::Header()
   if (sep!=std::string::npos) {
     file.erase(sep);
   }
-    
-  m_outstream<<"<LesHouchesEvents version=\"1.0\">"<<std::endl;
-  m_outstream<<"<header>"<<std::endl;
-  m_outstream<<"<!-- "<<std::endl; 
-  m_outstream<<"# created by SHERPA "<<SHERPA_VERSION<<"."<<SHERPA_SUBVERSION
+
+  std::ostream& outstream=*m_outstream.stream();
+  outstream<<"<LesHouchesEvents version=\"1.0\">"<<std::endl;
+  outstream<<"<header>"<<std::endl;
+  outstream<<"<!-- "<<std::endl; 
+  outstream<<"# created by SHERPA "<<SHERPA_VERSION<<"."<<SHERPA_SUBVERSION
              <<endl;
   
   Data_Reader dr(" ",";","!","=");
@@ -73,22 +72,22 @@ void Output_LHEF::Header()
   dr.SetInputFile(file);
   
   if (dr.OpenInFile()) {
-    m_outstream<<"# Run data extracted from : "<<file<<std::endl; 
-    m_outstream<<"--> "<<std::endl; 
-    m_outstream<<"<SHRunCard> "<<std::endl; 
+    outstream<<"# Run data extracted from : "<<file<<std::endl; 
+    outstream<<"--> "<<std::endl; 
+    outstream<<"<SHRunCard> "<<std::endl; 
     My_In_File oldfile(path,file);
     oldfile.Open();
-    m_outstream<<oldfile->rdbuf();
-    m_outstream<<"</SHRunCard> "<<std::endl; 
+    outstream<<oldfile->rdbuf();
+    outstream<<"</SHRunCard> "<<std::endl; 
   }
-  m_outstream<<"</header>"<<std::endl;
+  outstream<<"</header>"<<std::endl;
   
-  m_outstream<<"<init>"<<std::endl;
+  outstream<<"<init>"<<std::endl;
   //run info to be dumped here
   Flavour Beam1 = rpa->gen.Beam1();
   Flavour Beam2 = rpa->gen.Beam2();
-  int IDBMUP1 = Beam1.HepEvt();
-  int IDBMUP2 = Beam2.HepEvt();
+  int IDBMUP1 = (long int)Beam1;
+  int IDBMUP2 = (long int)Beam2;
   double EBMUP1 = rpa->gen.PBeam(0)[0];
   double EBMUP2 = rpa->gen.PBeam(1)[0];
   
@@ -97,11 +96,11 @@ void Output_LHEF::Header()
   int NPRUP = 1;
   int PDFGUP1 = 0;
   int PDFGUP2 = 0;
-  int PDFSUP1 = dr.GetValue<int>("LHEF_PDF_NUMBER_1",rpa->gen.PDF(0)->LHEFNumber());
-  int PDFSUP2 = dr.GetValue<int>("LHEF_PDF_NUMBER_2",rpa->gen.PDF(1)->LHEFNumber());
+  int PDFSUP1 = dr.GetValue<int>("LHEF_PDF_NUMBER_1",rpa->gen.PDF(0)?rpa->gen.PDF(0)->LHEFNumber():-1);
+  int PDFSUP2 = dr.GetValue<int>("LHEF_PDF_NUMBER_2",rpa->gen.PDF(1)?rpa->gen.PDF(1)->LHEFNumber():-1);
 
-  m_outstream<<std::setprecision(10);
-  m_outstream<<std::setw(6)<<IDBMUP1<<" "
+  outstream<<std::setprecision(10);
+  outstream<<std::setw(6)<<IDBMUP1<<" "
 	     <<std::setw(6)<<IDBMUP2<<" "
 	     <<std::setw(11)<<EBMUP1<<" "
 	     <<std::setw(11)<<EBMUP2<<" "
@@ -113,28 +112,30 @@ void Output_LHEF::Header()
 	     <<std::setw(4)<<NPRUP<<std::endl;
 
   //process information
-  m_outstream<<std::setw(18)<<m_xs<<" "
+  outstream<<std::setw(18)<<m_xs<<" "
 	     <<std::setw(18)<<m_xserr<<" "
 	     <<std::setw(18)<<m_max<<" "
 	     <<std::setw(4)<<NPRUP<<std::endl; 
-  m_outstream<<"</init>"<<std::endl;
+  outstream<<"</init>"<<std::endl;
 }
 
 void Output_LHEF::Output(Blob_List* blobs, const double weight) 
 {
   Blob *sp(blobs->FindFirst(btp::Signal_Process));
-  m_outstream<<"<event trials='"<<(int)(*sp)["Trials"]->Get<double>();
+  std::ostream& outstream=*m_outstream.stream();
+  outstream<<"<event trials='"<<(int)(*sp)["Trials"]->Get<double>();
   if ((*sp)["MC@NLO_KT2_Start"])
-    m_outstream<<"' kt2_start='"<<(*sp)["MC@NLO_KT2_Start"]->Get<double>()
+    outstream<<"' kt2_start='"<<(*sp)["MC@NLO_KT2_Start"]->Get<double>()
 	       <<"' kt2_stop='"<<(*sp)["MC@NLO_KT2_Stop"]->Get<double>();
   if ((*sp)["Factorisation_Scale"])
-    m_outstream<<"' muf2='"<<(*sp)["Factorisation_Scale"]->Get<double>();
+    outstream<<"' muf2='"<<(*sp)["Factorisation_Scale"]->Get<double>();
   double mur2=0.0;
   if ((*sp)["Renormalization_Scale"]) {
     mur2=(*sp)["Renormalization_Scale"]->Get<double>();
-    m_outstream<<"' mur2='"<<mur2;
+    outstream<<"' mur2='"<<mur2;
   }
-  m_outstream<<"'>"<<std::endl;
+  outstream<<"'>"<<std::endl;
+  Poincare cms(rpa->gen.PBeam(0)+rpa->gen.PBeam(1));
   for (Blob_List::const_iterator blit=blobs->begin();blit!=blobs->end();++blit){
     if ((*blit)->Type()==ATOOLS::btp::Signal_Process) {
       //LHE event information
@@ -146,44 +147,50 @@ void Output_LHEF::Output(Blob_List* blobs, const double weight)
 	SCALUP=sqrt((*(*blit))["Resummation_Scale"]->Get<double>());
       double AQEDUP = -1.;
       double AQCDUP = mur2?(*MODEL::as)(mur2):-1.0;
-      m_outstream<<std::setprecision(10);
-      m_outstream<<std::setiosflags(std::ios::scientific);
-      m_outstream<<std::setw(4)<<NUP<<" "
+      outstream<<std::setprecision(10);
+      outstream<<std::setiosflags(std::ios::scientific);
+      outstream<<std::setw(4)<<NUP<<" "
 		 <<std::setw(4)<<IDPRUP<<" "
 		 <<std::setw(18)<<XWGTUP<<" "
 		 <<std::setw(18)<<SCALUP<<" "
 		 <<std::setw(18)<<AQEDUP<<" "
 		 <<std::setw(18)<<AQCDUP<<std::endl;
-      for (int i=0;i<(*blit)->NInP();i++)
-	m_outstream<<std::setw(8)<<(*blit)->InParticle(i)->Flav().HepEvt()<<" -1  0  0 "
+      for (int i=0;i<(*blit)->NInP();i++) {
+	Vec4D p((*blit)->InParticle(i)->Momentum());
+	if (m_bntp) cms.Boost(p);
+	outstream<<std::setw(8)<<(long int)(*blit)->InParticle(i)->Flav()<<" -1  0  0 "
 		   <<std::setw(4)<<(*blit)->InParticle(i)->GetFlow(1)<<" "
 		   <<std::setw(4)<<(*blit)->InParticle(i)->GetFlow(2)<<" "
-		   <<std::setw(18)<<(*blit)->InParticle(i)->Momentum()[1]<<" "
-		   <<std::setw(18)<<(*blit)->InParticle(i)->Momentum()[2]<<" "
-		   <<std::setw(18)<<(*blit)->InParticle(i)->Momentum()[3]<<" "
-		   <<std::setw(18)<<(*blit)->InParticle(i)->Momentum()[0]<<" "
+		   <<std::setw(18)<<p[1]<<" "
+		   <<std::setw(18)<<p[2]<<" "
+		   <<std::setw(18)<<p[3]<<" "
+		   <<std::setw(18)<<p[0]<<" "
 		   <<std::setw(18)<<(*blit)->InParticle(i)->FinalMass()<<" "
 		   <<" 0  9"<<std::endl;
-      for (int i=0;i<(*blit)->NOutP();i++)
-	m_outstream<<std::setw(8)<<(*blit)->OutParticle(i)->Flav().HepEvt()<<"  1  1  2 "
+      }
+      for (int i=0;i<(*blit)->NOutP();i++) {
+	Vec4D p((*blit)->OutParticle(i)->Momentum());
+	if (m_bntp) cms.Boost(p);
+	outstream<<std::setw(8)<<(long int)(*blit)->OutParticle(i)->Flav()<<"  1  1  2 "
 		   <<std::setw(4)<<(*blit)->OutParticle(i)->GetFlow(1)<<" "
 		   <<std::setw(4)<<(*blit)->OutParticle(i)->GetFlow(2)<<" "
-		   <<std::setw(18)<<(*blit)->OutParticle(i)->Momentum()[1]<<" "
-		   <<std::setw(18)<<(*blit)->OutParticle(i)->Momentum()[2]<<" "
-		   <<std::setw(18)<<(*blit)->OutParticle(i)->Momentum()[3]<<" "
-		   <<std::setw(18)<<(*blit)->OutParticle(i)->Momentum()[0]<<" "
+		   <<std::setw(18)<<p[1]<<" "
+		   <<std::setw(18)<<p[2]<<" "
+		   <<std::setw(18)<<p[3]<<" "
+		   <<std::setw(18)<<p[0]<<" "
 		   <<std::setw(18)<<(*blit)->OutParticle(i)->FinalMass()<<" "
 		   <<" 0  9"<<std::endl;
-      m_outstream<<std::resetiosflags(std::ios::fixed);
+      }
+      outstream<<std::resetiosflags(std::ios::fixed);
     }
   }
-  m_outstream<<"</event>"<<std::endl;
+  outstream<<"</event>"<<std::endl;
 }
 
 void Output_LHEF::Footer()
 {
   string footer = std::string("</LesHouchesEvents>");
-  m_outstream<<footer<<std::endl;
+  (*m_outstream.stream())<<footer<<std::endl;
 }
 
 void Output_LHEF::SetXS(const double& xs, const double& xserr) {

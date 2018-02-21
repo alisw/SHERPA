@@ -7,20 +7,22 @@
 #include "ATOOLS/Phys/Blob_List.H"
 #include "ATOOLS/Phys/Cluster_Amplitude.H"
 #include "ATOOLS/Phys/NLO_Subevt.H"
+#include "ATOOLS/Phys/Weight_Info.H"
 #include "ATOOLS/Math/Random.H"
 #include "PHASIC++/Decays/Decay_Map.H"
 #include "PHASIC++/Decays/Decay_Table.H"
 #include "PHASIC++/Decays/Decay_Channel.H"
 
 #include "MODEL/Main/Model_Base.H"
-#include "MODEL/Interaction_Models/Single_Vertex.H"
-#include "MODEL/Interaction_Models/Color_Function.H"
-#include "PHASIC++/Decays/Color_Function_Decay.H"
+#include "MODEL/Main/Single_Vertex.H"
+#include "MODEL/Main/Color_Function.H"
 #include "PHASIC++/Channels/Multi_Channel.H"
 #include "PHASIC++/Channels/Rambo.H"
+#include "PHASIC++/Channels/Decay_Dalitz.H"
 #include "METOOLS/Main/Spin_Structure.H"
 #include "ATOOLS/Org/Run_Parameter.H"
 #include "SHERPA/SoftPhysics/Soft_Photon_Handler.H"
+#include "SHERPA/Tools/Variations.H"
 
 #include "EXTRA_XS/One2Two/Comix1to2.H"
 #include "EXTRA_XS/One2Three/Comix1to3.H"
@@ -47,14 +49,14 @@ public:
 };
 
 Hard_Decay_Handler::Hard_Decay_Handler(std::string path, std::string file) :
-  p_newsublist(NULL), m_path(""), m_file(""), m_resultdir(""), m_offshell(""),
+  p_newsublist(NULL), m_path(path), m_file(file), m_resultdir(""), m_offshell(""),
   m_store_results(0), m_decay_tau(false), m_set_widths(false),
   m_br_weights(true), m_usemass(true)
 {
   Data_Reader dr(" ",";","!","=");
   dr.AddWordSeparator("\t");
-  dr.SetInputPath(path);
-  dr.SetInputFile(file);
+  dr.SetInputPath(m_path);
+  dr.SetInputFile(m_file);
   m_mass_smearing=dr.GetValue<int>("HARD_MASS_SMEARING",1);
   m_spincorr=rpa->gen.HardSC();
   /*
@@ -65,6 +67,11 @@ Hard_Decay_Handler::Hard_Decay_Handler(std::string path, std::string file) :
   m_br_weights=dr.GetValue<int>("HDH_BR_WEIGHTS",1);
   m_decay_tau=dr.GetValue<int>("DECAY_TAU_HARD",0);
   m_set_widths=dr.GetValue<int>("HDH_SET_WIDTHS",0);
+
+  m_int_accuracy=dr.GetValue<double>("HDH_INT_ACCURACY", 0.01);
+  m_int_niter=dr.GetValue<int>("HDH_INT_NITER", 2500);
+  m_int_target_mode=dr.GetValue<int>("HDH_INT_TARGET_MODE", 0);
+
   // also need to tell shower whats massive now
   // TODO: need to use the same mass-selector
   // for now, implement alike
@@ -75,28 +82,12 @@ Hard_Decay_Handler::Hard_Decay_Handler(std::string path, std::string file) :
     THROW(fatal_error,std::string("QED corrections to hard decays only ")
                       +std::string("available in massive mode."));
   }
-  std::string r=dr.GetValue<std::string>("DECAY_RESULT_DIRECTORY","");
-  m_resultdir=(r==""?dr.GetValue<std::string>("RESULT_DIRECTORY","Results"):r);
+  m_resultdir=dr.GetValue<std::string>("DECAY_RESULT_DIRECTORY",
+                                       dr.GetValue<std::string>("RESULT_DIRECTORY","Results")+"/Decays");
   if (m_store_results) {
-    MakeDir(m_resultdir+"/Decays/", true);
+    MakeDir(m_resultdir, true);
   }
   m_offshell=dr.GetValue<std::string>("RESOLVE_DECAYS", "Threshold");
-
-  Data_Reader nodecayreader("|", ";", "#");
-  nodecayreader.SetString(dr.GetValue<std::string>("HDH_NO_DECAY", ""));
-  vector<string> disabled_channels;
-  nodecayreader.VectorFromString(disabled_channels);
-  for (size_t i=0; i<disabled_channels.size(); ++i)
-    m_disabled_channels.insert(disabled_channels[i]);
-  nodecayreader.SetString(dr.GetValue<std::string>("HDH_ONLY_DECAY", ""));
-  vector<string> forced_channels;
-  nodecayreader.VectorFromString(forced_channels);
-  for (size_t i=0; i<forced_channels.size(); ++i) {
-    string fc(forced_channels[i]);
-    size_t bracket(fc.find("{")), comma(fc.find(","));
-    int kfc(atoi((fc.substr(bracket+1,comma-bracket-1)).c_str()));
-    m_forced_channels[Flavour(abs(kfc), kfc<0)].insert(fc);
-  }
 
   DEBUG_FUNC("");
   p_decaymap = new Decay_Map(this);
@@ -121,52 +112,21 @@ Hard_Decay_Handler::Hard_Decay_Handler(std::string path, std::string file) :
   
   // initialize them sorted by masses:
   Decay_Map::iterator dmit;
-  Vertex_Table offshell;
-  msg_Info()<<"Initialising hard decay tables."<<endl;
-  size_t i(0);
+  msg_Debugging()<<"Initialising hard decay tables: two-body decays.\n";
   for (dmit=p_decaymap->begin(); dmit!=p_decaymap->end(); ++dmit) {
-    offshell.insert(make_pair(dmit->first,Vertex_List()));
-    msg_Tracking()<<"  Initialising two-body decays. Step "
-		  <<++i<<"/"<<p_decaymap->size()<<" ("<<dmit->first<<")            "
-		  <<endl;
     InitializeDirectDecays(dmit->second.at(0));
   }
-  i=0;
-  if (p_decaymap->size()) msg_Tracking()<<endl;
+  msg_Debugging()<<"Initialising hard decay tables: three-body decays.\n";
   for (dmit=p_decaymap->begin(); dmit!=p_decaymap->end(); ++dmit) {
-    msg_Tracking()<<"  Initialising three-body decays. Step "
-		  <<++i<<"/"<<p_decaymap->size()<<" ("<<dmit->first<<")            "
-		  <<endl;
-    if (m_offshell=="None") {
-      PRINT_INFO("Warning: Ignoring offshell decays as requested.");
-    }
-    else if (m_offshell=="Threshold") {
-      RefineDecaysThreshold(dmit->second.at(0));
-    }
-    else if (m_offshell=="ByWidth") {
-      RefineDecaysByWidth(dmit->second.at(0));
-    }
-    else THROW(fatal_error, "Parameter RESOLVE_DECAYS set to wrong value.");
-
-    // force/disable specified decay channels
-    for (size_t i=0;i<dmit->second.at(0)->size();++i) {
-      Decay_Channel* dc=dmit->second.at(0)->at(i);
-      if (dc->Active()<1) continue;
-      string idc(dc->IDCode());
-      size_t bracket(idc.find("{")), comma(idc.find(","));
-      int kfc(atoi((idc.substr(bracket+1,comma-bracket-1)).c_str()));
-      Flavour dec(abs(kfc), kfc<0);
-      if (m_disabled_channels.count(idc) ||
-	  (m_forced_channels.find(dec)!=m_forced_channels.end() &&
-           m_forced_channels[dec].size() &&
-	   !m_forced_channels[dec].count(idc))) 
-	dc->SetActive(0);
-    }
-
-    dmit->second.at(0)->UpdateWidth();
-    if (m_set_widths)
-      dmit->second.at(0)->Flav().SetWidth(dmit->second.at(0)->TotalWidth());
+    InitializeOffshellDecays(dmit->second.at(0));
   }
+  msg_Debugging()<<"Initialising hard decay tables: customizing decay tables.\n";
+  CustomizeDecayTables();
+
+  if (m_set_widths)
+    for (dmit=p_decaymap->begin(); dmit!=p_decaymap->end(); ++dmit) {
+      dmit->second.at(0)->Flav().SetWidth(dmit->second.at(0)->TotalWidth());
+    }
 
   if (p_decaymap->size()) msg_Info()<<endl<<*p_decaymap<<endl;
   WriteDecayTables();
@@ -249,7 +209,9 @@ void Hard_Decay_Handler::SetDecayMasses(Data_Reader *const dr)
     m_decmass.insert(fl);
     m_decmass.insert(fl.Bar());
   }
-  Flavour_Vector mf(m_decmass.begin(),m_decmass.end());
+  Flavour_Vector mf;
+  for (Flavour_Set::iterator fit(m_decmass.begin());fit!=m_decmass.end();++fit)
+    if (fit->Mass(true)!=fit->Mass(false)) mf.push_back(*fit);
   msg_Info()<<METHOD<<"(): Massive decay flavours: "<<mf<<std::endl;
 }
 
@@ -259,19 +221,28 @@ void Hard_Decay_Handler::InitializeDirectDecays(Decay_Table* dt)
   DEBUG_FUNC(dt->Flav());
   Flavour inflav=dt->Flav();
   Vertex_Table::const_iterator vlit=s_model->VertexTable()->find(inflav);
-  const Vertex_List& vertexlist(vlit->second);
+  const Vertex_List& vlist=(vlit!=s_model->VertexTable()->end()) ? (vlit->second) : Vertex_List();
+  // temporary hack:
+  // prepare reduced vertex list, not containing duplicates
+  // in the sense of having identical external flavours
+  Vertex_List reduced_vlist;
+  for (Vertex_List::const_iterator vit=vlist.begin();vit!=vlist.end();++vit){
+    Vertex_List::const_iterator vjt=reduced_vlist.begin();
+    for(;vjt!=reduced_vlist.end(); ++vjt)
+      if((*vjt)->in == (*vit)->in) break;
+    if(vjt==reduced_vlist.end()) reduced_vlist.push_back(*vit);
+  }
 
   msg_Debugging()<<"Vertices:"<<std::endl;
-  for (size_t i=0;i<vertexlist.size();i++) {
-    Single_Vertex* sv=vertexlist[i];
+  for (size_t i=0;i<reduced_vlist.size();i++) {
+    Single_Vertex* sv=reduced_vlist[i];
     if (!ProperVertex(sv)) continue;
     msg_Debugging()<<"  "<<i<<": "<<*sv<<std::endl;
     Decay_Channel* dc=new Decay_Channel(inflav, this);
-    for (int j=1; j<sv->nleg; ++j) dc->AddDecayProduct(sv->in[j]);
+    for (int j=1; j<sv->NLegs(); ++j) dc->AddDecayProduct(sv->in[j]);
 
-    assert(sv->Color.size()==1);
     Comix1to2* diagram=new Comix1to2(dc->Flavs());
-    dc->AddDiagram(diagram,new Color_Function_Decay(sv->Color[0]));
+    dc->AddDiagram(diagram);
 
     dc->SetChannels(new Multi_Channel(""));
     dc->Channels()->SetNin(1);
@@ -287,86 +258,117 @@ void Hard_Decay_Handler::InitializeDirectDecays(Decay_Table* dt)
   if (m_set_widths) dt->Flav().SetWidth(dt->TotalWidth());
 }
 
-void Hard_Decay_Handler::RefineDecaysThreshold(Decay_Table* dt) {
+void Hard_Decay_Handler::InitializeOffshellDecays(Decay_Table* dt) {
   DEBUG_FUNC(dt->Flav()<<" "<<dt->size());
   size_t dtsize=dt->size();
   for (size_t i=0;i<dtsize;++i) {
     Decay_Channel* dc=dt->at(i);
-    if (!dc) THROW(fatal_error,"Could not retrieve decay table.");
-    msg_Debugging()<<*dc<<std::endl;
-    double outmass=0.0;
-    for (size_t j=1; j<dc->Flavs().size(); ++j)
-      outmass+=this->Mass(dc->Flavs()[j]);
-    msg_Debugging()<<this->Mass(dt->Flav())<<" vs "<<outmass<<std::endl;
-    if (this->Mass(dt->Flav())>outmass) continue;
-
     vector<Decay_Channel*> new_dcs=ResolveDecay(dc);
-    for (size_t j=0; j<new_dcs.size(); ++j) {
-      dt->AddDecayChannel(new_dcs[j]);
-    }
-    if (new_dcs.size()>0) {
+    if (TriggerOffshell(dc, new_dcs)) {
       dc->SetActive(-1);
       for (size_t j=0; j<new_dcs.size(); ++j) {
-        DEBUG_INFO("Adding "<<*new_dcs[j]);
+        // check for duplicates
+        Decay_Channel* dup=dt->GetDecayChannel(new_dcs[j]->Flavs());
+        if (dup && dup->Active()>=0) {
+          DEBUG_INFO("Adding new diagram to "<<*dup);
+          for (size_t k=0; k<new_dcs[j]->GetDiagrams().size(); ++k) {
+            dup->AddDiagram(new_dcs[j]->GetDiagrams()[k]);
+          }
+          for (size_t k=0; k<new_dcs[j]->Channels()->Channels().size(); ++k) {
+            dup->AddChannel(new_dcs[j]->Channels()->Channels()[k]);
+          }
+          new_dcs[j]->ResetDiagrams();
+          new_dcs[j]->ResetChannels();
+          delete new_dcs[j];
+          new_dcs[j]=NULL;
+          CalculateWidth(dup);
+        }
+        else {
+          DEBUG_INFO("Adding "<<new_dcs[j]->Name());
+          dt->AddDecayChannel(new_dcs[j]);
+        }
       }
     }
     else {
-      for (size_t j=0; j<new_dcs.size(); ++j) {
-        new_dcs[j]->SetActive(-1);
-      }
-    }
-  }
-}
-
-void Hard_Decay_Handler::RefineDecaysByWidth(Decay_Table* dt) {
-  DEBUG_FUNC(dt->Flav()<<" "<<dt->size());
-  size_t dtsize=dt->size();
-  for (size_t i=0;i<dtsize;++i) {
-    Decay_Channel* dc=dt->at(i);
-    DEBUG_VAR(*dc);
-    vector<Decay_Channel*> new_dcs=ResolveDecay(dc);
-    double sum_resolved_widths=0.0;
-    for (size_t j=0; j<new_dcs.size(); ++j) {
-      Decay_Channel* dup=dt->GetDecayChannel(new_dcs[j]->Flavs());
-      if (dup) {
-        DEBUG_INFO("Duplicate for "<<*dup);
-        for (DiagColVec::const_iterator it=new_dcs[j]->GetDiagrams().begin();
-             it!=new_dcs[j]->GetDiagrams().end(); ++it) {
-          dup->AddDiagram(it->first, it->second);
-        }
-        for (vector<Single_Channel*>::const_iterator it=new_dcs[j]->Channels()->Channels().begin();
-             it!=new_dcs[j]->Channels()->Channels().end(); ++it) {
-          dup->AddChannel(*it);
-        }
-        new_dcs[j]->ResetDiagrams();
-        new_dcs[j]->ResetChannels();
-        delete new_dcs[j];
-        new_dcs[j]=NULL;
-        sum_resolved_widths-=dup->Width();
-        CalculateWidth(dup);
-        sum_resolved_widths+=dup->Width();
-      }
-      else {
-        sum_resolved_widths+=new_dcs[j]->Width();
-        dt->AddDecayChannel(new_dcs[j]);
-      }
-    }
-    DEBUG_INFO("resolved="<<sum_resolved_widths<<" vs. "<<dc->Width());
-
-    if (sum_resolved_widths>dc->Width()) {
-      dc->SetActive(-1);
-    }
-    else {
+      DEBUG_INFO("Keeping factorised.");
       for (size_t j=0; j<new_dcs.size(); ++j) {
         if (new_dcs[j]) new_dcs[j]->SetActive(-1);
       }
     }
   }
+  dt->UpdateWidth();
+  if (m_set_widths) dt->Flav().SetWidth(dt->TotalWidth());
+}
+
+
+void Hard_Decay_Handler::CustomizeDecayTables()
+{
+  Data_Reader dr(" ", ";", "#", "=");
+  dr.SetInputPath(m_path);
+  dr.SetInputFile(m_file);
+  dr.AddIgnore("[");
+  dr.AddIgnore("]");
+  vector<vector<string> > helpsvv;
+  dr.MatrixFromFile(helpsvv,"HDH_STATUS");
+  for (size_t i=0;i<helpsvv.size();++i) {
+    if (helpsvv[i].size()==2) {
+      pair<Decay_Table*, Decay_Channel*> match=p_decaymap->FindDecayChannel(helpsvv[i][0]);
+      int status=ToType<int>(helpsvv[i][1]);
+      if (match.first && match.second) match.first->SetChannelStatus(match.second,status);
+      else PRINT_INFO("Ignoring unknown decay channel: "<<helpsvv[i][0]);
+    }
+    else THROW(fatal_error,"Wrong input format.");
+  }
+
+  dr.MatrixFromFile(helpsvv,"HDH_WIDTH");
+  for (size_t i=0;i<helpsvv.size();++i) {
+    if (helpsvv[i].size()==2) {
+      pair<Decay_Table*, Decay_Channel*> match=p_decaymap->FindDecayChannel(helpsvv[i][0], true);
+      double externalwidth=ToType<double>(helpsvv[i][1]);
+      if (match.first) {
+        match.second->SetWidth(externalwidth);
+        match.second->SetDeltaWidth(0.0);
+      }
+      else {
+        PRINT_INFO("Ignoring custom decay channel without decay table: "<<helpsvv[i][0]);
+      }
+    }
+    else THROW(fatal_error,"Wrong input format.");
+  }
+
+  for (Decay_Map::iterator dmit=p_decaymap->begin(); dmit!=p_decaymap->end(); ++dmit) {
+    dmit->second.at(0)->UpdateWidth();
+  }
+}
+
+
+bool Hard_Decay_Handler::TriggerOffshell(Decay_Channel* dc, vector<Decay_Channel*> new_dcs) {
+  DEBUG_FUNC(dc->Name()<<"... "<<new_dcs.size());
+
+  if (m_offshell=="Threshold") {
+    double outmass=0.0;
+    for (size_t j=1; j<dc->Flavs().size(); ++j)
+      outmass+=this->Mass(dc->Flavs()[j]);
+    DEBUG_INFO(this->Mass(dc->Flavs()[0])<<" vs "<<outmass);
+    return (this->Mass(dc->Flavs()[0])<outmass);
+  }
+  else if (m_offshell=="ByWidth") {
+    double sum_resolved_widths=0.0;
+    for (size_t i=0; i<new_dcs.size(); ++i) {
+      if (new_dcs[i]) sum_resolved_widths+=new_dcs[i]->Width();
+    }
+    return (sum_resolved_widths>dc->Width());
+  }
+  else if (m_offshell=="None") {
+    return false;
+  }
+  else THROW(fatal_error, "Parameter RESOLVE_DECAYS set to wrong value.");
+  return false;
 }
 
 vector<Decay_Channel*> Hard_Decay_Handler::ResolveDecay(Decay_Channel* dc1)
 {
-  DEBUG_FUNC(*dc1);
+  DEBUG_FUNC(dc1->Name());
   vector<Decay_Channel*> new_dcs;
   const std::vector<ATOOLS::Flavour> flavs1(dc1->Flavs());
   for (size_t j=1;j<flavs1.size();++j) {
@@ -378,9 +380,20 @@ vector<Decay_Channel*> Hard_Decay_Handler::ResolveDecay(Decay_Channel* dc1)
     }
     if (ignore) continue;
     Vertex_Table::const_iterator it=s_model->VertexTable()->find(flavs1[j]);
-    const Vertex_List& vertexlist(it->second);
-    for (size_t k=0;k<vertexlist.size();k++) {
-      Single_Vertex* sv = vertexlist[k];
+    const Vertex_List& vlist(it->second);
+    // temporary hack:
+    // prepare reduced vertex list, not containing duplicates
+    // in the sense of having identical external flavours
+    Vertex_List reduced_vlist;
+    for (Vertex_List::const_iterator vit=vlist.begin();vit!=vlist.end();++vit){
+      Vertex_List::const_iterator vjt=reduced_vlist.begin();
+      for(;vjt!=reduced_vlist.end(); ++vjt)
+        if((*vjt)->in == (*vit)->in) break;
+      if(vjt==reduced_vlist.end()) reduced_vlist.push_back(*vit);
+    }
+
+    for (size_t k=0;k<reduced_vlist.size();k++) {
+      Single_Vertex* sv = reduced_vlist[k];
       if (!ProperVertex(sv)) continue;
       // TODO so far special case 1->3 only
       Decay_Channel* dc=new Decay_Channel(flavs1[0], this);
@@ -388,9 +401,10 @@ vector<Decay_Channel*> Hard_Decay_Handler::ResolveDecay(Decay_Channel* dc1)
       dc->AddDecayProduct(flavs1[3-j]);
       dc->AddDecayProduct(sv->in[1]);
       dc->AddDecayProduct(sv->in[2]);
-      DEBUG_FUNC("trying "<<*dc);
+      DEBUG_FUNC("trying "<<dc->Name());
       // TODO what about W+ -> b t -> b W b -> b b ... two diagrams, factor 2, ...?
-      // TODO what about W' -> b t -> b W b ... two diagrams, factor 2, ...?
+      // TODO what about identical particles like W' -> b t -> b W b ... two diagrams, factor 2, ...?
+      // TODO what about W -> W gamma -> l v gamma?
       for (size_t l=1; l<4; ++l) {
         if (dc->Flavs()[l]==flavs1[3-j]) nonprop=l;
       }
@@ -400,27 +414,22 @@ vector<Decay_Channel*> Hard_Decay_Handler::ResolveDecay(Decay_Channel* dc1)
       }
 
       assert(dc1->GetDiagrams().size()==1);
-      assert(sv->Color.size()==1);
       DEBUG_VAR(dc->Flavs());
       DEBUG_VAR(flavs1[j]);
       Comix1to3* diagram=new Comix1to3(dc->Flavs(),flavs1[j],
                                        nonprop, propi, propj);
-      Color_Function_Decay* col1=new Color_Function_Decay(*dc1->GetDiagrams()[0].second);
-      DEBUG_VAR(*col1);
-      Color_Function_Decay col2(sv->Color[0]);
-      DEBUG_VAR(col2);
-      vector<int> bumps = col1->Multiply(col2);
-      DEBUG_VAR(*col1);
-      DEBUG_INFO("Contracting "<<0+bumps[0]<<" with "<<j);
-      col1->Contract(0+bumps[0],j);
-      DEBUG_VAR(*col1);
-      dc->AddDiagram(diagram, col1);
+
+      dc->AddDiagram(diagram);
 
       dc->SetChannels(new Multi_Channel(""));
       dc->Channels()->SetNin(1);
       dc->Channels()->SetNout(dc->NOut());
-      Rambo* rambo = new Rambo(1,dc->NOut(),&dc->Flavs().front(),this);
-      dc->Channels()->Add(rambo);
+      dc->Channels()->Add(new Rambo(1,dc->NOut(),&dc->Flavs().front(),this));
+      if (flavs1[j].Width()>0.0) {
+        dc->Channels()->Add(new Decay_Dalitz(&dc->Flavs().front(),
+                                             flavs1[j].Mass(), flavs1[j].Width(),
+                                             nonprop, propi, propj, this));
+      }
       dc->Channels()->Reset();
 
       if (CalculateWidth(dc)) new_dcs.push_back(dc);
@@ -442,8 +451,7 @@ bool Hard_Decay_Handler::CalculateWidth(Decay_Channel* dc)
   for (size_t l=1; l<dc->Flavs().size(); ++l)
     outmass+=this->Mass(dc->Flavs()[l]);
   if (this->Mass(dc->Flavs()[0])>outmass) {
-    DEBUG_INFO("Starting calculation of widths now.");
-    DEBUG_INFO(*dc);
+    DEBUG_FUNC("Starting calculation of "<<dc->Name()<<" width now.");
     if (m_store_results && m_read.find(dc->Flavs()[0])!=m_read.end()) {
       if (m_read[dc->Flavs()[0]].find(dc->IDCode())!=
           m_read[dc->Flavs()[0]].end()) {
@@ -454,12 +462,16 @@ bool Hard_Decay_Handler::CalculateWidth(Decay_Channel* dc)
       }
       else {
         msg_Tracking()<<"    Integrating "<<dc->Name()<<endl;
-        dc->CalculateWidth();
+        dc->CalculateWidth(m_int_accuracy,
+                           m_int_target_mode==0 ? dc->Flavs()[0].Width() : 0.0,
+                           m_int_niter);
       }
     }
     else {
       msg_Tracking()<<"    Integrating "<<dc->Name()<<endl;
-      dc->CalculateWidth();
+      dc->CalculateWidth(m_int_accuracy,
+                         m_int_target_mode==0 ? dc->Flavs()[0].Width() : 0.0,
+                         m_int_niter);
     }
   }
   else {
@@ -475,15 +487,15 @@ bool Hard_Decay_Handler::CalculateWidth(Decay_Channel* dc)
 
 bool Hard_Decay_Handler::ProperVertex(MODEL::Single_Vertex* sv)
 {
-  if (!sv->on || sv->dec) return false;
+  if (sv->dec) return false;
 
-  for (int i(0); i<sv->nleg; ++i)
+  for (int i(0); i<sv->NLegs(); ++i)
     if (sv->in[i].IsDummy()) return false;
 
-  if (sv->nleg!=3) return false; // TODO
+  if (sv->NLegs()!=3) return false; // TODO
 
-  // ignore radiation graphs. should we?
-  for (int i=1; i<sv->nleg; ++i) {
+  // TODO: ignore radiation graphs. should we?
+  for (int i=1; i<sv->NLegs(); ++i) {
     if (sv->in[i].Kfcode()==sv->in[0].Kfcode()) {
       return false;
     }
@@ -567,6 +579,12 @@ void Hard_Decay_Handler::TreatInitialBlob(ATOOLS::Blob* blob,
     // msg_Out()<<".\n";
     bdbmeweight->Set<double>(brfactor*bdbmeweight->Get<double>());
   }
+  Blob_Data_Base * wgtinfo((*blob)["MEWeightInfo"]);
+  if (wgtinfo) *wgtinfo->Get<ME_Weight_Info*>()*=brfactor;
+
+  Blob_Data_Base * varweights((*blob)["Variation_Weights"]);
+  if (varweights) varweights->Get<Variation_Weights>()*=brfactor;
+
   NLO_subevtlist* sublist(NULL);
   Blob_Data_Base * bdb((*blob)["NLO_subeventlist"]);
   if (bdb) sublist=bdb->Get<NLO_subevtlist*>();
@@ -711,6 +729,7 @@ void Hard_Decay_Handler::AddDecayClustering(ATOOLS::Cluster_Amplitude*& ampl,
     msg_Debugging()<<"1 to 2 case"<<std::endl;
     Cluster_Amplitude* copy=ampl->InitPrev();
     copy->CopyFrom(ampl);
+    copy->SetNLO(0);
     copy->SetFlag(1);
     copy->SetMS(ampl->MS());
     Cluster_Leg *lij(ampl->IdLeg(idmother));
@@ -746,8 +765,10 @@ void Hard_Decay_Handler::AddDecayClustering(ATOOLS::Cluster_Amplitude*& ampl,
     d1->SetMom(RecombinedMomentum(daughters[0],photons,stat1));
     d1->SetStat(stat1);
     d1->SetFlav(daughters[0]->Flav());
+    d1->SetFromDec(true);
     copy->CreateLeg(RecombinedMomentum(daughters[1],photons,stat2),
                     daughters[1]->RefFlav());
+    copy->Legs().back()->SetFromDec(true);
     size_t idnew=1<<(++imax);
     copy->Legs().back()->SetId(idnew);
     copy->Legs().back()->SetStat(stat2);
@@ -785,6 +806,7 @@ void Hard_Decay_Handler::AddDecayClustering(ATOOLS::Cluster_Amplitude*& ampl,
     // propagator always combines daughters 1+2
     Cluster_Amplitude* step1=ampl->InitPrev();
     step1->CopyFrom(ampl);
+    step1->SetNLO(0);
     step1->SetFlag(1);
     step1->SetMS(ampl->MS());
     Cluster_Leg *lij(ampl->IdLeg(idmother));
@@ -821,6 +843,7 @@ void Hard_Decay_Handler::AddDecayClustering(ATOOLS::Cluster_Amplitude*& ampl,
     d1->SetMom(RecombinedMomentum(daughters[0],photons,stat1));
     d1->SetStat(stat1);
     d1->SetFlav(daughters[0]->Flav());
+    d1->SetFromDec(true);
     // todo: 1->2 qcd shower with ew fs recoil partner
     // d1->SetK(idmother);// not that simple: w->qq' has color connection in fs
     Decay_Channel* dc(NULL);
@@ -830,7 +853,7 @@ void Hard_Decay_Handler::AddDecayClustering(ATOOLS::Cluster_Amplitude*& ampl,
       DEBUG_VAR(*dc);
     }
     else THROW(fatal_error, "Internal error.");
-    Comix1to3* amp=dynamic_cast<Comix1to3*>(dc->GetDiagrams()[0].first);
+    Comix1to3* amp=dynamic_cast<Comix1to3*>(dc->GetDiagrams()[0]);
     if (!amp) THROW(fatal_error, "Internal error.");
     Flavour prop_flav=amp->Prop();
     Vec4D momd2=RecombinedMomentum(daughters[1],photons,stat2);
@@ -840,6 +863,7 @@ void Hard_Decay_Handler::AddDecayClustering(ATOOLS::Cluster_Amplitude*& ampl,
     size_t idnew1=1<<(++imax);
     step1->Legs().back()->SetId(idnew1);
     step1->Legs().back()->SetStat(0);
+    step1->Legs().back()->SetFromDec(true);
     Cluster_Amplitude::SetColours(ampl->IdLeg(idmother),
                                   step1->IdLeg(idmother),
                                   step1->Legs().back());
@@ -861,6 +885,7 @@ void Hard_Decay_Handler::AddDecayClustering(ATOOLS::Cluster_Amplitude*& ampl,
     
     Cluster_Amplitude* step2=step1->InitPrev();
     step2->CopyFrom(step1);
+    step2->SetNLO(0);
     step2->SetFlag(1);
     step2->SetMS(step1->MS());
     for (size_t i=0; i<step1->Legs().size(); ++i)
@@ -876,6 +901,7 @@ void Hard_Decay_Handler::AddDecayClustering(ATOOLS::Cluster_Amplitude*& ampl,
     size_t idnew2=1<<(++imax);
     step2->Legs().back()->SetId(idnew2);
     step2->Legs().back()->SetStat(stat3);
+    step2->Legs().back()->SetFromDec(true);
     Cluster_Amplitude::SetColours(step1->IdLeg(idnew1),
                                   step2->IdLeg(idnew1),
                                   step2->Legs().back());
@@ -933,6 +959,7 @@ void Hard_Decay_Handler::AddPhotonsClustering(Cluster_Amplitude*& ampl,
                 <<" with "<<daughter->Flav()<<" "<<ID(idmother)<<std::endl;
   Cluster_Amplitude* copy=ampl->InitPrev();
   copy->CopyFrom(ampl);
+  copy->SetNLO(0);
   copy->SetFlag(1);
   copy->SetMS(ampl->MS());
   Cluster_Leg *lij(ampl->IdLeg(idmother));
@@ -1074,7 +1101,7 @@ void Hard_Decay_Handler::ReadDecayTable(Flavour decayer)
   reader.AddComment("#");
   reader.AddComment("//");
   reader.AddWordSeparator("\t");
-  reader.SetInputPath(m_resultdir+"/Decays/");
+  reader.SetInputPath(m_resultdir);
   reader.SetInputFile(decayer.ShellName());
   
   vector<vector<string> > file;
@@ -1099,12 +1126,15 @@ void Hard_Decay_Handler::WriteDecayTables()
 
   Decay_Map::iterator dmit;
   for (dmit=p_decaymap->begin(); dmit!=p_decaymap->end(); ++dmit) {
-    ofstream ostr((m_resultdir+"/Decays/"+dmit->first.ShellName()).c_str());
-    ostr<<"# Decay table for "<<dmit->first<<endl<<endl;
+    ofstream ostr((m_resultdir+"/"+dmit->first.ShellName()).c_str());
+    ostr<<"# Decay table for "<<dmit->first<<endl;
+    ostr<<"# IDCode                   \tWidth     \tDeltaWidth \tMaximum"<<endl<<endl;
     Decay_Table::iterator dtit;
     for (dtit=dmit->second[0]->begin(); dtit!=dmit->second[0]->end(); ++dtit) {
-      ostr<<(*dtit)->IDCode()<<"\t"<<(*dtit)->IWidth()<<"\t"
-          <<(*dtit)->IDeltaWidth()<<"\t"<<(*dtit)->Max()<<endl;
+      ostr<<setw(25)<<left<<(*dtit)->IDCode()<<"\t"
+          <<setw(12)<<left<<(*dtit)->IWidth()<<"\t"
+          <<setw(12)<<left<<(*dtit)->IDeltaWidth()<<"\t"
+          <<setw(12)<<left<<(*dtit)->Max()<<endl;
     }
     ostr.close();
   }
@@ -1114,7 +1144,7 @@ bool Hard_Decay_Handler::Decays(const ATOOLS::Flavour& flav)
 {
   if (flav.IsHadron()) return false;
   if (flav.Kfcode()==kf_tau && !m_decay_tau) return false;
-  if (flav.IsStable()) return false;
+  if (!flav.IsOn() || flav.IsStable()) return false;
   return true;
 }
 

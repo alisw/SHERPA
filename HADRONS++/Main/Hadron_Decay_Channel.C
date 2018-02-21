@@ -5,7 +5,6 @@
 #include "HADRONS++/Current_Library/Current_Base.H"
 #include "HADRONS++/PS_Library/HD_PS_Base.H"
 #include "PHASIC++/Decays/Decay_Table.H"
-#include "PHASIC++/Decays/Color_Function_Decay.H"
 #include "PHASIC++/Channels/Multi_Channel.H"
 #include "ATOOLS/Org/MyStrStream.H"
 #include "ATOOLS/Math/Vector.H"
@@ -80,12 +79,11 @@ bool Hadron_Decay_Channel::Initialise(GeneralModel startmd)
     reader.AddComment("#");
     reader.AddComment("//");
     reader.SetInputPath(m_path);
-    reader.SetInputFile(m_filename);
+    reader.SetInputFile(m_filename+"|<Options>|</Options>");
     reader.SetMatrixType(mtc::transposed);
 
     // process <Options>
     vector<vector<string> > options_svv;
-    reader.SetFileBegin("<Options>"); reader.SetFileEnd("</Options>");
     if(reader.MatrixFromFile(options_svv)) ProcessOptions(options_svv);
     else {
       msg_Error()<<METHOD<<": Error.\n"
@@ -98,8 +96,8 @@ bool Hadron_Decay_Channel::Initialise(GeneralModel startmd)
     // process <ME>
     vector<vector<string> > me_svv;
     GeneralModel model_for_ps;
-    reader.SetFileBegin("<ME>"); reader.SetFileEnd("</ME>");
-    reader.RereadInFile();
+    reader.SetInputFile(m_filename+"|<ME>|</ME>");
+    reader.RescanInFile();
     if(reader.MatrixFromFile(me_svv)) ProcessME(me_svv, reader, model_for_ps);
     else {
       msg_Error()<<METHOD<<": Error.\n"
@@ -110,8 +108,8 @@ bool Hadron_Decay_Channel::Initialise(GeneralModel startmd)
 
     // process <Phasespace>
     vector<vector<string> > ps_svv;
-    reader.SetFileBegin("<Phasespace>"); reader.SetFileEnd("</Phasespace>");
-    reader.RereadInFile();
+    reader.SetInputFile(m_filename+"|<Phasespace>|</Phasespace>");
+    reader.RescanInFile();
     if(!reader.MatrixFromFile(ps_svv)) {
     msg_Error()<<METHOD<<": Error.\n"
 	       <<"   Read in failure for <Phasespace> section in "
@@ -124,19 +122,19 @@ bool Hadron_Decay_Channel::Initialise(GeneralModel startmd)
     // process <Result> 
     // don't do it before ME and phasespace, or CalcNormWidth doesn't work!
     vector<vector<string> > result_svv;
-    reader.SetFileBegin("<Result>"); reader.SetFileEnd("</Result>");
-    reader.RereadInFile();
+    reader.SetInputFile(m_filename+"|<Result>|</Result>");
+    reader.RescanInFile();
     reader.MatrixFromFile(result_svv);
     ProcessResult(result_svv);
   }
   else { // if DC file does not exist yet
+    PRINT_INFO("Decay channel file in "<<m_path<<"/"<<m_filename<<" does not exist yet. Will use Isotropic decay.");
     msg_Tracking()<<"No DC file yet in :"<<m_path<<"/"<<m_filename<<".\n";
     int n=NOut()+1;
     vector<int> decayindices(n);
     for(int i=0;i<n;i++) decayindices[i]=i;
     HD_ME_Base* me=new Generic(m_physicalflavours,decayindices,"Generic");
-    PHASIC::Color_Function_Decay* col=new PHASIC::Color_Function_Decay();
-    AddDiagram(me, col);
+    AddDiagram(me);
     AddPSChannel( string("Isotropic"), 1., m_startmd);
     msg_Tracking()<<"Calculating width for "<<Name()<<":\n";
     CalculateWidth();
@@ -204,16 +202,15 @@ void Hadron_Decay_Channel::ProcessME( vector<vector<string> > me_svv,
       me->SetPath(m_path);
       msg_Tracking()<<"  "<<me->Name()<<endl;
       vector<vector<string> > parameter_svv;
-      reader.SetFileBegin("<"+me_svv[i][2]+">"); reader.SetFileEnd("</"+me_svv[i][2]+">");
-      reader.RereadInFile();
+      reader.SetInputFile(m_filename+"|<"+me_svv[i][2]+">|</"+me_svv[i][2]+">");
+      reader.RescanInFile();
       reader.MatrixFromFile(parameter_svv);
       GeneralModel me_model=Parameters2Model(parameter_svv,model_for_ps);
       me->SetModelParameters( me_model );
       Complex factor = Complex(ToType<double>(ip.Interprete(me_svv[i][0])),
                                ToType<double>(ip.Interprete(me_svv[i][1])));
       me->SetFactor(factor);
-      PHASIC::Color_Function_Decay* col=new PHASIC::Color_Function_Decay();
-      AddDiagram(me, col);
+      AddDiagram(me);
       nr_of_mes++;
     }
     if(me_svv[i].size()==4) {
@@ -221,8 +218,8 @@ void Hadron_Decay_Channel::ProcessME( vector<vector<string> > me_svv,
       Current_Base* current1 = SelectCurrent(me_svv[i][2]);
       current1->SetPath(m_path);
       vector<vector<string> > parameter1_svv;
-      reader.SetFileBegin("<"+me_svv[i][2]+">"); reader.SetFileEnd("</"+me_svv[i][2]+">");
-      reader.RereadInFile();
+      reader.SetInputFile(m_filename+"|<"+me_svv[i][2]+">|</"+me_svv[i][2]+">");
+      reader.RescanInFile();
       reader.MatrixFromFile(parameter1_svv);
       GeneralModel current1_model=Parameters2Model(parameter1_svv,model_for_ps);
       current1->SetModelParameters( current1_model );
@@ -230,8 +227,8 @@ void Hadron_Decay_Channel::ProcessME( vector<vector<string> > me_svv,
       Current_Base* current2 = SelectCurrent(me_svv[i][3]);
       current2->SetPath(m_path);
       vector<vector<string> > parameter2_svv;
-      reader.SetFileBegin("<"+me_svv[i][3]+">"); reader.SetFileEnd("</"+me_svv[i][3]+">");
-      reader.RereadInFile();
+      reader.SetInputFile(m_filename+"|<"+me_svv[i][3]+">|</"+me_svv[i][3]+">");
+      reader.RescanInFile();
       reader.MatrixFromFile(parameter2_svv);
       GeneralModel current2_model=Parameters2Model(parameter2_svv,model_for_ps);
       current2->SetModelParameters( current2_model );
@@ -258,8 +255,7 @@ void Hadron_Decay_Channel::ProcessME( vector<vector<string> > me_svv,
       me->SetCurrent1(current1);
       me->SetCurrent2(current2);
       me->SetFactor(factor);
-      PHASIC::Color_Function_Decay* col=new PHASIC::Color_Function_Decay();
-      AddDiagram(me, col);
+      AddDiagram(me);
       nr_of_mes++;
     }
   }
@@ -270,8 +266,7 @@ void Hadron_Decay_Channel::ProcessME( vector<vector<string> > me_svv,
     vector<int> decayindices(n);
     for(int i=0;i<n;i++) decayindices[i]=i;
     HD_ME_Base* me=new Generic(m_physicalflavours,decayindices,"Generic");
-    PHASIC::Color_Function_Decay* col=new PHASIC::Color_Function_Decay();
-    AddDiagram(me, col);
+    AddDiagram(me);
   }
 }
 
@@ -432,7 +427,7 @@ bool Hadron_Decay_Channel::SetColorFlow(ATOOLS::Blob* blob)
     Particle_Vector outparts=blob->GetOutParticles();
     if(m_diagrams.size()>0) {
       // try if the matrix element knows how to set the color flow
-      HD_ME_Base* firstme=(HD_ME_Base*) m_diagrams[0].first;
+      HD_ME_Base* firstme=(HD_ME_Base*) m_diagrams[0];
       bool anti=blob->InParticle(0)->Flav().IsAnti();
       if(firstme->SetColorFlow(outparts,n_q,n_g,anti)) return true;
     }
@@ -559,7 +554,7 @@ void Hadron_Decay_Channel::LatexOutput(std::ostream& f, double totalwidth)
   }
   f<<"\\\\"<<endl;
   if((m_diagrams.size()>0 &&
-      ((HD_ME_Base*) m_diagrams[0].first)->Name()!="Generic")) {
+      ((HD_ME_Base*) m_diagrams[0])->Name()!="Generic")) {
     sprintf( helpstr, "%.4f", IWidth()/totalwidth*100. );
     f<<" & "<<helpstr;
     if( IDeltaWidth() > 0. ) {
@@ -569,7 +564,7 @@ void Hadron_Decay_Channel::LatexOutput(std::ostream& f, double totalwidth)
     f<<" \\% ";
   }
   for(size_t i=0;i<m_diagrams.size();i++) {
-    HD_ME_Base* me=(HD_ME_Base*) m_diagrams[i].first;
+    HD_ME_Base* me=(HD_ME_Base*) m_diagrams[i];
     if(me->Name()=="Current_ME") {
       Current_ME* cme=(Current_ME*) me;
       f<<"\\verb;"<<cme->GetCurrent1()->Name()

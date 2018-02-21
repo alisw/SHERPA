@@ -18,7 +18,7 @@ namespace METOOLS {
 
     Complex m_cpl;
 
-    size_t m_stat;
+    int m_stat;
 
     static size_t s_cimin, s_cimax;
 
@@ -34,9 +34,7 @@ namespace METOOLS {
     // member functions
     virtual std::string Label() const = 0;
 
-    virtual bool Evaluate(const CObject *a,const CObject *b);
-    virtual bool Evaluate(const CObject *a,const CObject *b,
-			  const CObject *e);
+    virtual bool Evaluate(const CObject_Vector &j);
     virtual void AddJ(CObject *const c) = 0;
 
     inline static void SetCIMin(const size_t &cimin) { s_cimin=cimin; }
@@ -47,7 +45,7 @@ namespace METOOLS {
 
     inline Complex Coupling() const { return m_cpl; }
 
-    inline size_t Stat() const { return m_stat; }
+    inline int Stat() const { return m_stat; }
 
   };// end of class Color_Calculator
 

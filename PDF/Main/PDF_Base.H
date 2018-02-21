@@ -13,9 +13,13 @@ namespace PDF {
     ATOOLS::Flavour m_bunch;
     ATOOLS::Data_Reader *p_read;
     int m_ibeam;
+    std::string m_set;
+    int m_member;
     PDF_Arguments(const ATOOLS::Flavour &bunch,
-		  ATOOLS::Data_Reader *const read, int ibeam):
-      m_bunch(bunch), p_read(read), m_ibeam(ibeam) {}
+                  ATOOLS::Data_Reader *const read, int ibeam,
+                  std::string set, int member):
+      m_bunch(bunch), p_read(read), m_ibeam(ibeam),
+      m_set(set), m_member(member) {}
   };// end of struct PDF_Arguments
 
   struct PDF_Flavour: public ATOOLS::Flavour {
@@ -26,9 +30,10 @@ namespace PDF {
 
   struct PDF_AS_Info {
     int m_order;
-    double m_asmz;
+    double m_asmz,m_mz2;
     std::vector<PDF_Flavour> m_flavs;
-    inline PDF_AS_Info(): m_order(-1), m_asmz(0.0) {}
+    std::vector<PDF_Flavour> m_allflavs;
+    inline PDF_AS_Info(): m_order(-1), m_asmz(0.0), m_mz2(0.0) {}
   };// end of struct PDF_AS_Info
 
   class PDF_Base {
@@ -46,6 +51,7 @@ namespace PDF {
 
     std::string m_type;    
 
+    std::string m_set;
     int m_member;
     int m_lhef_number;
 
@@ -56,9 +62,9 @@ namespace PDF {
 
     std::vector<std::pair<ATOOLS::Flavour,double> > m_extracted;
 
-    void SingleExtract(const ATOOLS::Flavour flavour,const double x);
+    void SingleExtract(const ATOOLS::Flavour& flavour,const double& x);
     void SingleReset();
-    virtual void CalculateSpec(double x,double Q2) = 0;
+    virtual void CalculateSpec(const double& x,const double& Q2) = 0;
 
   private:
 
@@ -73,20 +79,21 @@ namespace PDF {
     virtual ~PDF_Base();
 
     // member functions
-    virtual bool   Collinear(const double kp2) const;
-    virtual double Cut(const std::string &type);
-    
     void   Calculate(double x,double Q2);
-    virtual double GetXPDF(const ATOOLS::Flavour flavour) = 0;
+    virtual double GetXPDF(const ATOOLS::Flavour& flavour) = 0;
+    virtual double GetXPDF(const kf_code& kf, bool anti) = 0;
     virtual double AlphaSPDF(const double &q2);
+
+    inline  double GetXPDF(const int& id) { return GetXPDF(abs(id),id<0); }
 
     virtual PDF_Base *GetCopy() = 0;
     virtual PDF_Base *GetBasicPDF();
 
     void SetBounds();
 
+    virtual void SetAlphaSInfo();
     virtual void SetPDFMember();
-
+    
     static void ShowSyntax(const size_t i);
 
     // inline functions
@@ -103,7 +110,7 @@ namespace PDF {
 
     inline PDF_Base *operator->() { return GetBasicPDF(); }
 
-    inline void Extract(const ATOOLS::Flavour flavour,const double x)
+    inline void Extract(const ATOOLS::Flavour& flavour,const double& x)
     { GetBasicPDF()->SingleExtract(flavour,x); }
     inline void Reset()
     { GetBasicPDF()->SingleReset(); }
@@ -115,6 +122,7 @@ namespace PDF {
 
     inline PDF_AS_Info ASInfo() const { return m_asinfo; }
 
+    inline std::string Set() const { return m_set; }
     inline int Member() const { return m_member; }
 
     int LHEFNumber() const { return m_lhef_number; }

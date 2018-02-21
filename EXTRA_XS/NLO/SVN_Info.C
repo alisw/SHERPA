@@ -1,3 +1,3 @@
 #include "ATOOLS/Org/SVN_Info.H"
 static ATOOLS::SVN_Info initializer
-("EXTRA_XS/NLO","branches/rel-2-1-1","24084","1f00372a6170792688d36c8b523bec8b");
+("EXTRA_XS/NLO","branches/rel-2-2-4","30888","7a87a0bbfcdc93b438e5595171e88735");

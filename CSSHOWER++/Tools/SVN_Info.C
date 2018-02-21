@@ -1,3 +1,3 @@
 #include "ATOOLS/Org/SVN_Info.H"
 static ATOOLS::SVN_Info initializer
-("CSSHOWER++/Tools","branches/rel-2-1-1","24084","2a2300c7f434d5e1a826e64943897a7e");
+("CSSHOWER++/Tools","branches/rel-2-2-4","30888","ea911122494b0a88dbcb3cc4d5cf0607");

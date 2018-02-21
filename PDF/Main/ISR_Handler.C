@@ -64,16 +64,10 @@ ISR_Handler::ISR_Handler(ISR_Base **isrbase):
     else p_remnants[i] = new No_Remnant(i);
   }
   for (size_t i=0;i<2;++i) p_remnants[i]->SetPartner(p_remnants[1-i]);
-#ifdef USING__Threading
-  pthread_mutex_init(&m_mtx,NULL);
-#endif
 }
 
 ISR_Handler::~ISR_Handler() 
 {
-#ifdef USING__Threading
-  pthread_mutex_destroy(&m_mtx);
-#endif
   if (p_isrbase) {
     for (int i=0;i<2;i++) {
       if (p_isrbase[i]) delete p_isrbase[i];  
@@ -168,6 +162,7 @@ bool ISR_Handler::CheckConsistency(ATOOLS::Flavour *partons)
 {
   bool fit = 1;
   for (int i=0;i<2;i++) {
+    if (partons[i].Kfcode()==0) continue;
     if (p_isrbase[i]->On()) {
       fit = PDF(i)->Contains(partons[i]);
       if (fit == 0) {
@@ -296,10 +291,14 @@ void ISR_Handler::SetLimits(Double_Vector &spkey,Double_Vector &ykey,
   xkey[3]=log(xkey[3]);
 }
 
-double ISR_Handler::Weight(const int mode,Vec4D p1,Vec4D p2,
-			   double Q12,double Q22,Flavour fl1,Flavour fl2,int warn)
+double ISR_Handler::PDFWeight(const int mode,Vec4D p1,Vec4D p2,
+                              double Q12,double Q22,Flavour fl1,Flavour fl2,
+                              int warn)
 {
-  if (m_mode==0) return 0.25/sqrt(sqr(p1*p2)-p1.Abs2()*p2.Abs2());
+  // mode&1 -> swap beams
+  // mode&2 -> override m_mode and only calc left beam
+  // mode&4 -> override m_mode and only calc right beam
+  if (m_mode==0) return 1.;
   msg_IODebugging()<<METHOD<<"(mode = "<<mode<<")\n";
   if (fl1.Size()>1 || fl2.Size()>1)
     THROW(fatal_error,"Do not try to calculate an ISR weight with containers.");
@@ -311,19 +310,22 @@ double ISR_Handler::Weight(const int mode,Vec4D p1,Vec4D p2,
     std::swap<Vec4D>(p1,p2);
     std::swap<double>(Q12,Q22);
   }
-  x1=Min(1.0,p1.PPlus()/p_beam[0]->OutMomentum().PPlus());
-  x2=Min(1.0,p2.PMinus()/p_beam[1]->OutMomentum().PMinus());
+  x1=CalcX(p1);
+  x2=CalcX(p2);
   msg_IODebugging()<<"  "<<p1<<" from "<<p_beam[0]->OutMomentum()<<" -> "
 		 <<p1.PPlus()<<" / "<<p_beam[0]->
     OutMomentum().PPlus()<<" = "<<x1<<std::endl;
   msg_IODebugging()<<"  "<<p2<<" from "<<p_beam[1]->OutMomentum()<<" -> "
 		 <<p2.PMinus()<<" / "<<p_beam[1]->
     OutMomentum().PMinus()<<" = "<<x2<<std::endl;
-  if (PDF(0) && (Q12<PDF(0)->Q2Min() || Q12>PDF(0)->Q2Max()))
+  if (PDF(0) && (Q12<PDF(0)->Q2Min() || Q12>PDF(0)->Q2Max())) {
+    msg_IODebugging()<<"  Q_1^2 out of bounds"<<std::endl;
     return 0.;
-  if (PDF(1) && (Q22<PDF(1)->Q2Min() || Q22>PDF(1)->Q2Max()))
+  }
+  if (PDF(1) && (Q22<PDF(1)->Q2Min() || Q22>PDF(1)->Q2Max())) {
+    msg_IODebugging()<<"  Q_2^2 out of bounds"<<std::endl;
     return 0.;
-  MtxLock();
+  }
   m_mu2[mode&1]=Q12;
   m_mu2[1-(mode&1)]=Q22;
   int cmode(((mode&6)>>1)?((mode&6)>>1):m_mode);
@@ -332,24 +334,24 @@ double ISR_Handler::Weight(const int mode,Vec4D p1,Vec4D p2,
   switch (cmode) {
     case 3 :
       if (!p_isrbase[0]->PDF()->Contains(fl1) ||
-          !p_isrbase[1]->PDF()->Contains(fl2)) { MtxUnLock(); return 0.; }
+          !p_isrbase[1]->PDF()->Contains(fl2)) { return 0.; }
       if (x1>p_isrbase[0]->PDF()->RescaleFactor() ||
-          x2>p_isrbase[1]->PDF()->RescaleFactor()) { MtxUnLock(); return 0.; }
+          x2>p_isrbase[1]->PDF()->RescaleFactor()) { return 0.; }
       if (!(p_isrbase[0]->CalculateWeight(x1,0.0,0.0,Q12,warn) &&
-	    p_isrbase[1]->CalculateWeight(x2,0.0,0.0,Q22,warn))) { MtxUnLock(); return 0.; }
+	    p_isrbase[1]->CalculateWeight(x2,0.0,0.0,Q22,warn))) { return 0.; }
       break;
     case 2 :
-      if (!p_isrbase[1]->PDF()->Contains(fl2)) { MtxUnLock(); return 0.; }
-      if (x2>p_isrbase[1]->PDF()->RescaleFactor()) { MtxUnLock(); return 0.; }
-      if (!p_isrbase[1]->CalculateWeight(x2,0.0,0.0,Q22,warn)) { MtxUnLock(); return 0.; }
+      if (!p_isrbase[1]->PDF()->Contains(fl2)) { return 0.; }
+      if (x2>p_isrbase[1]->PDF()->RescaleFactor()) { return 0.; }
+      if (!p_isrbase[1]->CalculateWeight(x2,0.0,0.0,Q22,warn)) { return 0.; }
       break;
     case 1 :
-      if (!p_isrbase[0]->PDF()->Contains(fl1)) { MtxUnLock(); return 0.; }
-      if (x1>p_isrbase[0]->PDF()->RescaleFactor()) { MtxUnLock(); return 0.; }
-      if (!p_isrbase[0]->CalculateWeight(x1,0.0,0.0,Q12,warn)) { MtxUnLock(); return 0.; }
+      if (!p_isrbase[0]->PDF()->Contains(fl1)) { return 0.; }
+      if (x1>p_isrbase[0]->PDF()->RescaleFactor()) { return 0.; }
+      if (!p_isrbase[0]->CalculateWeight(x1,0.0,0.0,Q12,warn)) { return 0.; }
       break;
-    case 0 : MtxUnLock(); break;
-    default : MtxUnLock(); return 0.;
+    case 0 : break;
+    default : return 0.;
   }
   if (cmode!=3 || (CheckRemnantKinematics(fl1,x1,0,false) &&
                     CheckRemnantKinematics(fl2,x2,1,false))) {
@@ -357,21 +359,28 @@ double ISR_Handler::Weight(const int mode,Vec4D p1,Vec4D p2,
     double f2=(cmode&2)?p_isrbase[1]->Weight(fl2):1.0;
     m_xf1[mode&1]=x1*f1;
     m_xf2[mode&1]=x2*f2;
-    MtxUnLock();
     msg_IODebugging()<<"  PDF1: "<<rpa->gen.Beam1()<<" -> "<<fl1<<" at ("<<x1
 		   <<","<<sqrt(Q12)<<") -> "<<om::bold<<f1<<om::reset<<"\n";
     msg_IODebugging()<<"  PDF2: "<<rpa->gen.Beam2()<<" -> "<<fl2<<" at ("<<x2
 		   <<","<<sqrt(Q22)<<") -> "<<om::bold<<f2<<om::reset<<"\n";
-    double flux=0.25/sqrt(sqr(p1*p2)-p1.Abs2()*p2.Abs2());
-    msg_IODebugging()<<"  Flux: "<<flux<<", Weight: "
-		     <<f1*f2*((mode&14)?1.0:flux)<<std::endl;
+    msg_IODebugging()<<"  Weight: "<<f1*f2<<std::endl;
     if (IsBad(f1*f2)) return 0.0;
     if (s_nozeropdf && f1*f2==0.0)
       return pow(std::numeric_limits<double>::min(),0.25);
-    return f1*f2*((mode&14)?1.0:flux);
+    return f1*f2;
   }
-  MtxUnLock();
   return 0.;
+}
+
+double ISR_Handler::Flux(const Vec4D& p1, const Vec4D& p2)
+{
+  return 0.25/sqrt(sqr(p1*p2)-p1.Abs2()*p2.Abs2());
+}
+
+double ISR_Handler::CalcX(const ATOOLS::Vec4D& p)
+{
+  if (p[3]>0.) return Min(1.0,p.PPlus()/p_beam[0]->OutMomentum().PPlus());
+  else         return Min(1.0,p.PMinus()/p_beam[1]->OutMomentum().PMinus());
 }
 
 bool ISR_Handler::BoostInCMS(Vec4D *p,const size_t n) 
@@ -421,18 +430,4 @@ ATOOLS::Blob_Data_Base* ISR_Handler::Info(const int frame) const
 {
   if (frame==0) return new ATOOLS::Blob_Data<std::vector<double> >(m_info_cms);
   return new ATOOLS::Blob_Data<std::vector<double> >(m_info_lab);
-}
-
-void ISR_Handler::MtxLock()
-{
-#ifdef USING__Threading
-  pthread_mutex_lock(&m_mtx);
-#endif
-}
-
-void ISR_Handler::MtxUnLock()
-{
-#ifdef USING__Threading
-  pthread_mutex_unlock(&m_mtx);
-#endif
 }

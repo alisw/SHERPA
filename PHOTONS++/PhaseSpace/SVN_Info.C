@@ -1,3 +1,3 @@
 #include "ATOOLS/Org/SVN_Info.H"
 static ATOOLS::SVN_Info initializer
-("PHOTONS++/PhaseSpace","branches/rel-2-1-1","24084","93f55aba6d69327cd10a0283f2ec7426");
+("PHOTONS++/PhaseSpace","branches/rel-2-2-4","30888","f198a8cf92399a0ed04e4f2938f53432");

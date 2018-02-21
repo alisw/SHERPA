@@ -14,8 +14,9 @@ using namespace ATOOLS;
 using namespace std;
 
 Shower::Shower(PDF::ISR_Handler * isr,const int qed,
-	       Data_Reader *const dataread) : 
-  p_actual(NULL), m_sudakov(isr,qed), p_isr(isr)
+	       Data_Reader *const dataread,int type) : 
+  p_actual(NULL), m_sudakov(isr,qed), p_isr(isr),
+  p_variationweights(NULL)
 {
   int evol=ToType<int>(rpa->gen.Variable("CSS_EVOLUTION_SCHEME"));
   int kfmode=ToType<int>(rpa->gen.Variable("CSS_KFACTOR_SCHEME"));
@@ -25,10 +26,24 @@ Shower::Shower(PDF::ISR_Handler * isr,const int qed,
   double fs_as_fac=ToType<double>(rpa->gen.Variable("CSS_FS_AS_FAC"));
   double is_as_fac=ToType<double>(rpa->gen.Variable("CSS_IS_AS_FAC"));
   double mth=ToType<double>(rpa->gen.Variable("CSS_MASS_THRESHOLD"));
+  const bool reweightalphas = dataread->GetValue<int>("CSS_REWEIGHT_ALPHAS",1);
+  const bool reweightpdfs = dataread->GetValue<int>("CSS_REWEIGHT_PDFS",1);
+  m_maxrewem = dataread->GetValue<int>("REWEIGHT_MAXEM",0);
+  if (m_maxrewem < 0) {
+    m_maxrewem = std::numeric_limits<int>::max();
+  }
   m_use_bbw   = dataread->GetValue<int>("CSS_USE_BBW",1);
-  m_kscheme   = dataread->GetValue<int>("CSS_KIN_SCHEME",0);
+  m_kscheme   = dataread->GetValue<int>("CSS_KIN_SCHEME",1);
   m_noem      = dataread->GetValue<int>("CSS_NOEM",0);
   m_recdec    = dataread->GetValue<int>("CSS_RECO_DECAYS",0);
+  if (type) {
+    kfmode=dataread->GetValue<int>("MI_CSS_KFACTOR_SCHEME",0);
+    k0sqf=dataread->GetValue<double>("MI_CSS_FS_PT2MIN",1.0);
+    k0sqi=dataread->GetValue<double>("MI_CSS_IS_PT2MIN",4.0);
+    fs_as_fac=dataread->GetValue<double>("MI_CSS_FS_AS_FAC",0.66);
+    is_as_fac=dataread->GetValue<double>("MI_CSS_IS_AS_FAC",0.66);
+    m_kscheme = dataread->GetValue<int>("MI_CSS_KIN_SCHEME",1);
+  }
   std::vector<std::vector<std::string> > helpsvv;
   dataread->MatrixFromFile(helpsvv,"CSS_ENHANCE");
   m_efac.clear();
@@ -41,6 +56,8 @@ Shower::Shower(PDF::ISR_Handler * isr,const int qed,
   m_sudakov.SetScaleScheme(scs);
   m_sudakov.InitSplittingFunctions(MODEL::s_model,kfmode);
   m_sudakov.SetCoupling(MODEL::s_model,k0sqi,k0sqf,is_as_fac,fs_as_fac);
+  m_sudakov.SetReweightAlphaS(reweightalphas);
+  m_sudakov.SetReweightPDFs(reweightpdfs);
   m_kinFF.SetEvolScheme(evol);
   m_kinFI.SetEvolScheme(evol);
   m_kinIF.SetEvolScheme(evol);
@@ -67,6 +84,11 @@ double Shower::EFac(const std::string &sfk) const
 bool Shower::EvolveShower(Singlet * actual,const size_t &maxem,size_t &nem)
 {
   m_weight=1.0;
+  if (nem < m_maxrewem) {
+    m_sudakov.SetVariationWeights(p_variationweights);
+  } else {
+    m_sudakov.SetVariationWeights(NULL);
+  }
   return EvolveSinglet(actual,maxem,nem);
 }
 
@@ -91,7 +113,7 @@ int Shower::RemnantTest(Parton *const p,const Poincare_Sequence *lt)
   if (mom[0]<0.0 || mom.Nan()) return -1;
   if (mom[0]>rpa->gen.PBeam(p->Beam())[0] &&
       !IsEqual(mom[0],rpa->gen.PBeam(p->Beam())[0],1.0e-6)) return -1;
-  if (!m_sudakov.CheckPDF(GetXBj(p),p->GetFlavour(),p->Beam())) return -1;
+  if (!m_sudakov.CheckPDF(mom[0]/rpa->gen.PBeam(p->Beam())[0],p->GetFlavour(),p->Beam())) return -1;
   return p_isr->GetRemnant(p->Beam())->
     TestExtract(p->GetFlavour(),mom)?1:-1;
 }
@@ -228,6 +250,8 @@ int Shower::UpdateDaughters(Parton *const split,Parton *const newpB,
   newpB->SetVeto(split->KtVeto());
   newpC->SetVeto(split->KtVeto());
   newpB->SetStat(split->Stat());
+  newpB->SetFromDec(split->FromDec());
+  newpC->SetFromDec(split->FromDec());
   if (split->GetNext()) {
     split->GetNext()->SetPrev(newpB);
     newpB->SetNext(split->GetNext());
@@ -266,7 +290,7 @@ int Shower::UpdateDaughters(Parton *const split,Parton *const newpB,
 void Shower::ResetScales(const double &kt2)
 {
   for (PLiter pit(p_actual->begin());pit!=p_actual->end();++pit)
-    (*pit)->SetStart(kt2);
+    if ((*pit)->KtStart()>kt2) (*pit)->SetStart(kt2);
   m_last[0]=m_last[1]=m_last[2]=NULL;
 }
 
@@ -486,13 +510,6 @@ bool Shower::EvolveSinglet(Singlet * act,const size_t &maxem,size_t &nem)
 	  else msg_Debugging()<<"Skip truncated shower veto\n";
 	  }
 	}
-	msg_Debugging()<<"Disable jet veto\n";
-	Singlet *sing(p_actual);
-	sing->SetJF(NULL);
-	while (sing->GetLeft()) {
-	  sing=sing->GetLeft()->GetSing();
-	  sing->SetJF(NULL);
-	}
       }
       if (m_noem) continue;
       msg_Debugging()<<"nem = "<<nem+1<<" vs. maxem = "<<maxem<<"\n";
@@ -507,7 +524,9 @@ bool Shower::EvolveSinglet(Singlet * act,const size_t &maxem,size_t &nem)
           }
         }
       }
-      if (++nem>=maxem) return true;
+      ++nem;
+      if (nem >= m_maxrewem) m_sudakov.SetVariationWeights(NULL);
+      if (nem >= maxem) return true;
     }
   }
   return true;

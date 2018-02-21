@@ -15,15 +15,15 @@ The following parameters are used to steer the process setup.
 * Couplings::               Tag to set process-specific couplings.
 * CKKW::                    Tag to setup multijet merging.
 * Selector_File::           Tag to specify a specific selector file.
-* Order_EW::                Tag to fix the electroweak order.
-* Max_Order_EW::            Tag to fix the maximum electroweak order.
-* Order_QCD::               Tag to fix the QCD order.
-* Max_Order_QCD::           Tag to fix the maximum QCD order.
+* Order::                   Tag to fix the coupling order.
+* Max_Order::               Tag to fix the maximum coupling order.
+* Min_Order::               Tag to fix the minimum coupling order.
 * Min_N_Quarks::            Tag to set the minimum number of quarks.
 * Max_N_Quarks::            Tag to set the maximum number of quarks.
 * Min_N_TChannels::         Tag to request a minimum number of t-channels.
 * Max_N_TChannels::         Tag to request a maximum number of t-channels.
 * Print_Graphs::            Tag to enable writeout of feynman graphs.
+* Name_Suffix::             Tag to set a unique name suffix.
 * Integration_Error::       Tag to set a specific integration error.
 * Max_Epsilon::             Tag to set a specific epsilon for overweighting.
 * Enhance_Factor::          Tag to set an enhance factor.
@@ -37,9 +37,13 @@ The following parameters are used to steer the process setup.
 * NLO_EW_Part::             Tag to refine the setup of electroweak NLO processes.
 * Subdivide_Virtual::       Tag to split virtual contribution into pieces.
 * ME_Generator::            Tag to specifiy the tree ME generator.
-* RS_ME_Generator::         Tag to specifiy the real ME generator.
+* RS_ME_Generator::         Tag to specifiy the real-subtracted ME generator
+                            of an MC@@NLO process.
 * Loop_Generator::          Tag to specifiy the loop ME generator.
 * Integrator::              Tag to specifiy the integrator.
+* PSI_ItMin::               Tag to set the number of points per optimization step.
+* RS_PSI_ItMin::            Tag to set the number of points per optimization step
+                            in real-minus-subtraction parts.
 * End process::             The process setup end tag.
 @end menu
 
@@ -68,6 +72,7 @@ sections:
 @menu
 * PDG codes::
 * Particle containers::
+* Parentheses::
 * Curly brackets::
 @end menu
 
@@ -115,6 +120,27 @@ declared as
 @end verbatim
 Note that, if wanted, you have to add both particles and anti-particles.
 
+
+
+@node Parentheses
+@subsubsection Parentheses
+
+The parenthesis notation allows to group a list of processes with different 
+flavor content but similar structure. This is most useful in the context of 
+simulations containing heavy quarks.
+In a setup with massive b-quarks, for example, the b-quark will not be part 
+of the jets container. In order to include b-associated processes easily,
+the following can be used:
+@verbatim
+(run){
+  ...
+  MASSIVE[5] 1; PARTICLE_CONTAINER 98 B 5 -5;
+}(run);
+(processes){
+  Process 11 -11 -> (93,98) (93,98);
+  ...
+}(processes);
+@end verbatim
 
 
 @node Curly brackets
@@ -207,49 +233,46 @@ Examples are
 Sets a process-specific selector file name.
 
 
-@node Order_EW
-@subsection Order_EW
-Sets a process-specific electroweak order.
-The given number is exclusive, i.e. only matrix elements
-with exactly the given order in the electroweak coupling
-are generated.
+@node Order
+@subsection Order
+Sets a process-specific coupling order.
+Orders are counted at the amplitude level. 
+For example, the process 1 -1 -> 2 -2 would have
+orders (2,0), (1,1) and (0,2). The first number always
+refers to QCD, the second to electroweak. The third
+and following numbers are model specific. Half-integer
+orders are so far supported only by Comix.
+An asterisk can be used as a wildcard.
 
-Note that for decay chains with Amegic this setting 
-applies to the core process only, while with Comix it applies to
+Note that for decay chains this setting applies to
 the full process, see @ref{Decay} and @ref{DecayOS}.
 
 
-@node Max_Order_EW
-@subsection Max_Order_EW
-Sets a process-specific maximum electroweak order.
-The given number is inclusive, i.e. matrix elements
-with up to the given order in the electroweak coupling
-are generated.
+@node Max_Order
+@subsection Max_Order
+Sets a process-specific maximum coupling order.
+Orders are counted at the amplitude level. 
+For example, the process 1 -1 -> 2 -2 would have
+orders (2,0), (1,1) and (0,2). The first number always
+refers to QCD, the second to electroweak. The third
+and following numbers are model specific. Half-integer
+orders are so far supported only by Comix.
 
-Note that for decay chains with Amegic this setting 
-applies to the core process only, while with Comix it applies to
+Note that for decay chains this setting applies to
 the full process, see @ref{Decay} and @ref{DecayOS}.
 
 
-@node Order_QCD
-@subsection Order_QCD
-Sets a process-specific QCD order.
-The given number is exclusive, i.e. only matrix elements
-with exactly the given order in the strong coupling are generated.
+@node Min_Order
+@subsection Min_Order
+Sets a process-specific minimum coupling order.
+Orders are counted at the amplitude level. 
+For example, the process 1 -1 -> 2 -2 would have
+orders (2,0), (1,1) and (0,2). The first number always
+refers to QCD, the second to electroweak. The third
+and following numbers are model specific. Half-integer
+orders are so far supported only by Comix.
 
-Note that for decay chains with Amegic this setting 
-applies to the core process only, while with Comix it applies to
-the full process, see @ref{Decay} and @ref{DecayOS}.
-
-
-@node Max_Order_QCD
-@subsection Max_Order_QCD
-Sets a process-specific maximum QCD order.
-The given number is inclusive, i.e. matrix elements
-with up to the given order in the strong coupling are generated.
-
-Note that for decay chains with Amegic this setting 
-applies to the core process only, while with Comix it applies to
+Note that for decay chains this setting applies to
 the full process, see @ref{Decay} and @ref{DecayOS}.
 
 
@@ -286,6 +309,10 @@ using the command
 @end verbatim
 which creates an html page in the graphs directory that can be viewed 
 in a web browser.
+
+@node Name_Suffix
+@subsection Name_Suffix
+Defines a unique name suffix for the process.
 
 @node Integration_Error
 @subsection Integration_Error
@@ -516,6 +543,15 @@ To use this Sherpa has to be linked to BlackHat during installation by using the
 @node Integrator
 @subsection Integrator
 Sets a process-specific integrator, see @ref{INTEGRATOR}.
+
+@node PSI_ItMin
+@subsection PSI_ItMin
+Sets the number of points per optimization step, see @ref{PSI_ITMIN}.
+
+@node RS_PSI_ItMin
+@subsection RS_PSI_ItMin
+Sets the number of points per optimization step in real-minus-subtraction
+parts of fixed-order and MC@@NLO calculations, see @ref{PSI_ITMIN}.
 
 @node End process
 @subsection End process

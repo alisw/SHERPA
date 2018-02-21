@@ -4,6 +4,7 @@
 #include "EXTRA_XS/Main/ME2_Base.H"
 #include "MODEL/Main/Running_AlphaS.H"
 #include "MODEL/Main/Model_Base.H"
+#include "MODEL/UFO/UFO_Model.H"
 #include "PHASIC++/Process/Process_Info.H"
 #include "ATOOLS/Org/Data_Reader.H"
 
@@ -51,7 +52,7 @@ XS_egeqq_CSS_approx::XS_egeqq_CSS_approx
   p_bornme1 = dynamic_cast<ME2_Base*>(PHASIC::Tree_ME2_Base::GetME2(pico1));
   p_bornme2 = dynamic_cast<ME2_Base*>(PHASIC::Tree_ME2_Base::GetME2(pico2));
   if (!p_bornme1 || !p_bornme2) THROW(fatal_error,"no born me found.");
-  m_alphasdef = (*MODEL::as)(rpa->gen.CplScale());
+  m_alphasdef = MODEL::as->Default();
   PRINT_INFO("initialised XS_egeqq_CSS_approx2");
 }
 
@@ -120,6 +121,7 @@ Tree_ME2_Base *ATOOLS::Getter
 <Tree_ME2_Base,Process_Info,XS_egeqq_CSS_approx>::
 operator()(const Process_Info &pi) const
 {
+  if (dynamic_cast<UFO::UFO_Model*>(MODEL::s_model)) return NULL;
   Data_Reader read(" ",";","!","=");
   if (read.GetValue<int>("EXTRAXS_CSS_APPROX_ME",0)==0) return NULL;
   if (pi.m_fi.NLOType()!=nlo_type::lo) return NULL;
@@ -128,7 +130,8 @@ operator()(const Process_Info &pi) const
   if (fl[0].IsLepton() && fl[2]==fl[0] &&
       fl[1].IsGluon()  &&
       fl[3].IsQuark()  && fl[4]==fl[3].Bar()) {
-    if ((pi.m_oqcd==1 || pi.m_oqcd==99) && (pi.m_oew==2 || pi.m_oew==99)) {
+    if (pi.m_maxcpl[0]==1 && pi.m_maxcpl[1]==2 &&
+	pi.m_mincpl[0]==1 && pi.m_mincpl[1]==2) {
       return new XS_egeqq_CSS_approx(pi,fl);
     }
   }
@@ -169,7 +172,7 @@ XS_eqegq_CSS_approx::XS_eqegq_CSS_approx
   pico.m_fi.m_nloqcdtype=nlo_type::born;
   p_bornme = dynamic_cast<ME2_Base*>(PHASIC::Tree_ME2_Base::GetME2(pico));
   if (!p_bornme) THROW(fatal_error,"no born me found.");
-  m_alphasdef = (*MODEL::as)(rpa->gen.CplScale());
+  m_alphasdef = MODEL::as->Default();
   PRINT_INFO("initialised XS_eqegq_CSS_approx2");
 }
 
@@ -274,6 +277,7 @@ Tree_ME2_Base *ATOOLS::Getter
 <Tree_ME2_Base,Process_Info,XS_eqegq_CSS_approx>::
 operator()(const Process_Info &pi) const
 {
+  if (dynamic_cast<UFO::UFO_Model*>(MODEL::s_model)) return NULL;
   Data_Reader read(" ",";","!","=");
   if (read.GetValue<int>("EXTRAXS_CSS_APPROX_ME",0)==0) return NULL;
   if (pi.m_fi.NLOType()!=nlo_type::lo) return NULL;
@@ -282,7 +286,8 @@ operator()(const Process_Info &pi) const
   if (fl[0].IsLepton() && fl[2]==fl[0] &&
       fl[3].IsGluon()  &&
       fl[1].IsQuark()  && fl[4]==fl[1]) {
-    if ((pi.m_oqcd==1 || pi.m_oqcd==99) && (pi.m_oew==2 || pi.m_oew==99)) {
+    if (pi.m_maxcpl[0]==1 && pi.m_maxcpl[1]==2 &&
+	pi.m_mincpl[0]==1 && pi.m_mincpl[1]==2) {
       return new XS_eqegq_CSS_approx(pi,fl);
     }
   }

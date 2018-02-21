@@ -79,7 +79,7 @@ namespace ATOOLS {
       Hadron_Decay        =  8192,
       Hadron_Mixing       = 16384,
       Hadron_To_Parton    = 32768,
-      Unspecified         = 65535
+      Unspecified         = 65536
     };
   };// end of struct btp
 
@@ -193,6 +193,7 @@ namespace ATOOLS {
     const double& Weight()               const { return m_weight; }
     std::vector<double> WeightContainer()      { return m_weightcontainer; } 
     Vec4D CheckMomentumConservation() const;
+    double CheckChargeConservation() const;
     std::string ShortProcessName();
     bool  MomentumConserved();
     bool  CheckColour();
@@ -205,6 +206,7 @@ namespace ATOOLS {
   };// end of class Blob
 
 
+  typedef std::vector<ATOOLS::Blob *> Blob_Vector;
   typedef std::map<int,ATOOLS::Blob *> Int_Blob_Map;
   typedef std::map<ATOOLS::Particle *,ATOOLS::Blob *> Particle_Blob_Map;
 

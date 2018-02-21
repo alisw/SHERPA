@@ -1,30 +1,27 @@
 #include "AMEGIC++/Main/Point.H"
 
+#include "ATOOLS/Math/MathTools.H"
 #include "ATOOLS/Org/Message.H"
 
 using namespace AMEGIC;
 using namespace MODEL;
-
+using namespace ATOOLS;
 
 Point::Point(const Point& copy) { 
-  extrafl = 0;
-  Color   = new Color_Function;
+  Color   = NULL;
   Lorentz = NULL;
   middle  = 0;
-  nextra = 0;
 
   *this = copy;
 } 
 
-Point::Point(int extra) : nextra(extra)  { 
+Point::Point(int extra) { 
   zwf     = 0;
   propid  = 0;
-  extrafl = 0;
   v       = 0;
-  Color   = new Color_Function;
+  Color   = NULL;
   Lorentz = NULL;
   middle  = 0;
-  if (nextra>0) extrafl = new ATOOLS::Flavour[nextra]; 
 }
 
 Point& Point::operator=(const Point& p) {
@@ -36,18 +33,14 @@ Point& Point::operator=(const Point& p) {
     propid = p.propid;
     m      = p.m;
     fl     = p.fl;
-      
-    *Color = *p.Color; 
-    if (Lorentz) delete Lorentz;
-    Lorentz=NULL;
-    if (p.Lorentz) Lorentz = p.Lorentz->GetCopy(); 
- 
-    if (nextra>0) delete[] extrafl;
-    nextra = p.nextra;
-    if (nextra>0) {
-      extrafl = new ATOOLS::Flavour[nextra]; 
-      for(int i=0;i<nextra;i++) extrafl[i] = p.extrafl[i];
+
+    if (p.Lorentz) {
+      if (Color==NULL) Color = new Color_Function();
+      *Color = *p.Color; 
+      if (Lorentz) Lorentz->Delete();
+      Lorentz = p.Lorentz->GetCopy(); 
     }
+
     left   = p.left;
     right  = p.right;
     middle = p.middle;
@@ -224,21 +217,15 @@ std::ostream & operator<<(std::ostream & s, const Point & p)
   return s;
 }
 
-int Point::FindQCDOrder(int & oqcd) {
- if (!this) return oqcd;
-  if (v) oqcd+=v->oqcd;
-  left->FindQCDOrder(oqcd);
-  right->FindQCDOrder(oqcd);
-  if (middle) middle->FindQCDOrder(oqcd);
-  return oqcd;
+void Point::FindOrder(std::vector<int> &order)
+{
+  if (v) {
+    if (order.size()<v->order.size())
+      order.resize(v->order.size(),0);
+    for (size_t i(0);i<v->order.size();++i)
+      order[i]+=v->order[i];
+  }
+  if (left)   left  ->FindOrder(order);
+  if (left)   right ->FindOrder(order);
+  if (middle) middle->FindOrder(order);
 }
-
-int Point::FindQEDOrder(int & oqed) {
-if (!this) return oqed;
-  if (v) oqed+=v->oew;
-  left->FindQEDOrder(oqed);
-  right->FindQEDOrder(oqed);
-  if (middle) middle->FindQEDOrder(oqed);
-  return oqed;
-}
-

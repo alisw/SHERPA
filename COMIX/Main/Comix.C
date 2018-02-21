@@ -23,7 +23,6 @@ namespace COMIX {
     std::vector<PHASIC::Process_Base*>         m_rsprocs;
 
     std::string m_path, m_file;
-    int    m_act;
     time_t m_mets;
 
     void PrintLogo(std::ostream &s);
@@ -128,9 +127,6 @@ void Comix::PrintLogo(std::ostream &s)
   s<<"|     http://comix.freacafe.de     |\n";
   s<<"|   please cite  JHEP12(2008)039   |\n";
   s<<"+----------------------------------+\n";
-#ifdef USING__Threading
-  s<<"Comix was compiled for multithreading.\n";
-#endif
   rpa->gen.AddCitation
     (1,"Comix is published under \\cite{Gleisberg:2008fv}.");
 }
@@ -153,7 +149,6 @@ bool Comix::Initialize(const std::string &path,const std::string &file,
 		       BEAM::Beam_Spectra_Handler *const beamhandler,
 		       PDF::ISR_Handler *const isrhandler) 
 {
-  m_act=true;
   m_path=path;
   m_file=file;
   p_model=model;
@@ -166,12 +161,58 @@ bool Comix::Initialize(const std::string &path,const std::string &file,
   read.SetInputPath(m_path);
   read.SetInputFile(m_file);
   SetPSMasses(&read);
-  if (!read.GetValue<int>("COMIX_ALLOW_BSM",0))
-    if (model->Name()!="SM") m_act=false;
-  if (m_act) {
-    PrintLogo(msg->Info());
-    PrintVertices();
-  }
+  PrintLogo(msg->Info());
+  PrintVertices();
+  rpa->gen.SetVariable
+    ("COMIX_PMODE",read.GetValue<std::string>("COMIX_PMODE","D"));
+  int helpi;
+  if (!read.ReadFromFile(helpi,"COMIX_WF_MODE")) helpi=0;
+  else msg_Info()<<METHOD<<"(): Set wave function mode "<<helpi<<".\n";
+  rpa->gen.SetVariable("COMIX_WF_MODE",ToString(helpi));
+  if (!read.ReadFromFile(helpi,"COMIX_PG_MODE")) helpi=0;
+  else msg_Info()<<METHOD<<"(): Set print graph mode "<<helpi<<".\n";
+  rpa->gen.SetVariable("COMIX_PG_MODE",ToString(helpi));
+  if (!read.ReadFromFile(helpi,"COMIX_VL_MODE")) helpi=0;
+  else msg_Info()<<METHOD<<"(): Set vertex label mode "<<helpi<<".\n";
+  Vertex::SetVLMode(helpi);
+  if (!read.ReadFromFile(helpi,"COMIX_N_GPL")) helpi=3;
+  else msg_Info()<<METHOD<<"(): Set graphs per line "<<helpi<<".\n";
+  rpa->gen.SetVariable("COMIX_N_GPL",ToString(helpi));
+  double helpd;
+  if (!read.ReadFromFile(helpd,"DIPOLE_AMIN")) helpd=Max(rpa->gen.Accu(),1.0e-8);
+  else msg_Info()<<METHOD<<"(): Set dipole \\alpha_{cut} "<<helpd<<".\n";
+  rpa->gen.SetVariable("DIPOLE_AMIN",ToString(helpd));
+  if (!read.ReadFromFile(helpd,"DIPOLE_ALPHA")) helpd=1.0;
+  else msg_Info()<<METHOD<<"(): Set dipole \\alpha_{max} "<<helpd<<".\n";
+  rpa->gen.SetVariable("DIPOLE_ALPHA",ToString(helpd));
+  if (!read.ReadFromFile(helpd,"DIPOLE_ALPHA_FF")) helpd=0.0;
+  else msg_Info()<<METHOD<<"(): Set FF dipole \\alpha_{max} "<<helpd<<".\n";
+  rpa->gen.SetVariable("DIPOLE_ALPHA_FF",ToString(helpd));
+  if (!read.ReadFromFile(helpd,"DIPOLE_ALPHA_FI")) helpd=0.0;
+  else msg_Info()<<METHOD<<"(): Set FI dipole \\alpha_{max} "<<helpd<<".\n";
+  rpa->gen.SetVariable("DIPOLE_ALPHA_FI",ToString(helpd));
+  if (!read.ReadFromFile(helpd,"DIPOLE_ALPHA_IF")) helpd=0.0;
+  else msg_Info()<<METHOD<<"(): Set IF dipole \\alpha_{max} "<<helpd<<".\n";
+  rpa->gen.SetVariable("DIPOLE_ALPHA_IF",ToString(helpd));
+  if (!read.ReadFromFile(helpd,"DIPOLE_ALPHA_II")) helpd=0.0;
+  else msg_Info()<<METHOD<<"(): Set II dipole \\alpha_{max} "<<helpd<<".\n";
+  rpa->gen.SetVariable("DIPOLE_ALPHA_II",ToString(helpd));
+  if (!read.ReadFromFile(helpd,"DIPOLE_KAPPA")) helpd=2.0/3.0;
+  else msg_Info()<<METHOD<<"(): Set dipole \\kappa="<<helpd<<"\n.";
+  rpa->gen.SetVariable("DIPOLE_KAPPA",ToString(helpd));
+  if (!read.ReadFromFile(helpi,"DIPOLE_NF_GSPLIT"))
+    helpi=Flavour(kf_jet).Size()/2;
+  else msg_Info()<<METHOD<<"(): Set dipole N_f="<<helpi<<"\n.";
+  rpa->gen.SetVariable("DIPOLE_NF_GSPLIT",ToString(helpi));
+  if (!read.ReadFromFile(helpd,"DIPOLE_KT2MAX")) helpd=sqr(rpa->gen.Ecms());
+  else msg_Info()<<METHOD<<"(): Set dipole \\k_{T,max}^2 "<<helpd<<".\n";
+  rpa->gen.SetVariable("DIPOLE_KT2MAX",ToString(helpd));
+  rpa->gen.SetVariable("USR_WGT_MODE",
+		       ToString(read.GetValue("USR_WGT_MODE",1)));
+  rpa->gen.SetVariable("NLO_SMEAR_THRESHOLD",
+		       ToString(read.GetValue("NLO_SMEAR_THRESHOLD",0.0)));
+  rpa->gen.SetVariable("NLO_SMEAR_POWER",
+		       ToString(read.GetValue("NLO_SMEAR_POWER",0.5)));
 #ifdef USING__MPI
   if (MPI::COMM_WORLD.Get_rank()==0)
 #endif
@@ -184,7 +225,7 @@ bool Comix::Initialize(const std::string &path,const std::string &file,
 PHASIC::Process_Base *Comix::
 InitializeProcess(const PHASIC::Process_Info &pi, bool add)
 {
-  if (p_model==NULL || !m_act) return NULL;
+  if (p_model==NULL) return NULL;
   m_umprocs.push_back(std::vector<Single_Process*>());
   PHASIC::Process_Base *newxs(NULL);
   size_t nis(pi.m_ii.NExternal()), nfs(pi.m_fi.NExternal());

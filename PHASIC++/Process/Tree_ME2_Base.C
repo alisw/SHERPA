@@ -12,7 +12,9 @@ using namespace MODEL;
 Tree_ME2_Base::Tree_ME2_Base(const Process_Info &pi,
                              const Flavour_Vector &flavs):
   m_pinfo(pi), m_flavs(flavs), p_aqcd(NULL), p_aqed(NULL),
-  m_namps(0)
+  m_namps(0), m_norm(1.0), m_res(0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+  m_mur2(1.0), m_born(0.0)
+  
 {
 }
 
@@ -48,12 +50,12 @@ void Tree_ME2_Base::FillCombinations
 
 int Tree_ME2_Base::OrderQCD(const int &id)
 {
-  return -1;
+ return -1;
 }
 
 int Tree_ME2_Base::OrderEW(const int &id)
 {
-  return -1;
+ return -1;
 }
 
 double Tree_ME2_Base::TR() const
@@ -93,12 +95,12 @@ void Tree_ME2_Base::SetCouplings(const MODEL::Coupling_Map& cpls)
 
 double Tree_ME2_Base::AlphaQCD() const
 {
-  return p_aqcd ? p_aqcd->Default()*p_aqcd->Factor() : s_model->ScalarFunction("alpha_S");
+  return p_aqcd ? p_aqcd->Default()*p_aqcd->Factor() : s_model->ScalarConstant("alpha_S");
 }
 
 double Tree_ME2_Base::AlphaQED() const
 {
-  return p_aqed ? p_aqed->Default()*p_aqed->Factor() : s_model->ScalarFunction("alpha_QED");
+  return p_aqed ? p_aqed->Default()*p_aqed->Factor() : s_model->ScalarConstant("alpha_QED");
 }
 
 

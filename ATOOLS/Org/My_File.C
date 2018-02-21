@@ -18,7 +18,6 @@ std::ostream &ATOOLS::operator<<(std::ostream &ostr,const fom::code &code)
   switch (code) {
   case fom::temporary: return ostr<<"temporary";
   case fom::permanent: return ostr<<"permanent";
-  case fom::error:     return ostr<<"error";
   case fom::unknown:   return ostr<<"unknown";
   }
   return ostr;
@@ -90,7 +89,7 @@ bool My_File<FileType>::OpenDB(std::string file)
   file+=".db";
   if (s_sqldbs.find(file)!=s_sqldbs.end()) return true;
   sqlite3 *db=NULL;
-  int dummy;
+  int dummy=0;
 #ifdef USING__MPI
   if (MPI::COMM_WORLD.Get_rank()) {
     MPI::COMM_WORLD.Bcast(&dummy,1,MPI::INT,0);
@@ -103,6 +102,9 @@ bool My_File<FileType>::OpenDB(std::string file)
 #endif
   }
   else {
+    size_t pos(file.rfind('/'));
+    if (pos!=std::string::npos &&
+	!MakeDir(file.substr(0,pos),true)) return false;
     int res=0;
     if (s_sqlopenflag.length()==0) res=sqlite3_open(file.c_str(),&db);
     else res=sqlite3_open_v2(file.c_str(),&db,SQLITE_OPEN_READWRITE|
@@ -262,10 +264,17 @@ My_File<FileType>::FileInDB(const std::string &name)
 template <class FileType> bool
 My_File<FileType>::CopyInDB(std::string oldfile, std::string newfile)
 {
+  DataBase_Map::const_iterator nit(s_databases.find(newfile));
+  if (nit!=s_databases.end()) {
+    msg_Out()<<METHOD<<"(): '"<<newfile
+		     <<"' already in '"<<nit->second.first<<"'\n";
+    return false;
+  }
   DataBase_Map::const_iterator sit(s_databases.find(oldfile));
   if (sit!=s_databases.end()) {
+    std::string fn(newfile);
     sqlite3 *db=sit->second.first;
-    msg_IODebugging()<<METHOD<<"(): '"<<oldfile<<"' found in '"<<db<<"'";
+    msg_IODebugging()<<METHOD<<"(): '"<<oldfile<<"' found in '"<<db<<"'\n";
     oldfile.erase(0,sit->second.second.length());
     newfile.erase(0,sit->second.second.length());
     char *zErrMsg=0;
@@ -277,6 +286,14 @@ My_File<FileType>::CopyInDB(std::string oldfile, std::string newfile)
 		     <<zErrMsg<<"'."<<std::endl;
       sqlite3_free(zErrMsg);
     }
+    for (SQLDB_Map::const_iterator dit(s_sqldbs.begin());
+	 dit!=s_sqldbs.end();++dit)
+      if (dit->second==db) {
+	std::string tag(dit->first);
+	tag.replace(tag.length()-3,3,"/");
+	s_databases[fn]=std::pair<sqlite3*,std::string>(db,tag);
+	break;
+      }
     return true;
   }
   return false;

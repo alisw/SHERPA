@@ -25,8 +25,9 @@ namespace PDF {
 
     PDF_Base * GetCopy();
 
-    void   CalculateSpec(double,double);
-    double GetXPDF(const ATOOLS::Flavour); 
+    void   CalculateSpec(const double&,const double&);
+    double GetXPDF(const ATOOLS::Flavour&);
+    double GetXPDF(const kf_code&,bool);
 
   };// end of class PDF_MSTW
 
@@ -45,11 +46,13 @@ using namespace ATOOLS;
 
 PDF_MSTW::PDF_MSTW
 (const ATOOLS::Flavour &bunch,
- const std::string &bfile,int set):
+ const std::string &bfile,int member):
   m_path(rpa->gen.Variable("SHERPA_SHARE_PATH")+"/MSTW08Grid"),
   m_file(bfile), m_anti(1)
 {
-  m_member=set;
+  m_set="MSTW";
+  // default set is member=1
+  m_member=(member==0?1:member);
   m_type="MSTW";
   m_bunch=bunch;
   if (m_bunch==Flavour(kf_p_plus).Bar()) m_anti=-1;
@@ -73,9 +76,16 @@ PDF_MSTW::PDF_MSTW
   m_xmin=p_pdf->xmin;
   m_xmax=p_pdf->xmax;
   m_q2min=p_pdf->qsqmin;
+  if (file.find("nf4")!=-1)
+    m_asinfo.m_flavs.resize(4);
+  else if (file.find("nf3")!=-1)
+    m_asinfo.m_flavs.resize(3);
+  else
+    m_asinfo.m_flavs.resize(5);
   m_q2max=p_pdf->qsqmax;
   m_asinfo.m_order=p_pdf->alphaSorder;
   m_asinfo.m_asmz=p_pdf->alphaSMZ;
+  m_asinfo.m_mz2=sqr(91.1876);
 }
 
 PDF_MSTW::~PDF_MSTW()
@@ -90,14 +100,14 @@ PDF_Base *PDF_MSTW::GetCopy()
   return copy;
 }
 
-void PDF_MSTW::CalculateSpec(double x,double Q2)
+void PDF_MSTW::CalculateSpec(const double& x,const double& Q2)
 {
   m_x=x;
   m_Q2=Q2;
 }
 
 
-double PDF_MSTW::GetXPDF(const ATOOLS::Flavour infl) 
+double PDF_MSTW::GetXPDF(const ATOOLS::Flavour& infl)
 {
   if(m_x<m_xmin) m_x=m_xmin;
   if (m_x/m_rescale>m_xmax || m_rescale<0.0) return 0.0;
@@ -107,16 +117,23 @@ double PDF_MSTW::GetXPDF(const ATOOLS::Flavour infl)
   return m_rescale*p_pdf->parton(kfc,m_x/m_rescale,sqrt(m_Q2));
 }
 
+double PDF_MSTW::GetXPDF(const kf_code& kf, bool anti)
+{
+  if(m_x<m_xmin) m_x=m_xmin;
+  if (m_x>m_xmax) return 0.0;
+  int kfc=m_anti*(anti?-kf:kf);
+  if      (kf==kf_gluon)  kfc=0;
+  else if (kf==kf_photon) kfc=13;
+  return m_rescale*p_pdf->parton(kfc,m_x,sqrt(m_Q2));
+}
+
 DECLARE_PDF_GETTER(MSTW_Getter);
 
 PDF_Base *MSTW_Getter::operator()
   (const Parameter_Type &args) const
 {
   if (!args.m_bunch.IsHadron()) return NULL;
-  int set=args.p_read->GetValue<int>("PDF_SET_VERSION",1);
-  int ibeam=args.m_ibeam;
-  set=args.p_read->GetValue<int>("PDF_SET_VERSION_"+ToString(ibeam+1),set);
-  return new PDF_MSTW(args.m_bunch,m_key,set);
+  return new PDF_MSTW(args.m_bunch,args.m_set,args.m_member);
 }
 
 void MSTW_Getter::PrintInfo

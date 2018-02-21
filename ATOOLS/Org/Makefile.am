@@ -1,12 +1,5 @@
 pkglib_LTLIBRARIES = libToolsOrg.la
 
-if GZIP_SUPPORT
-GZIPSTREAMSOURCES = Gzip_Stream.C
-GZIPSTREAMHEADERS = Gzip_Stream.H
-else
-GZIPEXTRADIST = Gzip_Stream.C Gzip_Stream.H
-endif
-
 MD5_EXCLUDE = CXXFLAGS_PACKAGES.H CXXFLAGS.H
 
 SVNTAG = ATOOLS/Org
@@ -35,7 +28,7 @@ libToolsOrg_la_SOURCES        = \
 				Info_Key.C \
 				Integration_Info.C \
 				Library_Loader.C \
-				$(GZIPSTREAMSOURCES) \
+				Gzip_Stream.C \
 				binreloc.c
 
 localinc_HEADERS         =	\
@@ -49,6 +42,7 @@ localinc_HEADERS         =	\
 			STL_Tools.H \
 			RUsage.H \
 			Getter_Function.H \
+			Getter_Function.C \
 			My_MPI.H \
 			Exception.H \
 			Exception_Handler.H \
@@ -71,14 +65,14 @@ localinc_HEADERS         =	\
 			Library_Loader.H \
 			Node.H \
 			Node.C \
-			$(GZIPSTREAMHEADERS) \
+			Gzip_Stream.H \
 			binreloc.h
 
 libToolsOrg_la_LIBADD = @CONDITIONAL_GZIPLIBS@ @SQLITE3_LDFLAGS@
 
-libToolsOrg_la_CPPFLAGS   =	$(AM_CPPFLAGS) @SQLITE3_CFLAGS@
+libToolsOrg_la_CPPFLAGS   =	$(AM_CPPFLAGS) @CONDITIONAL_GZIPINCS@ @SQLITE3_CFLAGS@
 
-EXTRA_DIST    = $(GZIPEXTRADIST) CXXFLAGS.H.in
+EXTRA_DIST    = CXXFLAGS.H.in
 
 dist-hook:
 	rm -f $(distdir)/CXXFLAGS.H

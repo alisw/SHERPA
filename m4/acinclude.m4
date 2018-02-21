@@ -29,7 +29,7 @@ AC_DEFUN([SHERPA_SETUP_BUILDSYSTEM],
       echo "checking for architecture...  unknown"
       echo "hosts system type $build not yet supported, assuming unix behaviour."
       echo "possible failure due to unknown compiler/linker characteristics."
-      echo "please inform us about build results at info@sherpa-mc.de"
+      echo "please inform us about build results at sherpa@projects.hepforge.org"
       echo "(will continue in 10 seconds)"
       sleep 10
       if test "x$LDFLAGS" = "x"; then
@@ -185,6 +185,14 @@ AC_DEFUN([SHERPA_SETUP_VARIABLES],
   AC_SUBST(CSSBUILDDIR)
   AC_SUBST(CSSLIBS)
   
+  DIREDIR="\${top_srcdir}/DIRE"
+  DIREBUILDDIR="\${top_builddir}/DIRE"
+  DIRELIBS="-L\${DIREBUILDDIR}/Tools -L\${DIREBUILDDIR}/Shower -L\${DIREBUILDDIR}/Gauge -L\${DIREBUILDDIR}/Lorentz -L\${DIREBUILDDIR}/Main \
+		-lDireTools -lDireShower -lDireGauge -lDireLorentz -lDireMain"
+  AC_SUBST(DIREDIR)
+  AC_SUBST(DIREBUILDDIR)
+  AC_SUBST(DIRELIBS)
+  
 
   COMIXDIR="\${top_srcdir}/COMIX"
   COMIXBUILDDIR="\${top_builddir}/COMIX"
@@ -213,8 +221,10 @@ AC_DEFUN([SHERPA_SETUP_VARIABLES],
   
   MODELDIR="\${top_srcdir}/MODEL"
   MODELBUILDDIR="\${top_builddir}/MODEL"
-  MODELLIBS="-L\${MODELBUILDDIR}/Main -L\${MODELBUILDDIR}/Interaction_Models \	
-             -lModelMain -lModelInteractions"
+  MODELLIBS="-L\${MODELBUILDDIR}/Main \	
+             -lModelMain \
+	     -L\${MODELBUILDDIR}/UFO \
+	     -lModelUFO"
   AC_SUBST(MODELDIR)
   AC_SUBST(MODELBUILDDIR)
   AC_SUBST(MODELLIBS)
@@ -320,23 +330,6 @@ AC_DEFUN([SHERPA_SETUP_CONFIGURE_OPTIONS],
   )
   AC_SUBST(VERSIONING)
 
-  AC_ARG_ENABLE(
-    multithread,
-    AC_HELP_STRING([--enable-multithread], [Enable multithreading]),
-    [ AC_MSG_CHECKING(for multithreading)
-      case "${enableval}" in
-        no)  AC_MSG_RESULT(no); multithread=false ;;
-        yes) AC_MSG_RESULT(yes); multithread=true ;;
-      esac ],
-    [ AC_MSG_CHECKING(for multithreading); AC_MSG_RESULT(no); multithread=false ] 
-  )
-  if test "$multithread" = "true" ; then
-    AC_DEFINE([USING__Threading], "1", [using multithreading])
-    CONDITIONAL_THREADLIBS="-lpthread"
-  fi
-  AC_SUBST(CONDITIONAL_THREADLIBS)
-  AM_CONDITIONAL(USING__Threading, test "$multithread" = "true" )
-  
   AC_ARG_ENABLE(
     analysis,
     AC_HELP_STRING([--enable-analysis], [Enable analysis]),
@@ -541,6 +534,30 @@ AC_DEFUN([SHERPA_SETUP_CONFIGURE_OPTIONS],
   AM_CONDITIONAL(OPENLOOPS_SUPPORT, test "$openloops" = "true")
 
   AC_ARG_ENABLE(
+    recola,
+    AC_HELP_STRING([--enable-recola=/path/to/recola], [Enable Recola.]),
+    [ AC_MSG_CHECKING(for Recola installation directory);
+      case "${enableval}" in
+        no)  AC_MSG_RESULT(Recola not enabled); recola=false ;;
+        *)   RECOLA_PREFIX="$(echo ${enableval} | sed -e 's/\/$//g')"
+             recola=true;
+             if test -d "${RECOLA_PREFIX}"; then
+                AC_MSG_RESULT([${RECOLA_PREFIX}]);
+		CONDITIONAL_RECOLAINCS="-I$RECOLA_PREFIX/include";		
+             else
+                AC_MSG_WARN(${RECOLA_PREFIX} is not a valid path.);
+             fi;;
+      esac
+      ],
+    [ recola=false ]
+  )
+  if test "$recola" = "true" ; then
+    AC_DEFINE_UNQUOTED([RECOLA_PREFIX], "$RECOLA_PREFIX", [Recola installation prefix])
+  fi
+  AC_SUBST(CONDITIONAL_RECOLAINCS)    
+  AM_CONDITIONAL(RECOLA_SUPPORT, test "$recola" = "true")
+
+  AC_ARG_ENABLE(
     mcfm,
     AC_HELP_STRING([--enable-mcfm=/path/to/mcfm], [Enable MCFM.]),
     [ AC_MSG_CHECKING(for MCFM installation directory);
@@ -593,12 +610,12 @@ AC_DEFUN([SHERPA_SETUP_CONFIGURE_OPTIONS],
                CONDITIONAL_ROOTDIR=$ROOTSYS
                CONDITIONAL_ROOTINCS="-I$ROOTSYS/include -I$($ROOTSYS/bin/root-config --incdir)";
                CONDITIONAL_ROOTLIBS="-L$ROOTSYS/lib $($ROOTSYS/bin/root-config --glibs)"
-               CONDITIONAL_ROOTFLAGS=-Wno-long-long
+               CONDITIONAL_ROOTFLAGS="$($ROOTSYS/bin/root-config --cflags)"
              elif test -x "`which root-config`"; then
                CONDITIONAL_ROOTDIR=`root-config --prefix`;
                CONDITIONAL_ROOTINCS=-I`root-config --incdir`;
                CONDITIONAL_ROOTLIBS=`root-config --glibs`;
-               CONDITIONAL_ROOTFLAGS=-Wno-long-long
+               CONDITIONAL_ROOTFLAGS=`root-config --cflags`;
                 if ! test -d "$CONDITIONAL_ROOTDIR"; then
                   AC_MSG_ERROR(root-config --prefix returned a path that is not available. Please check your ROOT installation and set \$ROOTSYS manually.);
                 fi
@@ -610,7 +627,7 @@ AC_DEFUN([SHERPA_SETUP_CONFIGURE_OPTIONS],
                CONDITIONAL_ROOTDIR="${enableval}"
                CONDITIONAL_ROOTINCS="-I${enableval}/include -I${enableval}/include/root";
                CONDITIONAL_ROOTLIBS="-L${enableval}/lib $(${enableval}/bin/root-config --glibs)";
-               CONDITIONAL_ROOTFLAGS="-Wno-long-long"
+               CONDITIONAL_ROOTFLAGS="$(${enableval}/bin/root-config --cflags)";
              else
                AC_MSG_ERROR(${enableval} is not a valid path.);
              fi;
@@ -658,12 +675,15 @@ AC_DEFUN([SHERPA_SETUP_CONFIGURE_OPTIONS],
   if test "$lhapdf" = "true" ; then
     AC_DEFINE_UNQUOTED([LHAPDF_PATH], "$CONDITIONAL_LHAPDFDIR", [LHAPDF directory])
     AC_DEFINE([USING__LHAPDF], "1", [using LHAPDF])
+    if test [ "$lhapdfversion" -ge "6" ] ; then
+      AC_DEFINE(USING__LHAPDF6, "1", [using LHAPDF6])
+    fi
   fi
   AC_SUBST(CONDITIONAL_LHAPDFDIR)
   AC_SUBST(CONDITIONAL_LHAPDFLIBS)
   AC_SUBST(CONDITIONAL_LHAPDFINCS)
   AM_CONDITIONAL(LHAPDF_SUPPORT, test "$lhapdf" = "true")
-  AM_CONDITIONAL(LHAPDF_NATIVE_CPP, test [ "$lhapdfversion" -ge "6" ])
+  AM_CONDITIONAL(LHAPDF6_SUPPORT, test [ "$lhapdfversion" -ge "6" ])
 
   AC_ARG_ENABLE(
     hztool,
@@ -801,6 +821,25 @@ AC_DEFUN([SHERPA_SETUP_CONFIGURE_OPTIONS],
               else
                 AC_MSG_ERROR(Header zlib.h and/or library libz not found. Configure without --disable-gzip or install zlib (and its devel package, e.g. zlib-devel, zlib-dev or zlib1g-dev) if you want compressed output.);
               fi;;
+	*) if test -d "${enableval}"; then
+             ZLIB_OLD_LDFLAGS=$LDFLAGS; ZLIB_OLD_CPPFLAGS=$CPPFLAGS;
+             LDFLAGS="$LDFLAGS -L${enableval}/lib"
+             CPPFLAGS="$CPPFLAGS -I${enableval}/include"
+             AC_CHECK_LIB(z,inflateEnd,zlib_cv_libz=yes,zlib_cv_libz=no)
+             AC_CHECK_HEADER(zlib.h,zlib_cv_zlib_h=yes,zlib_cv_zlib_h=no)
+             if test "$zlib_cv_libz" = "yes" && test "$zlib_cv_zlib_h" = "yes"
+             then
+               zlib=true;
+               CONDITIONAL_GZIPLIBS="-Wl,-rpath -Wl,${enableval}/lib -L${enableval}/lib -lz"
+               CONDITIONAL_GZIPINCS="-I${enableval}/include"
+	       AC_MSG_RESULT(Using zlib from ${enableval})
+             else
+               AC_MSG_ERROR(Header zlib.h and/or library libz not found. Configure without --disable-gzip or install zlib.);
+             fi
+             LDFLAGS="$ZLIB_OLD_LDFLAGS"; CPPFLAGS="$ZLIB_OLD_CPPFLAGS";
+           else
+             AC_MSG_ERROR(no such directory '${enableval}');
+           fi;;
       esac ],
     [ zlib=false ]
   )
@@ -809,6 +848,7 @@ AC_DEFUN([SHERPA_SETUP_CONFIGURE_OPTIONS],
   fi
   AM_CONDITIONAL(GZIP_SUPPORT, test "$zlib" = "true")
   AC_SUBST(CONDITIONAL_GZIPLIBS)
+  AC_SUBST(CONDITIONAL_GZIPINCS)
 
   AC_ARG_ENABLE(
     pythia,

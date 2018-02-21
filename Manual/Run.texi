@@ -5,9 +5,10 @@ The following parameters describe general run information. They may be set in th
 
 @menu
 * EVENTS::            Number of events to generate.
-* EVENT_TYPE::        Type of events to generate
+* EVENT_TYPE::        Type of events to generate.
+* SHERPA_VERSION::    Sherpa version that can run this run card.
 * TUNE::              Parameter tunes.
-* OUTPUT::            Output level.
+* OUTPUT::            Screen output level.
 * LOG_FILE::          Log file.
 * RANDOM_SEED::       Seed for random number generator.
 * EVENT_SEED_MODE::   Setting predefined seeds.
@@ -21,9 +22,9 @@ The following parameters describe general run information. They may be set in th
 * SHERPA_CPP_PATH::   The C++ code generation path.
 * SHERPA_LIB_PATH::   The runtime library path.
 
-* Event output formats:: Event output in different formats.
-* MPI parallelization::  MPI parallelization with Sherpa.
-* Multi-threading::      Multi-threaded integration with Sherpa.
+* Event output formats::     Event output in different formats.
+* Scale and PDF variations:: On-the-fly scale and PDF variations.
+* MPI parallelization::      MPI parallelization with Sherpa.
 @end menu
 
 
@@ -58,6 +59,13 @@ Alternatively there are two more specialised modes, namely:
         hadron.          
 @end itemize
 
+@node SHERPA_VERSION
+@subsection SHERPA_VERSION
+@cindex SHERPA_VERSION
+This parameter ties a run card to a specific Sherpa version, e.g.
+@code{2.2.0}. If two parameters are given they are interpreted as
+a range of Sherpa versions.
+
 @node TUNE
 @subsection TUNE
 @cindex TUNE
@@ -80,7 +88,9 @@ assess MPI uncertainties.
 @subsection OUTPUT
 @cindex OUTPUT
 @cindex EVT_OUTPUT
-This parameter specifies the output level (verbosity) of the program.
+This parameter specifies the screen output level (verbosity) of the program.
+If you are looking for event file output options please refer to section
+@ref{Event output formats}.
 @*
 It can alternatively be set on the command line through option
 @option{-O}, see @ref{Command line}. A different output level can be 
@@ -101,7 +111,7 @@ The value can be any sum of the following:
 8: Debugging messages (even more output).
 @end itemize
 
-E.g. OUTPUT=3 would display information, events and errors.
+E.g. @option{OUTPUT=3} would display information, events and errors.
 
 @node LOG_FILE
 @subsection LOG_FILE
@@ -286,8 +296,9 @@ for the desired file base name. The following formats are currently available:
 @item HepMC_GenEvent
 Generates output in HepMC::IO_GenEvent format. The HepMC::GenEvent::m_weights 
 weight vector stores the following items: @code{[0]} event weight, @code{[1]} 
-combined matrix element and phase space weight (missing only PDF information, 
-thus directly suitable for PDF reweighting), @code{[2]} event weight 
+combined matrix element and PDF weight (missing only phase space weight
+information, thus directly suitable for evaluating the matrix element value of
+the given configuration), @code{[2]} event weight
 normalisation (in case of unweighted events event weights of ~ +/-1 
 can be obtained by (event weight)/(event weight normalisation)), and 
 @code{[3]} number of trials. The total cross section of the simulated event sample
@@ -297,12 +308,32 @@ the event generation run, and it can serve as a cross-check on the consistency
 of the HepMC event file.  Note that Sherpa conforms to the Les Houches 2013
 suggestion (@url{http://phystev.in2p3.fr/wiki/2013:groups:tools:hepmc}) 
 of indicating interaction types through the GenVertex type-flag.  Multiple
-event weights will also be enabled as soon as a similar standard has been
-defined.
+event weights can also be enabled with HepMC versions >2.06, cf. 
+@ref{Scale and PDF variations}. The following additional customisations 
+can be used
+
+@code{HEPMC_USE_NAMED_WEIGHTS=<0|1>} 
+Enable filling weights with an associated name. The nominal event weight 
+has the key @code{Weight}. @code{MEWeight}, @code{WeightNormalisation} and 
+@code{NTrials} provide additional information for each event as described 
+above. Needs HepMC version >2.06.
+
+@code{HEPMC_EXTENDED_WEIGHTS=<0|1>}
+Write additional event weight information needed for a posteriori reweighting 
+into the WeightContainer, cf. @ref{A posteriori scale and PDF variations using the HepMC GenEvent Output}. Necessitates 
+the use of @code{HEPMC_USE_NAMED_WEIGHTS}.
+
+@code{HEPMC_TREE_LIKE=<0|1>}
+Force the event record to be stricly tree-like. Please note that this removes 
+some information from the matrix-element-parton-shower interplay which would 
+be otherwise stored.
+
 @item HepMC_Short
 Generates output in HepMC::IO_GenEvent format, however, only incoming beams and 
 outgoing particles are stored. Intermediate and decayed particles are not 
-listed. The event weights stored as the same as above.
+listed. The event weights stored as the same as above, and 
+@code{HEPMC_USE_NAMED_WEIGHTS} and @code{HEPMC_EXTENDED_WEIGHTS} can be used to 
+customise.
 @item Delphes_GenEvent
 Generates output in @url{http://root.cern.ch,,Root} format, which can be passed to
 @uref{http://cp3.irmp.ucl.ac.be/projects/delphes,,Delphes} for analyses.
@@ -343,7 +374,7 @@ suited to communicate enough information for meaningful parton showering
 on top of multiparton final states.
 @item Root
 Generates output in ROOT ntuple format @strong{for NLO event generation only}. 
-For details on the ntuple format, see @ref{Structure of ROOT NTuple Output}.
+For details on the ntuple format, see @ref{A posteriori scale and PDF variations using the ROOT NTuple Output}.
 This output option is available only if Sherpa was linked to ROOT during 
 installation by using the configure option @code{--enable-root=/path/to/root}.
 ROOT ntuples can be read back into Sherpa and analyzed using the option
@@ -354,9 +385,11 @@ The output can be further customized using the following options:
 
 @table @option
 @item FILE_SIZE
-Number of events per file (default: 1000).
+Number of events per file (default: unlimited).
 @item NTUPLE_SIZE
 File size per NTuple file (default: unlimited).
+This option is deprecated. It may lead to errors in the subsequent 
+processing of NTuple files. Please use @option{FILE_SIZE} instead.
 @item EVT_FILE_PATH
 Directory where the files will be stored.
 @item OUTPUT_PRECISION
@@ -366,6 +399,59 @@ Steers the precision of all numbers written to file.
 For all output formats except ROOT and Delphes, events can be written directly 
 to gzipped files instead of plain text. The option @option{--enable-gzip} 
 must be given during installation to enable this feature.
+
+@node Scale and PDF variations
+@subsection Scale and PDF variations
+Sherpa can compute alternative event weights for different scale and 
+PDF choices on-the-fly, resulting in alternative weights for the generated 
+event. The can be evoked with the following syntax
+@verbatim
+SCALE_VARIATIONS <muR-fac-1>,<muF-fac-1>[,<PDF-1>]  <muR-fac-1>,<muF-fac-1>[,<PDF-1>] ...
+@end verbatim
+The key word @code{SCALE_VARIATIONS} takes a space separated list of 
+variation factors for the nominal renormalisation and factorisation scale 
+and an associated PDF set. Any set present in any of the PDF library interfaces
+loaded through @code{PDF_LIBRARY} can be used. If no PDF set is given it 
+defaults to the nominal one. Specific PDF members can be 
+specified by appending the PDF set name with @code{/<member-id>}. The 
+short-hand appendix @code{[all]} will provide the variations for all 
+members of the given set (only works with LHAPDF6 sets or the internal default
+set).  Please note: scales are, as always in Sherpa, given in their quadratic
+form.  Thus, a variation of factor 4 of the squared scale [GeV^2] means a
+variation of factor 2 on the scale itself [GeV].
+
+PDF variations on their own can also be invoked by giving the list of 
+PDF sets to be reweighted to to @code{PDF_VARIATIONS}.
+
+Thus, a complete variation using the PDF4LHC convention would read
+@verbatim
+  SCALE_VARIATIONS 0.25,0.25 0.25,1. 1.,0.25 1.,1. 1.,4. 4.,1. 4.,4.;
+  PDF_VARIATIONS CT10nlo[all] MMHT2014nlo68cl[all] NNPDF30_nlo_as_0118[all];
+@end verbatim
+Please note, this syntax will create 7+53+51+101=212 additional weights
+for each event.
+
+The additional event weights can then be written into the event output. 
+However, this is currently only supported for @code{HepMC_GenEvent} and 
+@code{HepMC_Short} with versions >2.06 and @code{HEPMC_USE_NAMED_WEIGHTS=1}. 
+The alternative event weights follow the Les Houches naming convention 
+for such variations, ie. they are named @code{MUR<fac>_MUF<fac>_PDF<id>}.
+When using Sherpa's interface to Rivet, @ref{Rivet analyses}, separate 
+instances of Rivet, one for each alternative event weight in addition to 
+the nominal one, are instantiated leading to one set of histograms each.
+They are again named using the @code{MUR<fac>_MUF<fac>_PDF<id>} convention.
+
+The user must also be aware that, of course, the cross section of the 
+event sample, changes when using an alternative event weight as compared 
+to the nominal one. Any histograming therefore has to account for this 
+and recompute the total cross section as the sum of weights devided by the 
+number of trials, cf. @ref{Cross section determination}.
+
+The on-the-fly reweighting works for all event generation modes (weighted or
+(partially) unweighted) and all calculation types (LO, LOPS, NLO, NLOPS,
+MEPS@@LO, MEPS@@NLO and MENLOPS).  However, it does not include the reweighting
+of parton shower emissions per default, which is an experimental feature in
+Sherpa 2.2.0.
 
 @node MPI parallelization
 @subsection MPI parallelization
@@ -383,18 +469,14 @@ by starting multiple instances of Sherpa with different random seed, cf.
 NTuple writeout can be used with MPI. Note that these require substantial 
 data transfer.
 
-@node Multi-threading
-@subsection Multi-threading
-@cindex PG_THREADS
-@cindex COMIX_ME_THREADS
-@cindex COMIX_PS_THREADS
-
-Multi-threaded integration in Sherpa can be enabled using the configuration
-option @samp{--enable-multithread}. Subsequently the computation of amplitudes
-for large groups of processes is split into a number of threads which is limited 
-from above by the parameter @option{PG_THREADS}. This parameter can also
-be specified using the command line option @option{-j}, see @ref{Command line}.
-Additionally, matrix-element calculation and phase-space evaluation for a 
-single process with Comix can be distributed to different threads according to 
-@mycite{Gleisberg2008fv}. The number of threads is then specified using the 
-parameters @option{COMIX_ME_THREADS} and @option{COMIX_PS_THREADS}, respectively.
+Please note that the process information contained in the @code{Process}
+directory for both Amegic and Comix needs to be generated without
+MPI parallelization first. Therefore, first run
+@verbatim
+Sherpa -f <run-card> INIT_ONLY=1
+@end verbatim
+and, in case of using Amegic, compile the libraries. Then start your
+parallized integration, e.g.
+@verbatim
+mpirun -n <n> Sherpa -f <run-card>
+@end verbatim

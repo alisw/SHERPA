@@ -112,6 +112,7 @@ namespace PHASIC {
 
     void ReadResults();
     void StoreResults(const int mode=0);
+    void StoreBackupResults();
     void PrepareTerminate();
 
     void SetEnhanceFactor(const double &efac);
@@ -120,7 +121,9 @@ namespace PHASIC {
 
     double SelectionWeight(const int mode) const;
 
-    void MPISync();
+    void MPISync(const int mode=0);
+    void MPICollect(std::vector<double> &sv,std::vector<double> &mv,size_t &i);
+    void MPIReturn(std::vector<double> &sv,std::vector<double> &mv,size_t &i);
 
     // inline functions
     inline Process_Base *Process() const { return p_proc; }

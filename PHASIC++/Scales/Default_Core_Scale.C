@@ -37,22 +37,14 @@ PDF::CParam Default_Core_Scale::Calculate(Cluster_Amplitude *const ampl)
   if (campl->Legs().size()!=ampl->Legs().size())
     msg_Debugging()<<*campl<<"\n";
   if (campl->Legs().size()!=4) {
-    double q2((campl->Leg(0)->Mom()+campl->Leg(1)->Mom()).Abs2());
+    double q=0.0;
     Vec4D ewsum;
     for (size_t i(0);i<campl->Legs().size();++i)
       if (!campl->Leg(i)->Flav().Strong()) ewsum+=campl->Leg(i)->Mom();
-    if (ewsum==Vec4D()) ewsum=campl->Leg(0)->Mom()+campl->Leg(1)->Mom();
-    if (campl->NIn()==2 &&
-	campl->Leg(0)->Flav().Strong() &&
-	campl->Leg(1)->Flav().Strong()) {// HThat'/2
-      q2=ewsum.PPerp();
-      for (size_t i(0);i<campl->Legs().size();++i)
-	if (campl->Leg(i)->Flav().Strong())
-	  q2+=campl->Leg(i)->Mom().PPerp();
-      q2=sqr(ewsum.Mass()+q2/2.0);
-    }
+      else q+=sqrt(dabs(campl->Leg(i)->Mom().MPerp2()));
+    q+=sqrt(dabs(ewsum.MPerp2()));
     campl->Delete();
-    return PDF::CParam(q2,dabs(ewsum.Abs2()),0.0,q2,-1);
+    return PDF::CParam(q*q/4.0,q*q/4.0,0.0,q*q/4.0,-1);
   }
   Flavour_Vector fl; fl.resize(4);
   fl[0]=campl->Leg(0)->Flav();
@@ -87,10 +79,17 @@ PDF::CParam Default_Core_Scale::Calculate(Cluster_Amplitude *const ampl)
       muq2=muf2=mur2=(campl->Leg(0)->Mom()+campl->Leg(1)->Mom()).Abs2();
     }
   }
-  else {// lh collision
-    msg_Debugging()<<"DIS like\n";
-    muq2=muf2=mur2=dabs((campl->Leg(fl[0].Strong()?1:0)->Mom()+
-			 campl->Leg(fl[2].Strong()?3:2)->Mom()).Abs2());
+  else {
+    if (!fl[0].Strong() && !fl[2].Strong()) {
+      msg_Debugging()<<"DIS like\n";
+      muq2=muf2=mur2=dabs((campl->Leg(fl[0].Strong()?1:0)->Mom()+
+			   campl->Leg(fl[2].Strong()?3:2)->Mom()).Abs2());
+    }
+    else {
+      msg_Debugging()<<"QCD Compton like\n";
+      muq2=muf2=mur2=dabs(sqrt(campl->Leg(2)->Mom().MPerp2()*
+			       campl->Leg(3)->Mom().MPerp2()));
+    }
   }
   campl->Delete();
   msg_Debugging()<<"\\mu_f = "<<sqrt(muf2)<<"\n"

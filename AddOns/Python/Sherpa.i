@@ -6,8 +6,11 @@
 %include "Blob.i"
 %include "Blob_List.i"
 %include "MEProcess.i"
+%include "Random.i"
+
 %{
 #include <SHERPA/Main/Sherpa.H>
+#include "ATOOLS/Math/Random.H"
   %}
 
 %catches (ATOOLS::Exception) SHERPA::Sherpa::InitializeTheRun(int, char**);
@@ -55,7 +58,15 @@ namespace SHERPA {
     bool InitializeTheEventHandler();
     long int NumberOfEvents() const;
     const ATOOLS::Blob_List &GetBlobList() const;
-    double GetMEWeight(const ATOOLS::Cluster_Amplitude &ampl) const;
+    double GetMEWeight(const ATOOLS::Cluster_Amplitude &ampl,const int mode=0) const;
     
   };
 }
+
+// Make the global pointer
+// to the RNG availeble
+ATOOLS::Random* ran;
+
+%inline %{
+  ATOOLS::Random* ATOOLS::ran;
+%}

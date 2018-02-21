@@ -7,14 +7,12 @@
 #include "ATOOLS/Org/CXXFLAGS.H"
 #include "ATOOLS/Math/Histogram.H"
 #include <list>
-#ifdef USING__Threading
-#include <pthread.h>
-#endif
 
 namespace ATOOLS { 
   class Blob_Data_Base; 
   class Poincare;
   class Mass_Selector;
+  struct Weight_Info;
 }
 
 namespace BEAM {
@@ -23,6 +21,10 @@ namespace BEAM {
 
 namespace PDF {
   class ISR_Handler;
+}
+
+namespace SHERPA {
+  class Variation_Weights;
 }
 
 namespace PHASIC {
@@ -49,44 +51,6 @@ namespace PHASIC {
   operator&(const psm::code &c1,const psm::code &c2)
   { return (psm::code)((int)c1&(int)c2); }
 
-  struct PDF_Info {
-    int m_fl1, m_fl2;
-    double m_x1, m_x2, m_muf12, m_muf22, m_xf1, m_xf2;
-    PDF_Info(const int &fl1=0, const int &fl2=0,
-             const double &x1=0.,const double &x2=0.,
-             const double &muf12=0.,const double &muf22=0.,
-             const double &xf1=0.,const double &xf2=0.) :
-      m_fl1(fl1), m_fl2(fl2), m_x1(x1), m_x2(x2),
-      m_muf12(muf12), m_muf22(muf22), m_xf1(xf1), m_xf2(xf2) {}
-  }; // end of struct PDF_Info
-
-  inline std::ostream & operator<<(std::ostream & s, const PHASIC::PDF_Info & pi)
-  {
-    s<<" pdf1 = ("<<pi.m_fl1<<","<<pi.m_x1<<","<<sqrt(pi.m_muf12)
-                  <<":"<<pi.m_xf1<<") , "
-     <<" pdf2 = ("<<pi.m_fl2<<","<<pi.m_x2<<","<<sqrt(pi.m_muf22)
-                  <<":"<<pi.m_xf2<<")";
-    return s;
-  }
-
-  struct Weight_Info {
-    PDF_Info m_pdf;
-    double m_weight, m_dxs, m_ntrial;
-    Weight_Info(const double &weight=0.0,
-                const double &dxs=0.0,const double &ntrial=0.0,
-                const int &fl1=0, const int &fl2=0,
-                const double &x1=0.,const double &x2=0.,
-                const double &xf1=0.0,const double &xf2=0.0,
-                const double &muf12=0.0,const double &muf22=0.0):
-      m_weight(weight), m_dxs(dxs), m_ntrial(ntrial),
-      m_pdf(PDF_Info(fl1,fl2,x1,x2,muf12,muf22,xf1,xf2)) {}
-  };// end of struct Weight_Info
-
-  inline std::ostream & operator<<(std::ostream & s, const PHASIC::Weight_Info & wi)
-  {
-    s<<" w = "<<wi.m_weight<<std::endl;
-    return s;
-  }
 
   class Phase_Space_Integrator;
   class Process_Base;
@@ -126,22 +90,14 @@ namespace PHASIC {
 
     double m_E, m_m[2], m_m2[2], m_s, m_smin, m_psweight;
     double m_result, m_error, m_abserror, m_enhance, m_osmass; 
-    
+
+    SHERPA::Variation_Weights * p_variationweights;
+
     std::vector<std::vector<double> > m_stats;
 
     psm::code m_cmode;
 
     bool m_printpspoint;
-
-#ifdef USING__Threading
-    pthread_t m_met, m_pst;
-    size_t m_sig, m_uset;
-    pthread_mutex_t m_sme_mtx, m_sps_mtx, m_tme_mtx, m_tps_mtx;
-    pthread_cond_t m_sme_cnd, m_sps_cnd, m_tme_cnd, m_tps_cnd;
-
-    static void *CalculateME(void *arg);
-    static void *CalculatePS(void *arg);
-#endif
 
     double EnhanceFactor(Process_Base *const proc);
 
@@ -176,7 +132,7 @@ namespace PHASIC {
     double Differential(Process_Integrator *const process,
 			const psm::code mode=psm::normal_call);
 
-    Weight_Info *OneEvent(Process_Base *const proc,const int mode=0);
+    ATOOLS::Weight_Info *OneEvent(Process_Base *const proc,const int mode=0);
 
     void AddPoint(const double xs);
 
@@ -234,6 +190,8 @@ namespace PHASIC {
     { m_maxtrials=maxtrials; }
     void SetEnhanceObservable(const std::string &enhanceobs);
     void SetEnhanceFunction(const std::string &enhancefunc);
+    void SetVariationWeights(SHERPA::Variation_Weights *vw)
+    { p_variationweights=vw; }
 
     inline Phase_Space_Integrator* Integrator() const 
     { return p_integrator; }

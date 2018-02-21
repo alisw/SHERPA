@@ -23,7 +23,7 @@ Inelastic_Event_Generator(Sigma_Inelastic * sigma,
   m_first(true), m_done(false), 
   m_Nladders_fix(MBpars("NLaddersFix")),
   m_kt2fac(MBpars("kt2_factor")), m_difffac(MBpars("diff_factor")),
-  m_test(test), m_output(0), m_analyse(false), p_ladder(NULL)
+  m_test(test), m_output(1), m_analyse(false), p_ladder(NULL)
 { 
   //msg_Out()<<METHOD<<" for "<<m_Nladders_fix<<" vs "
   //	   <<MBpars("NLaddersFix")<<".\n";
@@ -52,7 +52,7 @@ Inelastic_Event_Generator::~Inelastic_Event_Generator()
   if (m_output) {
     if (m_analyse) {
       msg_Info()
-	<<"Mean number of number of ladders: "
+	<<"Mean number of ladders: "
 	<<"naive = "<<m_histograms[string("N_ladder_naive")]->Average()<<", "
 	<<"start = "<<m_histograms[string("N_ladder_start")]->Average()<<", "
 	<<"prim = "<<m_histograms[string("N_ladder_prim")]->Average()<<", "
@@ -153,8 +153,8 @@ InitInelasticEvent(const bool & isUE,const bool & weighted) {
     int trials(0);
     if (m_analyse) m_histograms[string("B_naive")]->Insert(m_B);
     do {
-      if (m_Nladders_fix<=0) 
-	m_Nladders = ran->Poissonian((*p_eikonal)(m_B));//+(m_isUE?0:1);
+      if (m_Nladders_fix<=0)
+	m_Nladders = ran->Poissonian((*p_eikonal)(m_B))+(m_isUE?-1:0);
       else m_Nladders = m_Nladders_fix;
       msg_Debugging()<<"   check this: "<<m_B<<" --> "<<m_Nladders<<".\n";
       if (m_analyse) m_histograms[string("N_ladder_naive")]->Insert(m_Nladders);
@@ -303,7 +303,11 @@ CreateBlob(Blob_List * blobs,const double & xsec) {
   blob->SetPosition(pos);
   Blob_Data_Base *winfo((*blob)["Weight"]);
   if (!winfo) blob->AddData("Weight",new ATOOLS::Blob_Data<double>(1.));
-  
+  Blob_Data_Base *wninfo((*blob)["Weight_Norm"]);
+  if (!wninfo) blob->AddData("Weight_Norm",new ATOOLS::Blob_Data<double>(1.));
+  Blob_Data_Base *tinfo((*blob)["Trials"]);
+  if (!tinfo) blob->AddData("Trials",new ATOOLS::Blob_Data<double>(1.));
+
   Particle * part;
   for (LadderMap::iterator liter=p_ladder->GetEmissionsBegin();
        liter!=p_ladder->GetEmissionsEnd();liter++) {
@@ -338,7 +342,7 @@ CreateBlob(Blob_List * blobs,const double & xsec) {
 
 
 double Inelastic_Event_Generator::Smin() const {
-  double smin(m_luminosity.Smin()/4.*m_Nladders);
+  double smin(m_luminosity.Smin()*m_Nladders);
   if (!p_ladder) return smin;
   //   smin *= m_kt2fac;
   if (p_ladder->IsHardDiffractive() && p_ladder->Size()==2) smin *= m_difffac;

@@ -498,6 +498,7 @@ bool Decay_Handler_Base::AttachExtraQED(Blob* blob, size_t mode)
 {
   DEBUG_FUNC("qedmode="<<m_qedmode
              <<", shower="<<blob->Has(blob_status::needs_showers)
+             <<", qed="<<blob->Has(blob_status::needs_extraQED)
              <<", mode="<<mode
              <<", process="<<blob->ShortProcessName());
   if (!blob->Has(blob_status::needs_extraQED)) return false;

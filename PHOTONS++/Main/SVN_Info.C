@@ -1,3 +1,3 @@
 #include "ATOOLS/Org/SVN_Info.H"
 static ATOOLS::SVN_Info initializer
-("PHOTONS++/Main","branches/rel-2-1-1","24084","f6cf49f8003eb659a11b2faa17f1751f");
+("PHOTONS++/Main","branches/rel-2-2-4","30888","8db987c80250e65e281da18c9cd18829");

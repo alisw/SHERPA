@@ -21,7 +21,9 @@ namespace SHERPA {
   class Sherpa: public ATOOLS::Terminator_Object {
   private:
     std::string   m_path;
-    long int      m_trials, m_debugstep, m_debuginterval;
+    long int      m_trials, m_debugstep, m_debuginterval, m_displayinterval;
+    long int      m_evt_output, m_evt_output_start;
+    double        m_evt_starttime;
 
     Initialization_Handler * p_inithandler;
     Event_Handler          * p_eventhandler;
@@ -53,7 +55,7 @@ namespace SHERPA {
 
     const ATOOLS::Blob_List &GetBlobList() const;
 
-    double GetMEWeight(const ATOOLS::Cluster_Amplitude &ampl) const;
+    double GetMEWeight(const ATOOLS::Cluster_Amplitude &ampl,const int mode=0) const;
     
     inline Initialization_Handler * GetInitHandler() const 
     { return p_inithandler; }

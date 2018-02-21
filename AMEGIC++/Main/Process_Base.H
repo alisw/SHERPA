@@ -3,6 +3,7 @@
 
 #include "AMEGIC++/Main/Polarisation.H"
 #include "AMEGIC++/Main/Amegic_Base.H"
+#include "AMEGIC++/Amplitude/Vertex.H"
 #include "PHASIC++/Process/Single_Process.H"
 
 namespace MODEL { class Model_Base; }
@@ -48,7 +49,8 @@ namespace AMEGIC {
 
     // member functions
     void Init();
-    virtual int  InitAmplitude(MODEL::Model_Base *,Topology *,
+    virtual std::string CreateLibName();
+    virtual int  InitAmplitude(Amegic_Model *,Topology *,
 			       std::vector<Process_Base *> &,
 			       std::vector<Process_Base *> &) = 0;
 
@@ -90,6 +92,7 @@ namespace AMEGIC {
     ATOOLS::Flavour ReMap(const ATOOLS::Flavour &fl,const size_t &id) const;
     inline static void SetGauge(const int gauge) { s_gauge=gauge; }
     inline void SetSubevtList(ATOOLS::NLO_subevtlist *subs) { p_subevtlist=subs; }
+    ATOOLS::NLO_subevtlist *GetRSSubevtList() { return p_subevtlist; }
 
     virtual Process_Base *GetReal();
 
@@ -102,7 +105,6 @@ namespace AMEGIC {
     bool           FlavCompare(PHASIC::Process_Base *const proc);
     void           InitFlavmap(const Process_Base * proc);
     void           AddtoFlavmap(const std::string&,const ATOOLS::Flavour&);
-    ATOOLS::NLO_subevtlist *GetRSSubevtList() { return p_subevtlist; }
 
   };
 

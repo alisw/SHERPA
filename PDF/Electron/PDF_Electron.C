@@ -20,6 +20,7 @@ PDF_Electron::PDF_Electron(const Flavour _bunch,const int _izetta,const int _ord
   m_q2min=0.25;
   m_q2max=1.e14;
 
+  m_set    = "PDFE";
   m_bunch  = _bunch;
   m_partons.insert(m_bunch);
   m_type   = std::string("PDF_")+std::string(m_bunch.IDName());
@@ -29,14 +30,21 @@ PDF_Electron::PDF_Electron(const Flavour _bunch,const int _izetta,const int _ord
   m_init=false;
 }
 
-double PDF_Electron::GetXPDF(const ATOOLS::Flavour  fl) {
+double PDF_Electron::GetXPDF(const ATOOLS::Flavour& fl)
+{
   if (fl==m_bunch) return m_xpdf;
+  return 0.;
+}
+
+double PDF_Electron::GetXPDF(const kf_code& kf, bool anti)
+{
+  if (kf==m_bunch.Kfcode() && anti==m_bunch.IsAnti()) return m_xpdf;
   return 0.;
 }
 
 PDF_Base * PDF_Electron::GetCopy() { return new PDF_Electron(m_bunch,m_order,m_izetta); }
 
-void PDF_Electron::CalculateSpec(double x,double Q2)
+void PDF_Electron::CalculateSpec(const double& x, const double& Q2)
 {
   if (!m_init) {
     m_alpha  = (*aqed)(sqr(rpa->gen.Ecms()));

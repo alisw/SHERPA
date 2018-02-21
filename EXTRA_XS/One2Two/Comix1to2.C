@@ -2,12 +2,15 @@
 
 #include "METOOLS/Explicit/Current.H"
 #include "METOOLS/Explicit/Vertex.H"
+#include "EXTRA_XS/Main/ME_Tools.H"
 #include "MODEL/Main/Model_Base.H"
-#include "MODEL/Interaction_Models/Single_Vertex.H"
+#include "MODEL/Main/Single_Vertex.H"
+#include "PHASIC++/Main/Color_Integrator.H"
 
 using namespace EXTRAXS;
 using namespace ATOOLS;
 using namespace METOOLS;
+using namespace PHASIC;
 using namespace std;
 
 Comix1to2::Comix1to2(const vector<Flavour>& flavs) :
@@ -31,7 +34,7 @@ Comix1to2::Comix1to2(const vector<Flavour>& flavs) :
   // final current (1,2)
   Current_Key ckey(flavs[0],MODEL::s_model,1);
   m_fcur = Current_Getter::GetObject("D"+ckey.Type(),ckey);
-  Int_Vector isfs(2), ids(2), pols(2);
+  METOOLS::Int_Vector isfs(2), ids(2), pols(2);
   isfs[0]=flavs[1].IsFermion();
   isfs[1]=flavs[2].IsFermion();
   pols[0]=m_spins[ids[0]=1];
@@ -40,7 +43,8 @@ Comix1to2::Comix1to2(const vector<Flavour>& flavs) :
   m_fcur->SetFId(isfs);
   m_fcur->FindPermutations();
   // connect (1) & (2) into (1,2)
-  m_v1=GetVertex(m_cur[1], m_cur[2], m_fcur);
+  m_v1=ConstructVertices(m_cur[1], m_cur[2], m_fcur);
+  DEBUG_VAR(m_v1.size());
   m_fcur->InitPols(pols);
   m_fcur->Print();
   m_fcur->HM().resize(m_n);
@@ -63,11 +67,28 @@ Comix1to2::Comix1to2(const vector<Flavour>& flavs) :
   m_antifcur->SetFId(isfs);
   m_antifcur->FindPermutations();
   // connect (1) & (2) into (1,2)
-  m_antiv1=GetVertex(m_anticur[1], m_anticur[2], m_antifcur);
+  m_antiv1=ConstructVertices(m_anticur[1], m_anticur[2], m_antifcur);
+  DEBUG_VAR(m_antiv1.size());
   m_antifcur->InitPols(pols);
   m_antifcur->Print();
   m_antifcur->HM().resize(m_n);
   for (size_t i(0);i<m_n;++i) m_antifcur->HM()[i]=i;
+
+  p_ci=new Color_Integrator();
+  Idx_Vector cids(3,0);
+  METOOLS::Int_Vector acts(3,0), types(3,0);
+  for (size_t i(0);i<flavs.size();++i) {
+    cids[i]=i;
+    acts[i]=flavs[i].Strong();
+    if (acts[i]) {
+      if (abs(flavs[i].StrongCharge())==8) types[i]=0;
+      else if (flavs[i].IsAnti()) types[i]=(i==0?1:-1);
+      else types[i]=(i==0?-1:1);
+    }
+  }
+  if (!p_ci->ConstructRepresentations(cids,types,acts)) {
+    THROW(fatal_error, "Internal error.");
+  }
 }
 
 
@@ -81,43 +102,18 @@ Comix1to2::~Comix1to2()
   delete m_antifcur;
 }
 
-Vertex* Comix1to2::GetVertex(Current* cur1, Current* cur2, Current* prop) {
-  Vertex* v1(NULL);
-  Vertex_Key vkey(cur1,cur2,NULL,prop,MODEL::s_model);
-  MODEL::VMIterator_Pair keyrange(MODEL::s_model->GetVertex(vkey.ID()));
-  if (keyrange.first!=keyrange.second && keyrange.first->second->on) {
-    vkey.p_mv=keyrange.first->second;//fixme!!
-    vkey.m_p=std::string(1,'D');
-    v1=new Vertex(vkey);
-  }
-  else {
-    vkey=Vertex_Key(cur2,cur1,NULL,prop,MODEL::s_model);
-    keyrange=MODEL::s_model->GetVertex(vkey.ID());
-    if (keyrange.first!=keyrange.second && keyrange.first->second->on) {
-      vkey.p_mv=MODEL::s_model->GetVertex(vkey.ID()).first->second;//fixme!!
-      vkey.m_p=std::string(1,'D');
-      v1=new Vertex(vkey);
-    }
-    else THROW(fatal_error, "vertex not found: "+vkey.ID());
-  }
-  v1->SetJA(vkey.p_a);
-  v1->SetJB(vkey.p_b);
-  v1->SetJC(prop);
-  return v1;
-}
-     
-
 void Comix1to2::Calculate(const ATOOLS::Vec4D_Vector& momenta, bool anti) {
+  p_ci->GeneratePoint();
   if (anti) {
     for (size_t i(0);i<m_anticur.size();++i) {
-      m_anticur[i]->ConstructJ(i==0?-momenta[i]:momenta[i],0,0,0);
+      m_anticur[i]->ConstructJ(i==0?-momenta[i]:momenta[i],0,p_ci->I()[i],p_ci->J()[i],0);
       m_anticur[i]->Print();
     }
     m_antifcur->Evaluate();
   }
   else {
     for (size_t i(0);i<m_cur.size();++i) {
-      m_cur[i]->ConstructJ(i==0?-momenta[i]:momenta[i],0,0,0);
+      m_cur[i]->ConstructJ(i==0?-momenta[i]:momenta[i],0,p_ci->I()[i],p_ci->J()[i],0);
       m_cur[i]->Print();
     }
     m_fcur->Evaluate();
@@ -130,6 +126,10 @@ void Comix1to2::Calculate(const ATOOLS::Vec4D_Vector& momenta, bool anti) {
   }
   else {
     m_fcur->Contract<double>(*m_cur.front(),fill,*this,0);
+  }
+
+  for (size_t i=0; i<size(); ++i) {
+    (*this)[i] *= sqrt(p_ci->GlobalWeight());
   }
 }
 

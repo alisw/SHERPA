@@ -23,7 +23,7 @@ void errmsg_() {
 
 CTEQ6_Fortran_Interface::CTEQ6_Fortran_Interface(const ATOOLS::Flavour _bunch,
 						 const std::string _set,const int _member):
-  m_set(_set), m_anti(1) 
+  m_anti(1)
 {
   m_member=_member;
   m_xmin=1.e-6;
@@ -31,6 +31,7 @@ CTEQ6_Fortran_Interface::CTEQ6_Fortran_Interface(const ATOOLS::Flavour _bunch,
   m_q2min=.5;
   m_q2max=1.e12;
 
+  m_set=_set;
   m_type=m_set;
   m_bunch = _bunch;
   if (m_bunch==Flavour(kf_p_plus).Bar()) m_anti=-1;
@@ -41,6 +42,7 @@ CTEQ6_Fortran_Interface::CTEQ6_Fortran_Interface(const ATOOLS::Flavour _bunch,
     iset = 400;
     m_asinfo.m_order=1;
     m_asinfo.m_asmz=0.118;
+    m_asinfo.m_flavs.resize(5);
     path+="CTEQ66Grid";
     m_lhef_number=10550+m_member;
   }
@@ -48,63 +50,74 @@ CTEQ6_Fortran_Interface::CTEQ6_Fortran_Interface(const ATOOLS::Flavour _bunch,
     iset = 460;
     m_asinfo.m_order=1;
     m_asinfo.m_asmz=0.125;
+    m_asinfo.m_flavs.resize(5);
     path+="CTEQ66Grid";
   }
   if (m_set==std::string("cteq6.6a2")) {
     iset = 461;
     m_asinfo.m_order=1;
     m_asinfo.m_asmz=0.122;
+    m_asinfo.m_flavs.resize(5);
     path+="CTEQ66Grid";
   }
   if (m_set==std::string("cteq6.6a3")) {
     iset = 462;
     m_asinfo.m_order=1;
     m_asinfo.m_asmz=0.114;
+    m_asinfo.m_flavs.resize(5);
     path+="CTEQ66Grid";
   }
   if (m_set==std::string("cteq6.6a4")) {
     iset = 463;
     m_asinfo.m_order=1;
     m_asinfo.m_asmz=0.112;
+    m_asinfo.m_flavs.resize(5);
     path+="CTEQ66Grid";
   }
   if (m_set==std::string("cteq6m")) {
     iset = 1;
     m_asinfo.m_order=1;
     m_asinfo.m_asmz=0.118;
+    m_asinfo.m_flavs.resize(5);
     path+="CTEQ6Grid";
   }
   if (m_set==std::string("cteq6d")) {
     iset = 2;
     m_asinfo.m_order=1;
     m_asinfo.m_asmz=0.118;
+    m_asinfo.m_flavs.resize(5);
     path+="CTEQ6Grid";
   }
   if (m_set==std::string("cteq6l")) {
     iset = 3;
     m_asinfo.m_order=1;
     m_asinfo.m_asmz=0.117981;
+    m_asinfo.m_flavs.resize(5);
     path+="CTEQ6Grid";
   }
   if (m_set==std::string("cteq6l1")) {
     iset = 4;
     m_asinfo.m_order=0;
     m_asinfo.m_asmz=0.129783;
+    m_asinfo.m_flavs.resize(5);
     path+="CTEQ6Grid";
   }
   if (iset==1 && m_member>0 && m_member<=40) {
     iset=100+m_member;
     m_asinfo.m_order=1;
     m_asinfo.m_asmz=0.118;
+    m_asinfo.m_flavs.resize(5);
     path+="CTEQ6Grid";
   }
   if (iset==400 && m_member>0 && m_member<=44) {
     iset+=m_member;
     m_asinfo.m_order=1;
     m_asinfo.m_asmz=0.118;
+    m_asinfo.m_flavs.resize(5);
     path+="CTEQ6Grid";
   }
-  
+  m_asinfo.m_mz2=sqr(91.1876);
+
   char buffer[1024];
   char * err = getcwd(buffer,1024);
   if (err==NULL) {
@@ -139,16 +152,16 @@ PDF_Base *CTEQ6_Fortran_Interface::GetCopy()
   return copy;
 }
 
-void CTEQ6_Fortran_Interface::CalculateSpec(double x,double _Q2) 
+void CTEQ6_Fortran_Interface::CalculateSpec(const double& x, const double& _Q2)
 {
   for (size_t i=0;i<11;++i) m_calculated[i]=false;
   m_x=x/m_rescale;
   m_Q=sqrt(_Q2);
 }
 
-double CTEQ6_Fortran_Interface::GetXPDF(const ATOOLS::Flavour infl) 
+double CTEQ6_Fortran_Interface::GetXPDF(const ATOOLS::Flavour& infl)
 {
-  if ((m_x>m_xmax && m_rescale<1.) || m_rescale<0.) return 0.;
+  if (m_x>m_xmax || m_rescale<0.) return 0.;
   int cteqindex;
   switch (infl.Kfcode()) {
   case kf_gluon: cteqindex=0;                  break;
@@ -163,6 +176,23 @@ double CTEQ6_Fortran_Interface::GetXPDF(const ATOOLS::Flavour infl)
   return m_rescale*m_f[5-cteqindex];     
 }
 
+double CTEQ6_Fortran_Interface::GetXPDF(const kf_code& kf, bool anti)
+{
+  if (m_x>m_xmax) return 0.;
+  int cteqindex;
+  switch (kf) {
+  case kf_gluon: cteqindex=0;                    break;
+  case kf_d:     cteqindex=m_anti*(anti?-2:2);   break;
+  case kf_u:     cteqindex=m_anti*(anti?-1:1);   break;
+  default:       cteqindex=m_anti*(anti?-kf:kf); break;
+  }
+  if (!m_calculated[5-cteqindex]) {
+    m_f[5-cteqindex]=ctq6pdf_(cteqindex,m_x,m_Q)*m_x;
+    m_calculated[5-cteqindex]=true;
+  }
+  return m_rescale*m_f[5-cteqindex];
+}
+
 void CTEQ6_Fortran_Interface::Error()
 {
   THROW(critical_error,"Cteq6Pdf called ERRORMSG ");
@@ -174,10 +204,7 @@ PDF_Base *CTEQ6_Getter::operator()
   (const Parameter_Type &args) const
 {
   if (!args.m_bunch.IsHadron()) return NULL;
-  int mode=args.p_read->GetValue<int>("PDF_SET_VERSION",0);
-  int ibeam=args.m_ibeam;
-  mode=args.p_read->GetValue<int>("PDF_SET_VERSION_"+ToString(ibeam+1),mode);
-  return new CTEQ6_Fortran_Interface(args.m_bunch,m_key,mode);
+  return new CTEQ6_Fortran_Interface(args.m_bunch,args.m_set,args.m_member);
 }
 
 void CTEQ6_Getter::PrintInfo

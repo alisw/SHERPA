@@ -61,7 +61,7 @@ void Cluster::Update()
     <<"Error in Cluster::Cluster("<<p_trip->m_flav<<","<<p_anti->m_flav<<"):\n"
     <<"   Cannot handle this colour structure, will abort the run.\n"
     <<"   Please contact the Sherpa group for further assistance.";
-  exit(0);
+  abort();
 }
 
 bool Cluster::CheckConsistency(std::ostream & s,std::string method) {
@@ -317,15 +317,16 @@ void Cluster::Delete() {
 
 bool Cluster::EnsureMomentum() {
   Vec4D check(Momentum());
+  double E(dabs(check[0]));
   for (Cluster_Iterator cit(m_clusters.begin());cit!=m_clusters.end();cit++)
     check -= (*cit)->Momentum();
-  if (dabs(check.Abs2())>1.e-10 || dabs(check[0])>1.e-10 || 
-      dabs(check.PSpat())>1.e-10) {
-    // msg_Out()<<"*** "<<METHOD<<" yields "<<check<<" ("<<check.Abs2()<<") "
-    // 	     <<"for cluster "<<Number()<<"\n"<<(*this)
-    // 	     <<"********************************************************\n";
+  if (dabs(check.Abs2()/(E*E))>1.e-6 || dabs(check[0]/E)>1.e-6 || 
+      dabs(check.PSpat()/E)>1.e-6) {
+    msg_Out()<<"      --> "<<METHOD<<": simple construction not ok:\n"
+	     <<"      --> "<<check<<" ("<<check.Abs2()<<").\n";//<<(*this);
     return false;
   }
+  //msg_Out()<<"      --> "<<METHOD<<": four momentum ok now.\n";
   return true;
 }
 

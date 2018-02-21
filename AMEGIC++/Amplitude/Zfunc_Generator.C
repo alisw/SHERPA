@@ -6,7 +6,6 @@
 #include "ATOOLS/Math/Vector.H"
 #include "ATOOLS/Org/Run_Parameter.H"
 #include "ATOOLS/Org/Message.H"
-#include "MODEL/Interaction_Models/Interaction_Model_Base.H"
 
 using namespace AMEGIC;
 using namespace ATOOLS;
@@ -27,7 +26,7 @@ void Zfunc_Generator::BuildZlist(Virtual_String_Generator* _sgen,Basic_Sfuncs* _
 {
   if (ngraph!=1) return;
   zcalc.clear();
-  ZFCalc_Key key(_sgen,_BS,MODEL::s_model->GetInteractionModel());
+  ZFCalc_Key key(_sgen,_BS,MODEL::s_model);
   ZFCalc_Getter::Getter_List zfclist(ZFCalc_Getter::GetGetters());
   for (ZFCalc_Getter::Getter_List::const_iterator 
 	 git(zfclist.begin());git!=zfclist.end();++git) {
@@ -47,14 +46,15 @@ void Zfunc_Generator::LorentzConvert(Point* p)
 {
   if (p==0) return;
   Lorentz_Function* l = p->Lorentz;
+  if (l==NULL) return;
 
   int partarg[4]={-1,-1,-1,-1};
   for (short int i=0;i<l->NofIndex();i++) {
     switch (l->ParticleArg(i)) {
     case 0: partarg[i] = p->number;break;
-    case 1: partarg[i] = p->left->number;break;
-    case 2: partarg[i] = p->right->number;break;
-    case 3: partarg[i] = p->middle->number;break;
+    case 1: partarg[i] = p->left?p->left->number:-1;break;
+    case 2: partarg[i] = p->right?p->right->number:-1;break;
+    case 3: partarg[i] = p->middle?p->middle->number:-1;break;
     }
   }
   l->SetParticleArg(partarg[0],partarg[1],partarg[2],partarg[3]);
@@ -65,9 +65,9 @@ void Zfunc_Generator::LorentzConvert(Point* p)
 
 void Zfunc_Generator::MarkCut(Point* p,int notcut,bool fromfermion,bool cutvectors)
 {
-  if (p==0) return; 
+  if (p==0 || p->Lorentz==NULL) return; 
 
-  if (p->fl.IsVector() && p->number>99){
+  if (cutvecprop && p->fl.IsVector() && p->number>99){
     p->m = 1;
     notcut++;
     if(fromfermion && p->left->fl.IsFermion()){
@@ -124,17 +124,17 @@ void Zfunc_Generator::Convert(Point* p)
     }
     if(!LFDetermine_Zfunc(Zh,p,pf,pb)){
       Point* ph1 = pb;
-      if (ph1->left->fl.Is5VDummy()) { 
+      if (ph1->left->fl.Kfcode()==kf_shgluon) { 
 	if (ph1->right->fl.IsScalar() || ph1->right->m==1 || !ph1->right->left) ph1=ph1->left;
 	else if (ph1->right->left->fl.IsFermion()) ph1=ph1->left;
       }
-      if (ph1->right->fl.Is5VDummy()) { 
+      if (ph1->right->fl.Kfcode()==kf_shgluon) { 
 	if (ph1->left->fl.IsScalar() || ph1->left->m==1 || !ph1->left->left) ph1=ph1->right;
 	else if (ph1->left->left->fl.IsFermion()) ph1=ph1->right;
       }
       Point* ph=ph1->right;
       if (!( ph->fl.IsFermion() || ph->fl.IsScalar() || 
-	     (ph->fl.IsVector() && ph->number<99) || ph->m==1 || ph->fl.Is5VDummy())
+	     (ph->fl.IsVector() && ph->number<99) || ph->m==1 || ph->fl.Kfcode()==kf_shgluon)
 	  &&ph->left)
 	if(!(ph->left->fl.IsFermion())||ph->middle){
 	  ph->m=1;
@@ -143,7 +143,7 @@ void Zfunc_Generator::Convert(Point* p)
 	}
       ph=ph1->left;
       if (!( ph->fl.IsFermion() || ph->fl.IsScalar() || 
-	     (ph->fl.IsVector() && ph->number<99) || ph->m==1 || ph->fl.Is5VDummy())
+	     (ph->fl.IsVector() && ph->number<99) || ph->m==1 || ph->fl.Kfcode()==kf_shgluon)
 	  &&ph->left)
 	if(!(ph->left->fl.IsFermion())||ph->middle){
 	  ph->m=1;
@@ -153,7 +153,7 @@ void Zfunc_Generator::Convert(Point* p)
       if(ph1->middle){
 	ph=ph1->middle;
 	if (!( ph->fl.IsFermion() || ph->fl.IsScalar() || 
-	       (ph->fl.IsVector() && ph->number<99) || ph->m==1 || ph->fl.Is5VDummy())
+	       (ph->fl.IsVector() && ph->number<99) || ph->m==1 || ph->fl.Kfcode()==kf_shgluon)
 	    &&ph->left)
 	  if(!(ph->left->fl.IsFermion())||ph->middle){
 	    ph->m=1;
@@ -223,7 +223,7 @@ void Zfunc_Generator::LFPrint(const vector<Lorentz_Function*> &lflist)
 
 std::string Zfunc_Generator::LFEff(const std::string &type)
 { 
-  return (type=="Pol") ? "Gamma" : type;
+  return (type=="Pol") ? "FFV" : type;
 }
 
 int Zfunc_Generator::LFDetermine_Zfunc(Zfunc* Zh,Point* p,Point* pf,Point* pb)
@@ -286,7 +286,7 @@ int Zfunc_Generator::LFDetermine_Zfunc(Zfunc* Zh,Point* p,Point* pf,Point* pb)
     }
   }
   if (Zh->m_type=="") {
-    for (size_t i(0);i<lflist.size();++i) delete lflist[i];
+    for (size_t i(0);i<lflist.size();++i) lflist[i]->Delete();
     return 0;
     msg_Error()<<METHOD<<"(): Invalid Lorentz function."<<endl;
     LFPrint(lflist);  
@@ -294,7 +294,7 @@ int Zfunc_Generator::LFDetermine_Zfunc(Zfunc* Zh,Point* p,Point* pf,Point* pb)
   }
 
   LFFill_Zfunc(Zh,lflist,p,pf,pb);
-  for (size_t i(0);i<lflist.size();++i) delete lflist[i];
+  for (size_t i(0);i<lflist.size();++i) lflist[i]->Delete();
   return 1;
 }
 
@@ -506,7 +506,7 @@ void Zfunc_Generator::SetPropDirection(int Nargs,int incoming,
   int start = -1;
   //works only for incoming vectors!!!!
   for (size_t i=0;i<lfpointer.size();i++) {
-    if (LFEff(lfpointer[i]->Type())=="Gamma") {
+    if (LFEff(lfpointer[i]->Type())=="FFV") {
       for (short int k=0;k<lfpointer[i]->NofIndex();k++) {
 	if (lfpointer[i]->ParticleArg(k)==incoming) {
 	  start = i;

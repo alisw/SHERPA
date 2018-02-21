@@ -1,181 +1,79 @@
 #include "METOOLS/Explicit/Lorentz_Calculator.H"
-
-#include "METOOLS/Explicit/Vertex.H"
 #include "METOOLS/Currents/C_Scalar.H"
+#include "METOOLS/Currents/C_Spinor.H"
 #include "METOOLS/Currents/C_Vector.H"
-#include "ATOOLS/Org/MyStrStream.H"
+#include "METOOLS/Explicit/Vertex.H"
+#include "MODEL/Main/Single_Vertex.H"
+#include "ATOOLS/Org/Message.H"
+#include "ATOOLS/Org/Exception.H"
 
 namespace METOOLS {
 
   template <typename SType>
-  class SSVV_Calculator: public Lorentz_Calculator {
+  class VVSS_Calculator: public Lorentz_Calculator {
   public:
-
-    typedef std::complex<SType> SComplex;
-
-    typedef CScalar<SType> CScalarType;
-    typedef std::vector<CScalarType*> CScalarType_Vector;
+    
     typedef CVec4<SType> CVec4Type;
-    typedef std::vector<CVec4Type*> CVec4Type_Vector;
+    typedef CScalar<SType> CScalarType;
 
-  private:
+    VVSS_Calculator(const Vertex_Key &key):
+      Lorentz_Calculator(key) {}
 
-    SComplex m_cpl;
+    std::string Label() const { return "VVSS"; }
 
-    int m_dir, m_n[3];
+    CObject *Evaluate(const CObject_Vector &jj)
+    {
+      if (p_v->V()->id.back()==0){
+	const CVec4Type &a(*jj[0]->Get<CVec4Type>());
+	const CScalarType &e(*jj[1]->Get<CScalarType>());
+	const CScalarType &b(*jj[2]->Get<CScalarType>());
+	CVec4Type *j(CVec4Type::New(a*(e[0]*b[0])));
+	j->SetS(a.S()|e.S()|b.S());
+	return j;
+      }
+      if (p_v->V()->id.back()==1){
+	const CVec4Type &a(*jj[2]->Get<CVec4Type>());
+	const CScalarType &e(*jj[0]->Get<CScalarType>());
+	const CScalarType &b(*jj[1]->Get<CScalarType>());
+	CVec4Type *j(CVec4Type::New(a*(e[0]*b[0])));
+	j->SetS(a.S()|e.S()|b.S());
+	return j;
+      }
+      if (p_v->V()->id.back()==2){
+	const CVec4Type &a(*jj[1]->Get<CVec4Type>());
+	const CVec4Type &e(*jj[2]->Get<CVec4Type>());
+	const CScalarType &b(*jj[0]->Get<CScalarType>());
+	CScalarType *j(CScalarType::New((a*e)*b[0]));
+	j->SetS(a.S()|e.S()|b.S());
+	return j;
+      }
+      if (p_v->V()->id.back()==3){
+	const CVec4Type &a(*jj[0]->Get<CVec4Type>());
+	const CVec4Type &e(*jj[1]->Get<CVec4Type>());
+	const CScalarType &b(*jj[2]->Get<CScalarType>());
+	CScalarType *j(CScalarType::New((a*e)*b[0]));
+	j->SetS(a.S()|e.S()|b.S());
+	return j;
+      }
+      return NULL;
+    }
 
-  public:
-    
-    SSVV_Calculator(const Vertex_Key &key);
-    
-    std::string Label() const;
+  };// end of class VVSS_Calculator
 
-    void Evaluate();
-
-  };// end of class SSVV_Calculator
+  template class VVSS_Calculator<double>;
 
 }// end of namespace METOOLS
 
-#include "MODEL/Interaction_Models/Single_Vertex.H"
-#include "ATOOLS/Org/Exception.H"
-#include "ATOOLS/Org/Message.H"
-
 using namespace METOOLS;
-using namespace ATOOLS;
 
-template <typename SType>
-SSVV_Calculator<SType>::SSVV_Calculator(const Vertex_Key &key): 
-  Lorentz_Calculator(key) 
-{
-  for (size_t i(0);i<3;++i) m_n[i]=-1;
-  if (key.p_c->Flav().IntSpin()==0) {
-    m_dir=0;
-    for (size_t i(0);i<3;++i)
-      if (key.J(i)->Flav().IntSpin()==0) {
-	if (m_n[0]>=0) THROW(fatal_error,"Invalid flavours");
-	m_n[0]=i;
-      }
-      else {
-	if (m_n[1]<0) {
-	  m_n[1]=i;
-	}
-	else {
-	  if (m_n[2]>=0) THROW(fatal_error,"Invalid flavours");
-	  m_n[2]=i;
-	}
-      }
-  }
-  else {
-    m_dir=1;
-    for (size_t i(0);i<3;++i) {
-      DEBUG_VAR(i<<" "<<*key.J(i));
-      if (key.J(i)->Flav().IntSpin()>0) {
-	if (m_n[2]>=0) THROW(fatal_error,"Invalid flavours");
-	m_n[2]=i;
-      }
-      else {
-	if (m_n[0]<0) {
-	  m_n[0]=i;
-	}
-	else {
-	  if (m_n[1]>=0) THROW(fatal_error,"Invalid flavours");
-	  m_n[1]=i;
-	}
-      }}
-  }
-  m_cpl=SComplex(p_v->Coupling(0)*p_cc->Coupling());
-}
-
-template <typename SType>
-std::string SSVV_Calculator<SType>::Label() const
-{
-  return "SSVV["+ToString(m_cpl)+"]";
-}
-
-template <typename SType>
-void SSVV_Calculator<SType>::Evaluate()
-{
-  p_v->SetZero();
-  if (p_v->JA()->Zero()||p_v->JB()->Zero()||p_v->JE()->Zero()) return;
-#ifdef DEBUG__BG
-  msg_Debugging()<<*p_v->J(m_n[0])<<"(+)"<<*p_v->J(m_n[1])
-		 <<"(+)"<<*p_v->J(m_n[2])<<" SSVV("<<m_dir<<")\n";
-  msg_Indent();
-#endif
-  size_t i(0);
-  typename CObject_Matrix::const_iterator jit[3];
-  const CObject_Matrix &cca(p_v->JA()->J()),
-    &ccb(p_v->JB()->J()), &cce(p_v->JE()->J());
-  for (jit[0]=cca.begin();jit[0]!=cca.end();++jit[0]) {
-    for (jit[1]=ccb.begin();jit[1]!=ccb.end();++jit[1]) {
-      for (jit[2]=cce.begin();jit[2]!=cce.end();++jit[2],++i) {
-  if (m_dir==0) {
-    const CVec4Type_Vector *ca(jit[m_n[1]]->template Get<CVec4Type>());
-    const CVec4Type_Vector *cb(jit[m_n[2]]->template Get<CVec4Type>());
-    const CScalarType_Vector *ce(jit[m_n[0]]->template Get<CScalarType>());
-    for (typename CVec4Type_Vector::const_iterator 
-	   ait(ca->begin());ait!=ca->end();++ait)
-      for (typename CVec4Type_Vector::const_iterator 
-	     bit(cb->begin());bit!=cb->end();++bit)
-	for (typename CScalarType_Vector::const_iterator 
-	       eit(ce->begin());eit!=ce->end();++eit)
-	  if (p_cc->Evaluate(*ait,*bit,*eit)) {
-#ifdef DEBUG__BG
-	    msg_Debugging()<<"  a "<<**ait<<"\n";
-	    msg_Debugging()<<"  b "<<**bit<<"\n";
-	    msg_Debugging()<<"  e "<<**eit<<"\n";
-#endif
-	    CScalarType *j(CScalarType::New((**ait***bit)***eit));
-	    *j*=SComplex(m_cpl);
-	    j->SetH(p_v->H(i));
-	    j->SetS((*ait)->S()|(*bit)->S()|(*eit)->S());
-	    p_cc->AddJ(j);
-	    p_v->SetZero(false);
-	  }
-  }
-  else {
-    const CScalarType_Vector *ca(jit[m_n[0]]->template Get<CScalarType>());
-    const CScalarType_Vector *cb(jit[m_n[1]]->template Get<CScalarType>());
-    const CVec4Type_Vector *ce(jit[m_n[2]]->template Get<CVec4Type>());
-    for (typename CScalarType_Vector::const_iterator 
-	   ait(ca->begin());ait!=ca->end();++ait)
-      for (typename CScalarType_Vector::const_iterator 
-	     bit(cb->begin());bit!=cb->end();++bit)
-	for (typename CVec4Type_Vector::const_iterator 
-	       eit(ce->begin());eit!=ce->end();++eit)
-	  if (p_cc->Evaluate(*ait,*bit,*eit)) {
-#ifdef DEBUG__BG
-	    msg_Debugging()<<"  a "<<**ait<<"\n";
-	    msg_Debugging()<<"  b "<<**bit<<"\n";
-	    msg_Debugging()<<"  e "<<**eit<<"\n";
-#endif
-	    CVec4Type *j(CVec4Type::New((**ait***bit)***eit));
-	    *j*=SComplex(m_cpl);
-	    j->SetH(p_v->H(i));
-	    j->SetS((*ait)->S()|(*bit)->S()|(*eit)->S());
-	    p_cc->AddJ(j);
-	    p_v->SetZero(false);
-	  }
-  }
-      }
-    }
-  }
-}
-
-namespace METOOLS {
-
-  template class SSVV_Calculator<double>;
-
-}
-
-DECLARE_GETTER(SSVV_Calculator<double>,"DVVSS",
+DECLARE_GETTER(VVSS_Calculator<double>,"DVVSS",
 	       Lorentz_Calculator,Vertex_Key);
 Lorentz_Calculator *ATOOLS::Getter
-<Lorentz_Calculator,Vertex_Key,SSVV_Calculator<double> >::
+<Lorentz_Calculator,Vertex_Key,VVSS_Calculator<double> >::
 operator()(const Vertex_Key &key) const
-{ return new SSVV_Calculator<double>(key); }
+{ return new VVSS_Calculator<double>(key); }
 
 void ATOOLS::Getter<Lorentz_Calculator,Vertex_Key,
-		    SSVV_Calculator<double> >::
+		    VVSS_Calculator<double> >::
 PrintInfo(std::ostream &str,const size_t width) const
-{ str<<"SSVV vertex"; }
+{ str<<"VVSS vertex"; }

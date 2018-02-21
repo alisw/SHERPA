@@ -1,7 +1,6 @@
 (run){
   % general setting
   EVENTS 1M; ERROR 0.99;
-  MASSIVE_PS 4 5;
 
   % scales, tags for scale variations
   FSF:=1.; RSF:=1.; QSF:=1.;
@@ -29,7 +28,7 @@
 
 (processes){
   Process 93 93 -> 90 91 93{NJET};
-  Order_EW 2; CKKW sqr(QCUT/E_CMS);
+  Order (*,2); CKKW sqr(QCUT/E_CMS);
   NLO_QCD_Mode MC@NLO {LJET};
   ME_Generator Amegic {LJET};
   RS_ME_Generator Comix {LJET};
@@ -44,8 +43,8 @@
 }(processes)
 
 (selector){
-  Mass 11 -12 5. E_CMS
-  Mass 13 -14 5. E_CMS
-  Mass -11 12 5. E_CMS
-  Mass -13 14 5. E_CMS
+  Mass 11 -12 1. E_CMS
+  Mass 13 -14 1. E_CMS
+  Mass -11 12 1. E_CMS
+  Mass -13 14 1. E_CMS
 }(selector)

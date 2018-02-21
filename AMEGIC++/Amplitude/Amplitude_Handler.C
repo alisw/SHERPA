@@ -8,11 +8,11 @@
 #include "AMEGIC++/Amplitude/Color_Group.H"
 #include <iostream>
 #include <stdio.h>
+#include "ATOOLS/Org/Data_Reader.H"
 #include "ATOOLS/Org/MyStrStream.H"
 #include "AMEGIC++/Main/Process_Tags.H"
 #include "ATOOLS/Org/IO_Handler.H"
 #include "METOOLS/Main/Spin_Structure.H"
-#include "MODEL/Interaction_Models/Interaction_Model_Base.H"
 
 using namespace AMEGIC;
 using namespace ATOOLS;
@@ -20,13 +20,21 @@ using namespace MODEL;
 using namespace std;
 
 Amplitude_Handler::Amplitude_Handler(int N,Flavour* fl,int* b,Process_Tags* pinfo,
-				     Model_Base * model,Topology* top,
-				     int & _orderQCD,int & _orderEW,int & _ntchan,
+				     Amegic_Model * model,Topology* top,
+				     std::vector<double> & _maxcpl,
+				     std::vector<double> & _mincpl,
+				     size_t & _ntchanmin,size_t & _ntchanmax,
 				     MODEL::Coupling_Map *const cpls,
 				     Basic_Sfuncs* BS,String_Handler* _shand, 
-				     std::string print_graph,bool create_4V) 
-  : shand(_shand),CFCol_Matrix(0),Mi(0), m_print_graph(print_graph)
+				     std::string print_graph,bool create_4V,
+				     bool cutvecprop)
+  : m_cutvecprop(cutvecprop), shand(_shand), CFCol_Matrix(0), Mi(0),
+    m_print_graph(print_graph)
 {
+  m_maxcpl=_maxcpl;
+  m_mincpl=_mincpl;
+  for (size_t i(0);i<m_mincpl.size();++i) m_mincpl[i]*=2;
+  for (size_t i(0);i<m_maxcpl.size();++i) m_maxcpl[i]*=2;
   groupname = "Amplitude_Handler";
   int ndecays=pinfo->Ndecays();
   int nm = pinfo->Nmax(0);
@@ -42,17 +50,10 @@ Amplitude_Handler::Amplitude_Handler(int N,Flavour* fl,int* b,Process_Tags* pinf
   Flavour *sfl;
   if (ndecays>0) {
     sfl = new Flavour[pinfo->Nmax(nin)];
-    sfl[0] = fl[0];
-    sfl[1] = fl[1];
-    pinfo->GetFlavList(sfl+nin);
   }
   else sfl=fl;
 
-  //core process
-  gen = new Amplitude_Generator(nin+pinfo->Nout(),sfl,b,model,top,_orderQCD,_orderEW,_ntchan,BS,shand,create_4V);
-  subgraphlist[0] = gen->Matching();
-  gen->GetOrders(_orderEW,_orderQCD);
-  delete gen;
+  std::vector<int> order;
 
   //decay processes
   for (int i=1;i<=ndecays;i++) {
@@ -61,18 +62,38 @@ Amplitude_Handler::Amplitude_Handler(int N,Flavour* fl,int* b,Process_Tags* pinf
 //     pi->Print();cout<<endl;
     sfl[0] = *(pi->p_fl);
     pi->GetFlavList(sfl+1);
-    gen = new Amplitude_Generator(1+pi->Nout(),sfl,b_dec,model,top,99,99,-99,BS,shand);
+    gen = new Amplitude_Generator(1+pi->Nout(),sfl,b_dec,model,top,
+                                  std::vector<double>(2,99),0,99,BS,shand);
     subgraphlist[i] = gen->Matching();
     if (subgraphlist[i]==NULL) {
       ndecays = 0;
       subgraphlist[0] = NULL;
     }
-    int ew,qcd;
-    gen->GetOrders(ew,qcd);
-    _orderEW  += ew;
-    _orderQCD += qcd;
+    std::vector<double> corder=gen->Order();
+    if (corder.size()>order.size()) order.resize(corder.size(),0);
+    for (size_t i(0);i<corder.size();++i) order[i]+=corder[i];
     delete gen;
   }
+  if (order.size()>_maxcpl.size()) _maxcpl.resize(order.size(),99);
+  for (size_t i(0);i<order.size();++i) _maxcpl[i]-=order[i];
+
+  if (ndecays>0) {
+    sfl[0] = fl[0];
+    sfl[1] = fl[1];
+    pinfo->GetFlavList(sfl+nin);
+  }
+
+  //core process
+  gen = new Amplitude_Generator(nin+pinfo->Nout(),sfl,b,model,top,
+                                _maxcpl,_ntchanmin,_ntchanmax,BS,
+                                shand,create_4V);
+  subgraphlist[0] = gen->Matching();
+  _maxcpl=gen->Order();
+  delete gen;
+
+  if (order.size()>_maxcpl.size()) _maxcpl.resize(order.size(),0);
+  for (size_t i(0);i<order.size();++i) _maxcpl[i]+=order[i];
+  _mincpl=_maxcpl;
 
   if (msg_LevelIsTracking()) {
     msg_Out()<<"Amplitude_Handler::Amplitude_Handler:"<<endl;
@@ -113,10 +134,7 @@ Amplitude_Handler::Amplitude_Handler(int N,Flavour* fl,int* b,Process_Tags* pinf
       ++ntotal;
       prev = n;
       n->GetPointlist()->GeneratePropID();
-      //
-      n->SetOrderQCD();
-      n->SetOrderQED();
-      //
+      n->SetOrder();
       n = n->Next;
     }
   }
@@ -176,7 +194,7 @@ void Amplitude_Handler::CompleteAmplitudes(int N,Flavour* fl,int* b,Polarisation
   ngraph = 0;
   while (n) { 
     ++ngraph;
-    n->Zprojecting(fl,ngraph,true);
+    n->Zprojecting(fl,ngraph,true,m_cutvecprop);
     //n->FillCoupling(shand); 
 
     if (n->on) {
@@ -205,9 +223,9 @@ void Amplitude_Handler::CompleteAmplitudes(int N,Flavour* fl,int* b,Polarisation
   //Colors
   if (emit!=spect && emit!=127) {
     char cemit=emit,cspect=spect;
-    if (fl[(int)emit].IsGluon() || fl[(int)emit].IsGluino()) cemit+='A';
+    if (fl[(int)emit].IsGluon() || IsGluino(fl[(int)emit])) cemit+='A';
     else cemit+='i';
-    if (fl[(int)spect].IsGluon()|| fl[(int)spect].IsGluino()) cspect+='A';
+    if (fl[(int)spect].IsGluon()|| IsGluino(fl[(int)spect])) cspect+='A';
     else cspect+='i';
     CFCol_Matrix   = new CFColor(N,firstgraph,fl,cemit,cspect,pID);
   }
@@ -217,9 +235,9 @@ void Amplitude_Handler::CompleteAmplitudes(int N,Flavour* fl,int* b,Polarisation
       for (int i=0;i<N-1;i++) if (fl[i].Strong()) {
 	for (int j=i+1;j<N;j++) if (fl[j].Strong()) {
 	  char cemit=i,cspect=j;
-	  if (fl[i].IsGluon() || fl[i].IsGluino()) cemit+='A';
+	  if (fl[i].IsGluon() || IsGluino(fl[i])) cemit+='A';
 	  else cemit+='i';
-	  if (fl[j].IsGluon() || fl[j].IsGluino()) cspect+='A';
+	  if (fl[j].IsGluon() || IsGluino(fl[j])) cspect+='A';
 	  else cspect+='i';
 	  string sij=pID+string("_S")+ToString(i)+string("_")+ToString(j);
 	  //msg_Out()<<METHOD<<" new CFColor("<<sij<<")."<<std::endl;
@@ -292,10 +310,28 @@ void Amplitude_Handler::StoreAmplitudeConfiguration(std::string path)
   ioh.SetFileName(name);
   ioh.Output("",int(graphs.size()));
   My_Out_File cplfile(path+"/Couplings.dat");
+  My_Out_File sqrcplfile(path+"/SquaredCouplings.dat");
   cplfile.Open();
+  sqrcplfile.Open();
+  m_on.resize(graphs.size());
+  m_aon.resize(graphs.size(),0);
+  m_cplmatrix.resize(graphs.size());
   for (size_t i=0;i<graphs.size();i++) {
-    *cplfile<<i<<" "<<graphs[i]->GetOrderQCD()
-           <<" "<<graphs[i]->GetOrderQED()<<"\n";
+    m_on[i].resize(graphs.size(),1);
+    m_cplmatrix[i].resize(graphs.size(),graphs[i]->GetOrder());
+    for (size_t j=0;j<graphs.size();j++) {
+      if (m_cplmatrix[i][j].size()<graphs[j]->GetOrder().size())
+	m_cplmatrix[i][j].resize(graphs[j]->GetOrder().size(),0);
+      for (size_t k=0;k<graphs[j]->GetOrder().size();++k)
+	m_cplmatrix[i][j][k]+=graphs[j]->GetOrder()[k];
+      *sqrcplfile<<i<<" "<<j<<" "<<m_cplmatrix[i][j]<<"\n";
+      for (size_t k=0;k<Min(m_cplmatrix[i][j].size(),m_maxcpl.size());++k)
+	if (m_cplmatrix[i][j][k]>m_maxcpl[k]) m_on[i][j]=0;
+      for (size_t k=0;k<Min(m_cplmatrix[i][j].size(),m_mincpl.size());++k)
+	if (m_cplmatrix[i][j][k]<m_mincpl[k]) m_on[i][j]=0;
+      if (m_on[i][j]) m_aon[i]=1;
+    }
+    *cplfile<<i<<" "<<graphs[i]->GetOrder()<<"\n";
     int size=graphs[i]->Size();
     int *nums= new int[size];
     for (int j=0;j<size;j++) nums[j]=(*graphs[i])[j]->GetNumber();
@@ -308,7 +344,9 @@ void Amplitude_Handler::RestoreAmplitudes(std::string path)
 {
   std::string name = rpa->gen.Variable("SHERPA_CPP_PATH")+"/Process/Amegic/"+path+"/Cluster.dat";
   My_In_File cplfile(rpa->gen.Variable("SHERPA_CPP_PATH")+"/Process/Amegic/"+path+"/Couplings.dat");
+  My_In_File sqrcplfile(rpa->gen.Variable("SHERPA_CPP_PATH")+"/Process/Amegic/"+path+"/SquaredCouplings.dat");
   if (!cplfile.Open()) THROW(fatal_error,"Missing coupling data");
+  if (!sqrcplfile.Open()) THROW(fatal_error,"Missing squared coupling data");
   IO_Handler ioh;
   ioh.SetFileNameRO(name);
   size_t cg = ioh.Input<int>("");
@@ -319,16 +357,37 @@ void Amplitude_Handler::RestoreAmplitudes(std::string path)
   }
   int cnt=0;
   Amplitude_Base* ab;
+  m_on.resize(graphs.size());
+  m_aon.resize(graphs.size(),0);
+  m_cplmatrix.resize(graphs.size());
   for (size_t i=0;i<graphs.size();i++) {
-    int *nums, ci, oqcd, oqed;
-    *cplfile>>ci>>oqcd>>oqed;
+    int *nums, ci, cj;
+    std::string ords;
+    m_on[i].resize(graphs.size(),1);
+    m_cplmatrix[i].resize(graphs.size());
+    for (size_t j=0;j<graphs.size();j++) {
+      *sqrcplfile>>ci>>cj>>ords;
+      if (ci!=i || cj!=j) THROW(fatal_error,"Invalid coupling data");
+      Data_Reader read(",",";",")","(");
+      read.SetString(ords);
+      read.VectorFromString(m_cplmatrix[i][j],"");
+      for (size_t k=0;k<Min(m_cplmatrix[i][j].size(),m_maxcpl.size());++k)
+	if (m_cplmatrix[i][j][k]>m_maxcpl[k]) m_on[i][j]=0;
+      for (size_t k=0;k<Min(m_cplmatrix[i][j].size(),m_mincpl.size());++k)
+	if (m_cplmatrix[i][j][k]<m_mincpl[k]) m_on[i][j]=0;
+      if (m_on[i][j]) m_aon[i]=1;
+    }
+    *cplfile>>ci>>ords;
+    Data_Reader read(",",";",")","(");
+    read.SetString(ords);
+    std::vector<int> ord;
+    read.VectorFromString(ord,"");
     if (ci!=(int)i) THROW(fatal_error,"Invalid coupling data");
     nums=ioh.ArrayInput<int>("");
     int size=ioh.Nx();
     for (int j=0;j<size;j++) {
       ab=new Single_Amplitude_Base(shand,nums[j]);
-      ab->SetOrderQCD(oqcd);
-      ab->SetOrderQED(oqed);
+      ab->DefineOrder(ord);
       graphs[i]->Add(ab);
       
       m_ramplist.push_back(ab);
@@ -359,9 +418,9 @@ void Amplitude_Handler::CompleteLibAmplitudes(int N,std::string pID,std::string 
   //Colors
   if (emit!=spect && emit!=127) {
     char cemit=emit,cspect=spect;
-    if (fl[(int)emit].IsGluon() || fl[(int)emit].IsGluino()) cemit+='A';
+    if (fl[(int)emit].IsGluon() || IsGluino(fl[(int)emit])) cemit+='A';
     else cemit+='i';
-    if (fl[(int)spect].IsGluon() || fl[(int)spect].IsGluino()) cspect+='A';
+    if (fl[(int)spect].IsGluon() || IsGluino(fl[(int)spect])) cspect+='A';
     else cspect+='i';
     CFCol_Matrix   = new CFColor(N,firstgraph,fl,cemit,cspect,pID,true);
   }
@@ -371,9 +430,9 @@ void Amplitude_Handler::CompleteLibAmplitudes(int N,std::string pID,std::string 
       for (int i=0;i<N-1;i++) if (fl[i].Strong()) {
 	for (int j=i+1;j<N;j++) if (fl[j].Strong()) {
 	  char cemit=i,cspect=j;
-	  if (fl[i].IsGluon() || fl[i].IsGluino()) cemit+='A';
+	  if (fl[i].IsGluon() || IsGluino(fl[i])) cemit+='A';
 	  else cemit+='i';
-	  if (fl[j].IsGluon() || fl[j].IsGluino()) cspect+='A';
+	  if (fl[j].IsGluon() || IsGluino(fl[j])) cspect+='A';
 	  else cspect+='i';
 	  string sij=pID+string("_S")+ToString(i)+string("_")+ToString(j);
 	  
@@ -767,22 +826,22 @@ Complex Amplitude_Handler::Zvalue(int ihel)
   msg_Debugging()<<METHOD<<"(): {\n";
 #endif
   for (size_t i=0;i<graphs.size();i++) {
+    if (m_aon.size() && !m_aon[i]) continue;
     double cplfac(1.0);
-    int oqcd(graphs[i]->GetOrderQCD());
-    int oqed(graphs[i]->GetOrderQED());
-    if (p_aqcd && oqcd) {
+    const std::vector<int> &order(graphs[i]->GetOrder());
+    if (p_aqcd && order.size()>0 && order[0]) {
 #ifdef DEBUG__BG
-      msg_Debugging()<<"  qcd: "<<sqrt(p_aqcd->Factor())<<" ^ "<<oqcd
-		     <<" = "<<pow(p_aqcd->Factor(),oqcd/2.0)<<"\n";
+      msg_Debugging()<<"  qcd: "<<sqrt(p_aqcd->Factor())<<" ^ "<<order[0]
+		     <<" = "<<pow(p_aqcd->Factor(),order[0]/2.0)<<"\n";
 #endif     
-      cplfac *= pow(p_aqcd->Factor(),oqcd/2.0);
+      cplfac *= pow(p_aqcd->Factor(),order[0]/2.0);
     }  
-    if (p_aqed && oqed) {
+    if (p_aqed && order.size()>1 && order[1]) {
 #ifdef DEBUG__BG
-      msg_Debugging()<<"  qed: "<<sqrt(p_aqed->Factor())<<" ^ "<<oqed
-		     <<" = "<<pow(p_aqed->Factor(),oqed/2.0)<<"\n";
+      msg_Debugging()<<"  qed: "<<sqrt(p_aqed->Factor())<<" ^ "<<order[1]
+		     <<" = "<<pow(p_aqed->Factor(),order[1]/2.0)<<"\n";
 #endif   
-      cplfac *= pow(p_aqed->Factor(),oqed/2.0); 
+      cplfac *= pow(p_aqed->Factor(),order[1]/2.0); 
     }
 #ifdef DEBUG__BG
     msg_Debugging()<<"  graph "<<i<<" -> "<<cplfac<<"\n";
@@ -792,6 +851,7 @@ Complex Amplitude_Handler::Zvalue(int ihel)
   Complex M(0.,0.);
   for (size_t i=0;i<graphs.size();i++) {
     for (size_t j=0;j<graphs.size();j++) {
+      if (m_on.empty() || m_on[i][j]) 
       M+= Mi[i]*conj(Mi[j])*CFCol_Matrix->Mij(i,j);  //colfactors[i][j];
     }
   }
@@ -818,13 +878,12 @@ Complex Amplitude_Handler::Zvalue(int ihel,int ci,int cj)
   
   for (size_t i=0;i<graphs.size();i++) {
     double cplfac(1.0);
-    int oqcd(graphs[i]->GetOrderQCD());
-    int oqed(graphs[i]->GetOrderQED());
-    if (p_aqcd && oqcd) {
-      cplfac *= pow(p_aqcd->Factor(),oqcd/2.0);
+    const std::vector<int> &order(graphs[i]->GetOrder());
+    if (p_aqcd && order.size()>0 && order[0]) {
+      cplfac *= pow(p_aqcd->Factor(),order[0]/2.0);
     }
-    if (p_aqed && oqed) {
-      cplfac *= pow(p_aqed->Factor(),oqed/2.0);
+    if (p_aqed && order.size()>1 && order[1]) {
+      cplfac *= pow(p_aqed->Factor(),order[1]/2.0);
     }
     Mi[i] = cplfac*(graphs[i]->Zvalue(ihel));
   }
@@ -832,6 +891,7 @@ Complex Amplitude_Handler::Zvalue(int ihel,int ci,int cj)
   Complex M(0.,0.);
   for (size_t i=0;i<graphs.size();i++) {
     for (size_t j=0;j<graphs.size();j++) {
+      if (m_on[i][j]) 
       M+= Mi[i]*conj(Mi[j])*col->Mij(i,j);  //colfactors[i][j];
     }
   }
@@ -849,13 +909,12 @@ double Amplitude_Handler::Zvalue(Helicity* hel)
      desired polarisation states, if nessecary. */
   for (size_t col=0; col<graphs.size(); ++col) {
     double cplfac(1.0);
-    int oqcd(graphs[col]->GetOrderQCD());
-    int oqed(graphs[col]->GetOrderQED());
-    if (p_aqcd && oqcd) {
-      cplfac *= pow(p_aqcd->Factor(),oqcd/2.0);
+    const std::vector<int> &order(graphs[col]->GetOrder());
+    if (p_aqcd && order.size()>0 && order[0]) {
+      cplfac *= pow(p_aqcd->Factor(),order[0]/2.0);
     }
-    if (p_aqed && oqed) {
-      cplfac *= pow(p_aqed->Factor(),oqed/2.0);
+    if (p_aqed && order.size()>1 && order[1]) {
+      cplfac *= pow(p_aqed->Factor(),order[1]/2.0);
     }
     for (size_t ihel=0; ihel<hel->MaxHel(); ++ihel) A[col].push_back(cplfac*(graphs[col]->Zvalue(ihel)));
     hel->SpinorTransformation(A[col]);
@@ -869,6 +928,7 @@ double Amplitude_Handler::Zvalue(Helicity* hel)
       Complex M(0., 0.);
       for (size_t i=0;i<graphs.size();i++) {
 	for (size_t j=0;j<graphs.size();j++) {
+	  if (m_on[i][j]) 
 	  M+= A[i][ihel]*conj(A[j][ihel])*CFCol_Matrix->Mij(i,j);  //colfactors[i][j];
 	}
       }
@@ -883,13 +943,12 @@ Complex Amplitude_Handler::Zvalue(int ihel,int* sign)
 { // This is called for the gauge test
   for (size_t i=0;i<graphs.size();i++) {
     double cplfac(1.0);
-    int oqcd(graphs[i]->GetOrderQCD());
-    int oqed(graphs[i]->GetOrderQED());
-    if (p_aqcd && oqcd) {
-      cplfac *= pow(p_aqcd->Factor(),oqcd/2.0);
+    const std::vector<int> &order(graphs[i]->GetOrder());
+    if (p_aqcd && order.size()>0 && order[0]) {
+      cplfac *= pow(p_aqcd->Factor(),order[0]/2.0);
     }
-    if (p_aqed && oqed) {
-      cplfac *= pow(p_aqed->Factor(),oqed/2.0);
+    if (p_aqed && order.size()>1 && order[1]) {
+      cplfac *= pow(p_aqed->Factor(),order[1]/2.0);
     }
     Mi[i] = cplfac*(graphs[i]->Zvalue(ihel,sign));
   }
@@ -941,7 +1000,7 @@ void Amplitude_Handler::FillAmplitudes(vector<METOOLS::Spin_Amplitudes>& amps,
 
 int Amplitude_Handler::TOrder(Single_Amplitude* a)
 {  
-  if(!MODEL::s_model->GetInteractionModel()->HasTensors()) return 0;
+  if(MODEL::s_model->Name()!="ADD") return 0;
   return a->GetPointlist()->CountKK();
 } 
 
@@ -960,7 +1019,7 @@ int Amplitude_Handler::CompareAmplitudes(Amplitude_Handler* c_ampl, double & sf,
       return 0;
     }
     if (i==0) sf = factor;
-    else if(!ATOOLS::IsEqual(sf,factor)) {
+    else if(sf!=factor) {
       m_flavourmap.clear();
       return 0;
     }
@@ -982,6 +1041,7 @@ int Amplitude_Handler::SingleCompare(Point* p1,Point* p2, double & sf, map<strin
   }
   //Flavour equal....
   if (p1->fl.Mass()!=p2->fl.Mass()) return 0;
+  if (p1->fl.Width()!=p2->fl.Width()) return 0;
   if (p1->fl.Spin()!=p2->fl.Spin()) return 0;
 
   //outgoing number equal
@@ -1002,17 +1062,11 @@ int Amplitude_Handler::SingleCompare(Point* p1,Point* p2, double & sf, map<strin
   if (p1->Color->Type()!=p2->Color->Type()) return 0;
   
   //Couplings equal
-  //if (p1->ncpl!=p2->ncpl) return 0;
-  Complex ratio = Complex(0.,0.);
-  for (int i=0;i<2;i++) {
-    if (ratio==Complex(0.,0.) && p2->v->Coupling(i)!=Complex(0.,0.)) ratio = p1->v->Coupling(i)/p2->v->Coupling(i);
-    if (!ATOOLS::IsEqual(p2->v->Coupling(i)*ratio,p1->v->Coupling(i))) return 0;
-    if (!ATOOLS::IsEqual(p2->cpl[i],p1->cpl[i])) {
-      string help=ToString(p2->cpl[i]);
-      if (cplmap.find(help)==cplmap.end()) cplmap[help]=p1->cpl[i];
-    } 
+  if (p1->v->cpl.size()!=p2->v->cpl.size()) return 0;
+  for (int i=0;i<p1->v->cpl.size();i++) {
+    if (p1->v->Coupling(i)!=p2->v->Coupling(i)) return 0;
+    if (p1->cpl[i]!=p2->cpl[i]) return 0;
   }
-  sf *= abs(ratio);
   // return 1 if equal and 0 if different
 
   {

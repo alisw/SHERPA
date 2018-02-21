@@ -71,10 +71,10 @@ Soft_Collision_Handler::GenerateMinimumBiasEvent(ATOOLS::Blob_List * blobs,
   int outcome;
   switch (m_mode) {
   case 1: 
-    weight = 1.;
     //msg_Out()<<"#################################"<<std::endl
     //	     <<METHOD<<"("<<blobs->size()<<")"<<std::endl;
     outcome = p_shrimps->GenerateEvent(blobs);
+    weight = blobs->Weight();
     //msg_Out()<<(*blobs)<<"\n";
     //msg_Out()<<"####################### yields "<<outcome<<"."<<std::endl
     //	     <<"#################################"<<std::endl<<std::endl;
@@ -94,7 +94,7 @@ Soft_Collision_Handler::GenerateMinimumBiasEvent(ATOOLS::Blob_List * blobs,
 
 Cluster_Amplitude *Soft_Collision_Handler::ClusterConfiguration(Blob *const bl)
 {
-  m_cluster.SetMinKT2(p_shrimps->Smin());
+  m_cluster.SetMinKT2(p_shrimps->ShowerMinKT2());
   m_cluster.SetRescatt(p_shrimps->IsLastRescatter());
   m_cluster.SetTMax(p_shrimps->LadderTMax());
   m_cluster.SetNLad(p_shrimps->NLadders());

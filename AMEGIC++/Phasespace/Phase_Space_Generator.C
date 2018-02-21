@@ -50,7 +50,9 @@ bool Phase_Space_Generator::Construct(std::list<std::string>* liblist,string _pa
   dr.AddWordSeparator("\t");
   dr.SetInputPath(rpa->GetPath());
   dr.SetInputFile(rpa->gen.Variable("INTEGRATION_DATA_FILE"));
-  int inttype  = dr.GetValue<int>("AMEGIC_INTEGRATOR",6);
+  int inttype  = dr.GetValue<int>
+    ("AMEGIC_INTEGRATOR",
+     (rpa->gen.Beam1().IsHadron()&&rpa->gen.Beam2().IsHadron())?6:7);
   if (proc->Info().Has(nlo_type::real)) {
     inttype  = dr.GetValue<int>("AMEGIC_RS_INTEGRATOR",7);
   }
@@ -63,7 +65,6 @@ bool Phase_Space_Generator::Construct(std::list<std::string>* liblist,string _pa
 
   if (My_In_File::FileInDB(lmapname)) return 1-GetLibList(liblist);
 
-  ATOOLS::MakeDir(rpa->gen.Variable("SHERPA_CPP_PATH")+"/Process/Amegic/"+path);
   int newchannels = 0;
   //int extrachannel = 0;
   My_Out_File lmf(lmapname);
@@ -206,7 +207,7 @@ void Phase_Space_Generator::AddToMakefileAM(string makefilename,string pathID,st
     file<<"lib_LTLIBRARIES = libProc_"<<subdirname<<".la"<<endl;
     file<<"libProc_"<<subdirname<<"_la_SOURCES = CG.C "<<'\\'<<endl;
     file<<"\t"<<fileID<<".C"<<endl;
-    file<<"CURRENT_SHERPASYS = "<<ATOOLS::rpa->gen.Variable("SHERPA_INC_PATH")<<endl;
+    file<<"CURRENT_SHERPASYS ?= "<<ATOOLS::rpa->gen.Variable("SHERPA_INC_PATH")<<endl;
     file<<"INCLUDES = -I$(CURRENT_SHERPASYS)"<<endl;
     file<<"DEFS     = "<<endl;
     ofstream cgfile((rpa->gen.Variable("SHERPA_CPP_PATH")+"/Process/Amegic/"+pathID+"/CG.C").c_str());

@@ -4,6 +4,7 @@
 #include "ATOOLS/Org/Exception.H"
 #include "ATOOLS/Phys/Blob.H"
 #include "ATOOLS/Org/MyStrStream.H"
+#include "ATOOLS/Org/Smart_Pointer.C"
 
 using namespace METOOLS;
 using namespace ATOOLS;
@@ -31,10 +32,10 @@ Amplitude2_Tensor::Amplitude2_Tensor(const std::vector<ATOOLS::Particle*>& parts
   }
 }
 
+
 Amplitude2_Tensor::Amplitude2_Tensor(const vector<ATOOLS::Particle*>& parts,
                                      size_t level,
-                                     const PHASIC::DiagColVec& diagrams,
-                                     const vector<vector<Complex> >& cmatrix,
+                                     const std::vector<Spin_Amplitudes*>& diagrams,
                                      vector<int>& spin_i,
                                      vector<int>& spin_j) :
   p_next(NULL), m_value(-1.0,0.0), p_part(NULL), m_nhel(0)
@@ -45,8 +46,8 @@ Amplitude2_Tensor::Amplitude2_Tensor(const vector<ATOOLS::Particle*>& parts,
     m_value=Complex(0.0, 0.0);
     for (size_t i(0); i<diagrams.size(); ++i) {
       for (size_t j(0); j<diagrams.size(); ++j) {
-        m_value+=cmatrix[i][j]*diagrams[i].first->Get(spin_i)*
-            conj(diagrams[j].first->Get(spin_j));
+        m_value+=diagrams[i]->Get(spin_i)*
+          conj(diagrams[j]->Get(spin_j));
       }
     }
   }
@@ -61,23 +62,23 @@ Amplitude2_Tensor::Amplitude2_Tensor(const vector<ATOOLS::Particle*>& parts,
       spin_i[level]=(i%m_nhel);
       spin_j[level]=(i/m_nhel);
       (*p_next)[i]=new Amplitude2_Tensor(parts, level+1,
-                                         diagrams, cmatrix, spin_i, spin_j);
+                                         diagrams, spin_i, spin_j);
     }
   }
 }
+
 
 Amplitude2_Tensor::Amplitude2_Tensor(const vector<ATOOLS::Particle*>& parts,
                                      const vector<int>& permutation,
                                      size_t level,
                                      const vector<Spin_Amplitudes>& diagrams,
-                                     const vector<vector<Complex> >& cmatrix,
                                      vector<int>& spin_i, vector<int>& spin_j) :
   p_next(NULL), m_value(-1.0,0.0), p_part(NULL), m_nhel(0)
 {
   if (level>parts.size()) THROW(fatal_error, "Internal error 1");
 
   if (level==parts.size() || parts[level]->RefFlav().IsStable()) {
-    m_value=ContractRemaining(parts,permutation,level,diagrams,cmatrix,
+    m_value=ContractRemaining(parts,permutation,level,diagrams,
                               spin_i,spin_j, 1.0);
   }
   else {
@@ -91,9 +92,25 @@ Amplitude2_Tensor::Amplitude2_Tensor(const vector<ATOOLS::Particle*>& parts,
       spin_i[level]=(i%m_nhel);
       spin_j[level]=(i/m_nhel);
       (*p_next)[i]=new Amplitude2_Tensor(parts, permutation, level+1,
-                                         diagrams, cmatrix, spin_i, spin_j);
+                                         diagrams, spin_i, spin_j);
     }
   }
+}
+
+
+Amplitude2_Tensor::Amplitude2_Tensor(const Amplitude2_Tensor& other)
+{
+  m_value=other.m_value;
+  m_nhel=other.m_nhel;
+  p_part=other.p_part;
+
+  if (other.p_next) {
+    p_next=new vector<Amplitude2_Tensor*>(m_nhel*m_nhel);
+    for (size_t i=0; i<p_next->size(); ++i) {
+      (*p_next)[i]=new Amplitude2_Tensor(*(other.p_next->at(i)));
+    }
+  }
+  else p_next=NULL;
 }
 
 Complex Amplitude2_Tensor::ContractRemaining
@@ -101,7 +118,6 @@ Complex Amplitude2_Tensor::ContractRemaining
  const vector<int>& permutation,
  size_t level,
  const vector<Spin_Amplitudes>& diagrams,
- const std::vector<std::vector<Complex> >& cmatrix,
  vector<int>& spin_i, vector<int>& spin_j, double factor) const
 {
   if (level>parts.size()) THROW(fatal_error, "Internal error 1");
@@ -116,8 +132,8 @@ Complex Amplitude2_Tensor::ContractRemaining
     }
     for (size_t i(0); i<diagrams.size(); ++i) {
       for (size_t j(0); j<diagrams.size(); ++j) {
-        ret+=cmatrix[i][j]*diagrams[i].Get(spin_i_perm)*
-            conj(diagrams[j].Get(spin_j_perm))*factor;
+        ret+=diagrams[i].Get(spin_i_perm)*
+          conj(diagrams[j].Get(spin_j_perm))*factor;
       }
     }
   }
@@ -129,7 +145,7 @@ Complex Amplitude2_Tensor::ContractRemaining
       spin_i[level]=i;
       spin_j[level]=i;
       ret+=ContractRemaining(parts, permutation, level+1,
-                             diagrams, cmatrix, spin_i, spin_j, newfactor);
+                             diagrams, spin_i, spin_j, newfactor);
     }
   }
   return ret;
@@ -279,6 +295,20 @@ bool Amplitude2_Tensor::Contains(const ATOOLS::Particle* part) const
   return false;
 }
 
+void Amplitude2_Tensor::UpdateParticlePointers(const std::map<Particle*,Particle*>& pmap)
+{
+  if (p_part) {
+    std::map<Particle*,Particle*>::const_iterator pit(pmap.find(p_part));
+    if (pit!=pmap.end()) p_part=pit->second;
+    else THROW(fatal_error, "Could not update particle pointer.");
+  }
+  if (p_next) {
+    for (size_t i(0);i<p_next->size();++i) {
+      (*p_next)[i]->UpdateParticlePointers(pmap);
+    }
+  }
+}
+
 void Amplitude2_Tensor::Print(std::ostream& ostr, string label) const
 {
   if (m_value!=Complex(-1.0,0.0)) {
@@ -308,9 +338,12 @@ bool Amplitude2_Tensor::SortCrit(const pair<Particle*, size_t>& p1,
   return p1.first->RefFlav().IsStable()<p2.first->RefFlav().IsStable();
 }
 
+
 namespace ATOOLS {
-  template <> Blob_Data<METOOLS::Amplitude2_Tensor*>::~Blob_Data() {}
-  template class Blob_Data<METOOLS::Amplitude2_Tensor*>;
-  template METOOLS::Amplitude2_Tensor*&
-  Blob_Data_Base::Get<METOOLS::Amplitude2_Tensor*>();
+  template class SP(METOOLS::Amplitude2_Tensor);
+
+  template <> Blob_Data<SP(METOOLS::Amplitude2_Tensor)>::~Blob_Data() {}
+  template class Blob_Data<SP(METOOLS::Amplitude2_Tensor)>;
+  template SP(METOOLS::Amplitude2_Tensor)&
+    Blob_Data_Base::Get<SP(METOOLS::Amplitude2_Tensor)>();
 }

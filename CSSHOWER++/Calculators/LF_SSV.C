@@ -210,7 +210,7 @@ namespace CSSHOWER {
 
 }
 
-#include "MODEL/Interaction_Models/Single_Vertex.H"
+#include "MODEL/Main/Single_Vertex.H"
 #include "ATOOLS/Math/Random.H"
 
 using namespace CSSHOWER;
@@ -752,6 +752,64 @@ operator()(const Parameter_Type &args) const
 }
 
 void ATOOLS::Getter<SF_Lorentz,SF_Key,LF_SSV_FF>::
+PrintInfo(std::ostream &str,const size_t width) const
+{
+  str<<"ssv lorentz functions";
+}
+
+DECLARE_GETTER(LF_SSV_II,"SSV1",SF_Lorentz,SF_Key);
+
+SF_Lorentz *ATOOLS::Getter<SF_Lorentz,SF_Key,LF_SSV_II>::
+operator()(const Parameter_Type &args) const
+{
+  if (args.m_col<0) return NULL;
+  if ((args.m_mode==0 &&
+       args.p_v->in[0].IntSpin()==0 &&
+       args.p_v->in[1].IntSpin()==0 &&
+       args.p_v->in[2].IntSpin()==2) ||
+      (args.m_mode==1 &&
+       args.p_v->in[0].IntSpin()==0 &&
+       args.p_v->in[2].IntSpin()==0 &&
+       args.p_v->in[1].IntSpin()==2)) {
+    switch (args.m_type) {
+    case cstp::FF: return new LF_SSV_FF(args);
+    case cstp::FI: return new LF_SSV_FI(args);
+    case cstp::IF: return new LF_SSV_IF(args);
+    case cstp::II: return new LF_SSV_II(args);
+    case cstp::none: break;
+    }
+  }
+  if ((args.m_mode==0 &&
+       args.p_v->in[0].IntSpin()==0 &&
+       args.p_v->in[1].IntSpin()==2 &&
+       args.p_v->in[2].IntSpin()==0) ||
+      (args.m_mode==1 &&
+       args.p_v->in[0].IntSpin()==0 &&
+       args.p_v->in[2].IntSpin()==2 &&
+       args.p_v->in[1].IntSpin()==0)) {
+    switch (args.m_type) {
+    case cstp::FF: return new LF_SVS_FF(args);
+    case cstp::FI: return new LF_SVS_FI(args);
+    case cstp::IF: return new LF_SVS_IF(args);
+    case cstp::II: return new LF_SVS_II(args);
+    case cstp::none: break;
+    }
+  }
+  if (args.p_v->in[0].IntSpin()==2 &&
+      args.p_v->in[1].IntSpin()==0 &&
+      args.p_v->in[2].IntSpin()==0) {
+    switch (args.m_type) {
+    case cstp::FF: return new LF_VSS_FF(args);
+    case cstp::FI: return new LF_VSS_FI(args);
+    case cstp::IF: return new LF_VSS_IF(args);
+    case cstp::II: return new LF_VSS_II(args);
+    case cstp::none: break;
+    }
+  }
+  return NULL;
+}
+
+void ATOOLS::Getter<SF_Lorentz,SF_Key,LF_SSV_II>::
 PrintInfo(std::ostream &str,const size_t width) const
 {
   str<<"ssv lorentz functions";

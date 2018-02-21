@@ -70,7 +70,6 @@ namespace AMEGIC {
     int                 CheckLibraries();
     int                 CheckStrings(Single_Process_Combined*);
     void                WriteLibrary();
-    std::string         CreateLibName();
     void                CreateMappingFile(Single_Process_Combined*);
     void                UpdateMappingFile(std::string,std::map<std::string,Complex> &); 
     bool                CreateChannelLibrary();
@@ -81,11 +80,10 @@ namespace AMEGIC {
     void                AddChannels(std::list<std::string>*);
     bool                NewLibs() {return m_newlib;}
     bool                FoundMappingFile(std::string &,std::string &);
-    int                 InitAmplitude(MODEL::Model_Base *,Topology *,
+    int                 InitAmplitude(Amegic_Model *,Topology *,
 				      std::vector<Process_Base *> &,
 				      std::vector<Process_Base *> &);
     bool                SetUpIntegrator();
-    void                WriteMomFlavs(std::ofstream& to) { p_BS->WriteMomFlavs(to); }
     String_Handler    * GetStringHandler()             { return p_shand;}
     Amplitude_Handler * GetAmplitudeHandler()          { return p_ampl;}
     Helicity *          GetHelicity()                  { return p_hel; }    

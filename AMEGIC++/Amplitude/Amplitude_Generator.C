@@ -1,11 +1,12 @@
 //#include <iomanip>
 #include "AMEGIC++/Amplitude/Amplitude_Generator.H"
 #include "AMEGIC++/Amplitude/Amplitude_Manipulator.H"
+#include "AMEGIC++/Main/Tools.H"
 #include "ATOOLS/Org/Run_Parameter.H"
 #include "ATOOLS/Org/Message.H"
+#include "ATOOLS/Org/Exception.H"
 #include "ATOOLS/Math/MathTools.H"
 #include "ATOOLS/Math/Permutation.H"
-#include "MODEL/Interaction_Models/Interaction_Model_Base.H"
 
 namespace AMEGIC {
   class Compare_Pre_Amplitudes {
@@ -23,13 +24,17 @@ using namespace MODEL;
 using namespace std;
 
 Amplitude_Generator::Amplitude_Generator(int _no,Flavour* _fl,int* _b,
-					 Model_Base * _model,Topology * _top,
-					 int _nQCD,int _nEW,int _ntchan_min,
-					 Basic_Sfuncs* _BS,String_Handler* _shand, bool create_4V) 
+					 Amegic_Model * _model,Topology * _top,
+					 std::vector<double> _order,
+                                         size_t _ntchan_min,size_t _ntchan_max,
+                                         Basic_Sfuncs* _BS,String_Handler* _shand,
+                                         bool create_4V)
   : fl(_fl), b(_b), p_model(_model), top(_top), 
-    N(_no), nEW(_nEW), nQCD(_nQCD), ntchan_min(_ntchan_min),
+    N(_no), order(_order), ntchan_min(_ntchan_min), ntchan_max(_ntchan_max),
     BS(_BS), shand(_shand), m_create_4V(create_4V)
 {
+  DEBUG_FUNC("n="<<_no<<", order="<<_order<<", ntchannel="<<_ntchan_min
+              <<".."<<_ntchan_max<<", 4V="<<create_4V);
   single_top = top->Get(N-2);
   
   // 2 incoming
@@ -38,8 +43,8 @@ Amplitude_Generator::Amplitude_Generator(int _no,Flavour* _fl,int* _b,
 
   // fill hash table
   
-  Vertex * v = p_model->GetVertex();
-
+  Vertex * v = p_model->p_vertex;
+ 
   for (int i=0;i<v->MaxNumber();++i) {
     if ((*v)[i]->on) {
       v_table[(*v)[i]->in[0]].push_back((*v)[i]);
@@ -63,14 +68,14 @@ void Amplitude_Generator::Set_End(Point* p,int* &perm,int& pnum)
     p->number = *perm;
     p->fl = fl[*perm];
     p->b  = b[*perm];
-    if (p->Lorentz) delete p->Lorentz;
-    if (p->fl.IsBoson()) {
-      p->Lorentz = LF_Getter::GetObject("Pol",LF_Key());
-      p->Lorentz->SetParticleArg(0);
+    if (p->Lorentz) {
+      p->Lorentz->Delete();
+      p->Lorentz=NULL;
     }
-    else {
-      p->Lorentz = LF_Getter::GetObject("None",LF_Key());
-      p->Lorentz->SetParticleArg();
+    if (p->fl.IsBoson()) {
+      if (p->Color==NULL) p->Color = new Color_Function();
+      p->Lorentz = LF_Pol::New();
+      p->Lorentz->SetParticleArg(0);
     }
 
     perm++;
@@ -87,7 +92,7 @@ void Amplitude_Generator::Next_P(Point* p,Point* &hit)
   if (hit) return;
   if (p==0) return;
   if ((p->left!=0) && (p->right!=0)) {
-    if ((p->left->fl==Flavour(kf_none)) || (p->right->fl==Flavour(kf_none))) {
+    if (p->left->fl.Kfcode()==0 || p->right->fl.Kfcode()==0) {
       hit = p;
       return;
     }
@@ -116,29 +121,11 @@ void Amplitude_Generator::Print_P(Point* p)
   }
 }
 
-int Amplitude_Generator::MatchVertex(Single_Vertex* v,Flavour* flav,vector<Complex>& cpl)
-{
-  if (v->dec>0) return false;
-  if (flav[0] == v->in[0]) {
-    int hit = 1;
-    if (flav[1] != Flavour(kf_none)) {if (flav[1] != v->in[1]) hit = 0;}
-    else { flav[1] = v->in[1];}
-    if (flav[2] != Flavour(kf_none)) {if (flav[2] != v->in[2]) hit = 0;}
-    else { flav[2] = v->in[2];}
-    if (hit==1) {
-      cpl.clear();
-      for (size_t j=0;j<v->cpl.size();j++) cpl.push_back(v->Coupling(j));
-      return 1;
-    }
-  }
-  return 0;
-}
-
 int Amplitude_Generator::CheckEnd(Point* p,Flavour infl) 
 {
   if (p==0) return 1;
   if (p->left==0) return 1;
-  if (((p->left->fl)!=Flavour(kf_none)) && ((p->right->fl)!=Flavour(kf_none))) { 
+  if (p->left->fl.Kfcode() && p->right->fl.Kfcode()) { 
     Flavour flav[3];
     Flavour s_flav[3];
     vector <Complex> cpl;
@@ -187,8 +174,9 @@ int Amplitude_Generator::CheckEnd(Point* p,Flavour infl)
 	p->cpl.clear();
 	for (size_t k=0;k<cpl.size();k++) p->cpl.push_back(cpl[k]);
 	p->v = vl[j];
+	if (p->Color==NULL) p->Color = new Color_Function();
 	*p->Color = vl[j]->Color.back();
-	if (p->Lorentz) delete p->Lorentz;
+	if (p->Lorentz) p->Lorentz->Delete();
 	p->Lorentz = vl[j]->Lorentz.front()->GetCopy();
 	p->t = vl[j]->t;
 	return 1;
@@ -243,43 +231,43 @@ void Amplitude_Generator::SetProps(Point* pl,int dep,Single_Amplitude* &first,in
       flav[1] = p->left->fl;
       flav[2] = p->right->fl;
 
-      if (p->left->fl  == Flavour(kf_none)) p->left->b  = 0;
-      if (p->right->fl == Flavour(kf_none)) p->right->b = 0;
+      if (p->left->fl.Kfcode()==0) p->left->b  = 0;
+      if (p->right->fl.Kfcode()==0) p->right->b = 0;
 
       if (flav[0].Majorana()) {
-	if (p->left->fl != Flavour(kf_none)) {
+	if (p->left->fl.Kfcode()) {
 	  if (p->left->fl.IsFermion()) {
 	    if (p->b*p->left->b == 1)  flav[1] = flav[1].Bar();
 	  }
 	  else if (p->left->b   == -1) flav[1] = flav[1].Bar();
 	}
-	if (p->left->fl==Flavour(kf_none)) p->left->b = p->b;
+	if (p->left->fl.Kfcode()==0) p->left->b = p->b;
 	
-	if (p->right->fl != Flavour(kf_none)) {
+	if (p->right->fl.Kfcode()) {
 	  if (p->right->fl.IsFermion()) {
 	    if (p->b*p->right->b == 1)  flav[2] = flav[2].Bar();
 	}
 	else if (p->right->b  == -1) flav[2] = flav[2].Bar();  
 	}
-	if (p->right->fl==Flavour(kf_none)) p->right->b = p->b;
+	if (p->right->fl.Kfcode()==0) p->right->b = p->b;
       }
       else {
 	if (flav[0].IsBoson()) {
 	  if (p->left->b   == -1) flav[1] = flav[1].Bar();
 	  if (p->right->b  == -1) flav[2] = flav[2].Bar();
-	  if (p->left->fl  == Flavour(kf_none)) p->left->b  = -1;
-	  if (p->right->fl == Flavour(kf_none)) p->right->b = -1;
+	  if (p->left->fl.Kfcode()==0) p->left->b  = -1;
+	  if (p->right->fl.Kfcode()==0) p->right->b = -1;
 	}
 	else {
 	  if (flav[0].IsAnti()) {
 	    if (p->b*p->left->b == 1)  flav[1] = flav[1].Bar();
 	    if (p->right->b     ==-1)  flav[2] = flav[2].Bar();
-	    if (p->left->fl     == Flavour(kf_none)) p->left->b = p->b;
+	    if (p->left->fl.Kfcode()==0) p->left->b = p->b;
 	  }
 	  else {
 	    if (p->b*p->right->b == 1) flav[2] = flav[2].Bar();
 	    if (p->left->b       ==-1) flav[1] = flav[1].Bar();
-	    if (p->right->fl     == Flavour(kf_none)) p->right->b = p->b;
+	    if (p->right->fl.Kfcode()==0) p->right->b = p->b;
 	  }
 	}
       }
@@ -314,11 +302,12 @@ void Amplitude_Generator::SetProps(Point* pl,int dep,Single_Amplitude* &first,in
 	  //match
 	  int ll = 0;
 	  top->Copy(prea[ap].p,preah,ll);
-	  if (p->left->fl==Flavour(kf_none))  p->left->fl  = flav[1];
-	  if (p->right->fl==Flavour(kf_none)) p->right->fl = flav[2];
+	  if (p->left->fl.Kfcode()==0)  p->left->fl  = flav[1];
+	  if (p->right->fl.Kfcode()==0) p->right->fl = flav[2];
 	  p->v          = vl[i];
+	  if (p->Color==NULL) p->Color = new Color_Function();
 	  *p->Color = vl[i]->Color.back();
-	  if (p->Lorentz) delete p->Lorentz;
+	  if (p->Lorentz) p->Lorentz->Delete();
 	  p->Lorentz = vl[i]->Lorentz.front()->GetCopy();
 	  p->t = vl[i]->t;
 	  
@@ -362,12 +351,6 @@ void Amplitude_Generator::CreateSingleAmplitudes(Single_Amplitude * & first) {
   Single_Amplitude* gra;
   for (size_t i=0;i<prea_table.size();i++) {
     int sw1 = 1;
-    if (MODEL::s_model->GetInteractionModel()->Code()=="pure_QCD") {
-      for (int j=0;j<dep;j++) {
-	if (((prea_table[i].p[j].fl).IsBoson()) && 
-	    (prea_table[i].p[j].fl!=Flavour(kf_gluon))) { sw1 = 0; break; }
-      }
-    }
     // test if 3-Vertex
     if (sw1) {
       for (int j=0;j<dep;j++) {
@@ -447,77 +430,6 @@ void Amplitude_Generator::CreateSingleAmplitudes(Single_Amplitude * & first) {
       }
     }
   }
-}
-
-void Amplitude_Generator::Unite(Point* p,Point* pdel)
-{
-  int depth = single_top->depth;
-  Point psave;
-  for (short int i=0;i<depth;i++) {
-    if (p[i].number==pdel[i].number) {
-      if (p[i].fl!=pdel[i].fl) {
-	// Double Counting !!!!!!!!!!!!!!
-	int sw1 = 1;
-	for (short int j=0;j<p[i].nextra;j++) {
-	  if (p[i].extrafl[j]==pdel[i].fl) {
-	    sw1 = 0;
-	    break;
-	  }
-	}
-	if (sw1==1) {
-	  psave = p[i];
-	
-	  if (p[i].nextra>0) delete[] p[i].extrafl;
-	  p[i].cpl.clear();
-	  
-	  int nfl  = 1+pdel[i].nextra+p[i].nextra;
-	  
-	  p[i].extrafl = new Flavour[nfl];
-	  
-	  //Flavour
-	  int count = 0;
-	  for (short int j=0;j<psave.nextra;j++)
-	    p[i].extrafl[j] = psave.extrafl[j];   
-	  count += psave.nextra;
-	  
-	  p[i].extrafl[count] = pdel[i].fl;
-	  count++;
-	  for (short int j=0;j<pdel[i].nextra;j++)
-	    p[i].extrafl[count+j] = pdel[i].extrafl[j];			
-	  p[i].nextra = nfl;
-	  
-	  //Couplings
-	  count = 0;
-	  p[i].cpl.clear();
-	  for (size_t j=0;j<psave.Ncpl();j++) p[i].cpl.push_back(psave.cpl[j]);   
-	  count += psave.Ncpl();
-	  for (size_t j=0;j<pdel[i].Ncpl();j++) p[i].cpl.push_back(pdel[i].cpl[j]);			
-	  
-	  //previous couplings too
-	  int hit = -1;
-	  for (short int j=0;j<depth;j++) {
-	    if (p[j].left==&p[i] || p[j].right==&p[i]) {
-	      hit = j;
-	      break;
-	    }
-	  }
-	  if (hit!=-1) {
-	    psave = p[hit];
-	    p[hit].cpl.clear();
-	    
-	    //Couplings
-	    count = 0;
-	    for (size_t j=0;j<psave.Ncpl();j++) p[hit].cpl.push_back(psave.cpl[j]);   
-	    count += psave.Ncpl();
-	    for (size_t j=0;j<pdel[hit].Ncpl();j++) p[hit].cpl.push_back(pdel[hit].cpl[j]);			
-	  }
-	  else 
-	    msg_Error()<<"ERROR in Amplitude_Generator"<<endl
-			       <<"   Continue and hope for the best ..."<<std::endl;
-	}
-      }
-    }
-  } 
 }
 
 int Amplitude_Generator::CompareColors(Point* p1,Point* p2)
@@ -642,7 +554,7 @@ int Amplitude_Generator::Compare5Vertex(Point* p1,Point* p2)
   Point** pts1=new Point*[4];
   Point** pts2=new Point*[4];
   Point *p41,*p42;
-  if (p1->left->fl.Is5VDummy()) {
+  if (p1->left->fl.Kfcode()==kf_shgluon) {
     pts1[0]=p1->left->left;
     pts1[1]=p1->left->middle;
     pts1[2]=p1->left->right;
@@ -656,7 +568,7 @@ int Amplitude_Generator::Compare5Vertex(Point* p1,Point* p2)
     pts1[3]=p1->right->right;
     p41=p1->right;
   }
-  if (p2->left->fl.Is5VDummy()) {
+  if (p2->left->fl.Kfcode()==kf_shgluon) {
     pts2[0]=p2->left->left;
     pts2[1]=p2->left->middle;
     pts2[2]=p2->left->right;
@@ -671,8 +583,12 @@ int Amplitude_Generator::Compare5Vertex(Point* p1,Point* p2)
     p42=p2->right;
   }
 
-  if (!CompareColors(p41,p42)) return 0;
-
+  if (!CompareColors(p41,p42)) {
+    delete[] pts1;
+    delete[] pts2;
+    return 0;
+  }
+  
   int hit = 0;
   Permutation perm(4);
   for (int i=0;i<perm.MaxNumber()&&!hit;i++) {
@@ -725,16 +641,20 @@ void Amplitude_Generator::CountOrders(Single_Amplitude * & first)
   Single_Amplitude* f1 = first;
   Single_Amplitude* f2;
   int count=0;
-  int QEDmax = 0;
-  int QCDmax = 0;
+  std::vector<double> hitmax;
   while (f1) {
-    int hitQED = 0;
-    int hitQCD = 0;
-    hitQCD = f1->GetPointlist()->FindQCDOrder(hitQCD);
-    hitQED = f1->GetPointlist()->FindQEDOrder(hitQED);
-    if (hitQED>QEDmax&&hitQED<=nEW) QEDmax=hitQED;
-    if (hitQCD>QCDmax&&hitQCD<=nQCD) QCDmax=hitQCD;
-    if ((nEW<99  && hitQED!=nEW) || (nQCD<99 && hitQCD!=nQCD) ||
+    std::vector<int> hit;
+    f1->GetPointlist()->FindOrder(hit);
+    bool valid(true);
+    for (size_t i(0);i<Min(order.size(),hit.size());++i)
+      if (hit[i]>order[i]) valid=false;
+    msg_Debugging()<<"Order check: "<<hit<<" vs. "<<order<<" -> "<<valid<<"\n";
+    if (hit.size()>hitmax.size())
+      hitmax.resize(hit.size(),0);
+    for (size_t i(0);i<Min(hit.size(),hitmax.size());++i)
+      if (order.size()<=i || hit[i]<=order[i])
+	hitmax[i]=Max(hitmax[i],(double)hit[i]);
+    if (!valid ||
 	!CheckTChannels(f1->GetPointlist())) {
       ++count;
       if (f1==first) {
@@ -755,8 +675,7 @@ void Amplitude_Generator::CountOrders(Single_Amplitude * & first)
       f1 = f1->Next;
     }
   }
-  nEW = QEDmax;
-  nQCD = QCDmax;
+  order=hitmax;
   msg_Tracking()<<"Kicked number of diagrams (Amplitude_Generator::CountOrders()) "<<count<<endl;
 }
 
@@ -769,19 +688,19 @@ bool Amplitude_Generator::CheckTChannels(Point * p) {
   //
   msg_Debugging()<<METHOD<<" yields "<<ntchan<<" t-channel props, "
 		 <<"("<<ntchan_min<<"), start = "<<p->fl<<"."<<std::endl;
-  if (ntchan>=ntchan_min) return true;
+  if (ntchan>=ntchan_min && ntchan<=ntchan_max) return true;
   return false;
 }
  
 bool Amplitude_Generator::CheckOrders(Point * p)
 {
-  int hitQED = 0;
-  int hitQCD = 0;
-  hitQCD = p->FindQCDOrder(hitQCD);
-  hitQED = p->FindQEDOrder(hitQED);
-  if (nEW<99  && hitQED!=nEW)  return 0; 
-  if (nQCD<99 && hitQCD!=nQCD) return 0; 
-  return 1;
+  std::vector<int> hit;
+  p->FindOrder(hit);
+  bool valid(true);
+  for (size_t i(0);i<Min(order.size(),hit.size());++i)
+    if (hit[i]>order[i]) valid=false;
+  msg_Debugging()<<"Order check: "<<hit<<" vs. "<<order<<" -> "<<valid<<"\n";
+  return valid;
 }
  
 void Amplitude_Generator::Compare(Single_Amplitude* &first)
@@ -884,15 +803,14 @@ int Amplitude_Generator::ShrinkProps(Point*& p,Point*& pnext, Point*& pcopy, Poi
   }  
 
   //barflags 
-  Vertex* v = p_model->GetVertex();
+  Vertex* v = p_model->p_vertex;
   
   for (short int i=0;i<v->MaxNumber4();i++) {
-    if ((*v)(i)->on) {
       
       Single_Vertex test;
       
       test = *((*v))(i);
-      
+ 
       if (in[0]) test.in[0] = test.in[0].Bar();
       if (in[1]) test.in[1] = test.in[1].Bar();
       if (in[2]) test.in[3] = test.in[3].Bar();
@@ -924,40 +842,39 @@ int Amplitude_Generator::ShrinkProps(Point*& p,Point*& pnext, Point*& pcopy, Poi
 	  
 	  //setting the contraction flags
 	  pnext->m  = 1;
-	  
+
 	  if ((*v)(i)->Color.size()==1) {
 	    *pcopy->Color = (*v)(i)->Color.back();
-	    if (pcopy->Lorentz) delete pcopy->Lorentz;
+            if (pcopy->Lorentz) pcopy->Lorentz->Delete();
 	    pcopy->Lorentz = (*v)(i)->Lorentz.front()->GetCopy();
 	    pcopy->t = (*v)(i)->t;
-	    break;
-	  }
-	  else {
+            break;
+          }
+          else {
 	    for (size_t k=0;k<(*v)(i)->Color.size();k++) {
 	      *pcopy->Color = (*v)(i)->Color[k];
-	      if (pcopy->Lorentz) delete pcopy->Lorentz;
+              if (pcopy->Lorentz) pcopy->Lorentz->Delete();
 	      pcopy->Lorentz = (*v)(i)->Lorentz[k]->GetCopy();
 	      pcopy->t = (*v)(i)->t;
-	      
+
 	      Color_Function* cfmemo = pcopy->Color;
-	      
+             
 	      //set the contraction indices: 4 -> (prop->number) 
 	      while (cfmemo) {
 		cfmemo->Replace(4,pnext->number);
 		cfmemo = cfmemo->Next();
 	      }
-
+ 
 	      //fill the vector pcollist
 	      int ll = 0;
-	      Point* ptmp = new Point[single_top->depth];
-	      top->Copy(beg_pcopy,ptmp,ll);
-	      pcollist.push_back(ptmp);
+              Point* ptmp = new Point[single_top->depth];
+              top->Copy(beg_pcopy,ptmp,ll);
+              pcollist.push_back(ptmp);
 	    }
 	    break;
 	  }
 	}
       else hit = 0;
-    }
   }
   return hit;
 }
@@ -1060,7 +977,7 @@ int Amplitude_Generator::Is5VertexArtefact(Point* p, int &tcnt)
   case 0:
     break;
   case 1: 
-    if (tcnt!=-1 || !p->fl.Is5VDummy()) return 1;
+    if (tcnt!=-1 || p->fl.Kfcode()!=kf_shgluon) return 1;
     tcnt++;
     break;
   case -1:
@@ -1187,8 +1104,8 @@ Single_Amplitude* Amplitude_Generator::Matching()
 	  }
 	}
 	if (fl[perm[j]].IsLepton()) {
- 	    if (b[perm[j]]==1) lsum+=fl[perm[j]].LeptonNumber();
- 	    else lsum-=fl[perm[j]].LeptonNumber();
+ 	    if (b[perm[j]]==1) lsum+=LeptonNumber(fl[perm[j]]);
+ 	    else lsum-=LeptonNumber(fl[perm[j]]);
 	}
 
 	if (!fl[0].IsAnti()) {

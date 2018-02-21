@@ -6,16 +6,15 @@
 #define SORT_CRITERION std::less<std::string>
 #include "ATOOLS/Org/Getter_Function.C"
 
-template class Getter_Function
+template class ATOOLS::Getter_Function
 <MCATNLO::SF_Coupling,MCATNLO::SF_Key,SORT_CRITERION>;
 
-template class Getter_Function
+template class ATOOLS::Getter_Function
 <void,MCATNLO::SFC_Filler_Key,SORT_CRITERION>;
 
 #include "MCATNLO/Tools/Parton.H"
-#include "MODEL/Interaction_Models/Lorentz_Function.H"
-#include "MODEL/Interaction_Models/Color_Function.H"
-#include "MODEL/Interaction_Models/Single_Vertex.H"
+#include "MODEL/Main/Color_Function.H"
+#include "MODEL/Main/Single_Vertex.H"
 #include "ATOOLS/Phys/Cluster_Amplitude.H"
 #include "PDF/Main/PDF_Base.H"
 #include "ATOOLS/Math/Random.H"
@@ -33,7 +32,7 @@ double SF_Lorentz::s_kappa=2.0/3.0;
 SF_Lorentz::SF_Lorentz(const SF_Key &key):
   p_ms(key.p_ms), p_cf(key.p_cf), m_col(0)
 {
-  m_flavs[0]=key.p_v->in[0];
+  m_flavs[0]=key.p_v->in[0].Bar();
   if (key.m_mode==0) {
     m_flavs[1]=key.p_v->in[1];
     m_flavs[2]=key.p_v->in[2];
@@ -62,7 +61,7 @@ double SF_Coupling::s_qfac=1.0;
 
 SF_Coupling::SF_Coupling(const SF_Key &key):
   p_lf(NULL), m_type(key.m_type),
-  m_cplfac(1.0), m_kfmode(key.m_kfmode) 
+  m_cplfac(1.0), m_kfmode(key.m_kfmode)
 {
 }
 
@@ -102,7 +101,7 @@ Splitting_Function_Base::Splitting_Function_Base(const SF_Key &key):
       return;
     }
   }
-  p_lf = SFL_Getter::GetObject(ckey.p_v->Lorentz[0]->Type(),ckey);
+  p_lf = SFL_Getter::GetObject(ckey.p_v->Lorentz[0],ckey);
   if (p_lf==NULL) {
     m_on=-1;
     return;
@@ -183,6 +182,7 @@ double Splitting_Function_Base::operator()
    const double scale,const double Q2,const Color_Info &ci,
    Cluster_Amplitude *const sub)
 {
+  m_lastscale = scale;
   double sf((*p_lf)(z,y,eta,scale,Q2,sub));
   if (sf/p_lf->AsymmetryFactor(z,y,Q2)<0.0) return 0.0;
   if (sf<0.0 && sub==NULL) sf=-sf; 
@@ -215,6 +215,7 @@ double Splitting_Function_Base::OverIntegrated
   double lastint = p_lf->OverIntegrated(zmin,zmax,scale,xbj)/m_symf/m_polfac;
   if (!(IsBad(lastint)||lastint<0.0)) {
     m_lastint+=lastint;
+    m_lastints.push_back(m_lastint);
   }
   else {
     msg_Error()<<METHOD<<"(): Integral is "<<lastint<<" in ("<<m_type<<") "
@@ -238,16 +239,16 @@ double Splitting_Function_Base::RejectionWeight
 (const double z,const double y,const double eta,
  const double scale,const double Q2) 
 {
-  double res = operator()(z,y,eta,scale,Q2)/Overestimated(z,y);
+  m_lastacceptwgt = operator()(z,y,eta,scale,Q2)/Overestimated(z,y);
 #ifdef CHECK_rejection_weight
-  if (res>1.0) {
-    msg_Error()<<METHOD<<"(): Weight is "<<res<<" in ("<<m_type<<") "
+  if (m_lastacceptwgt>1.0) {
+    msg_Error()<<METHOD<<"(): Weight is "<<m_lastacceptwgt<<" in ("<<m_type<<") "
 	       <<p_lf->FlA()<<"->"<<p_lf->FlB()<<p_lf->FlC()
 	       <<" at z = "<<z<<", y = "<<y<<", x = "
 	       <<eta<<", Q = "<<sqrt(Q2)<<std::endl;
   }
 #endif
-  return res;
+  return m_lastacceptwgt;
 }
 
 void Splitting_Function_Base::ColorPoint(Parton *const p) const
@@ -264,13 +265,15 @@ Parton *Splitting_Function_Base::SetSpec(Parton *const spec)
 Parton *Splitting_Function_Base::SelectSpec()
 {
   if (m_specs.empty()) return NULL;
-  double disc=ran->Get()*m_specs.size();
-  return SetSpec(m_specs[Min(m_specs.size()-1,(size_t)disc)]);
+  double disc=ran->Get()*m_lastints.back(), sum(0.0);
+  for (size_t i(0);i<m_lastints.size();++i)
+    if (m_lastints[i]>=disc) return SetSpec(m_specs[i]);
 }
 
 void Splitting_Function_Base::ClearSpecs()
 {
   m_specs.clear();
+  m_lastints.clear();
 }
 
 double Splitting_Function_Base::GetXPDF
@@ -295,39 +298,61 @@ double Splitting_Function_Base::GetXPDF
 
 double SF_Lorentz::JFF(const double &y,const double &mui2,
 		       const double &muj2,const double &muk2,
-		       const double &muij2) const
+		       const double &muij2)
 { 
-  return (1.-y)*sqr(1.0-mui2-muj2-muk2)/sqrt(Lambda(1.0,muij2,muk2));
+  m_lastJ = (1.-y)*sqr(1.0-mui2-muj2-muk2)/sqrt(Lambda(1.0,muij2,muk2));
+  return m_lastJ;
 }
 
 double SF_Lorentz::JFI(const double &y,const double &eta,
-		       const double &scale,const Cluster_Amplitude *const sub) const
+		       const double &scale,const Cluster_Amplitude *const sub)
 { 
-  if (sub) return 1.0;
-  double fresh = p_sf->GetXPDF(scale,eta/(1.0-y),m_flspec,m_beam);
-  double old = p_sf->GetXPDF(scale,eta,m_flspec,m_beam);
-  if (fresh<0.0 || old<0.0 || IsZero(old,s_pdfcut) || IsZero(fresh,s_pdfcut)) return 0.; 
-  return (1.0-y) * fresh/old;
+  if (sub) {
+    m_lastJ = 1.0;
+  } else {
+    const double fresh = p_sf->GetXPDF(scale,eta/(1.0-y),m_flspec,m_beam);
+    const double old = p_sf->GetXPDF(scale,eta,m_flspec,m_beam);
+    if (fresh<0.0 || old<0.0 || IsZero(old,s_pdfcut) || IsZero(fresh,s_pdfcut)) {
+      m_lastJ = 0.;
+    } else {
+      m_lastJ = (1.0 - y) * fresh / old;
+    }
+  }
+  return m_lastJ;
 }
 
 double SF_Lorentz::JIF(const double &z,const double &y,const double &eta,
-		       const double &scale,const Cluster_Amplitude *const sub) const
+		       const double &scale,const Cluster_Amplitude *const sub)
 { 
-  if (sub) return 1.0/z;
-  double fresh = p_sf->GetXPDF(scale,eta/z,m_flavs[0],m_beam);
-  double old = p_sf->GetXPDF(scale,eta,m_flavs[1],m_beam);
-  if (fresh<0.0 || old<0.0 || IsZero(old,s_pdfcut) || IsZero(fresh,s_pdfcut)) return 0.; 
-  return fresh/old;
+  if (sub) {
+    m_lastJ = 1.0 / z;
+  } else {
+    const double fresh = p_sf->GetXPDF(scale,eta/z,m_flavs[0],m_beam);
+    const double old = p_sf->GetXPDF(scale,eta,m_flavs[1],m_beam);
+    if (fresh<0.0 || old<0.0 || IsZero(old,s_pdfcut) || IsZero(fresh,s_pdfcut)) {
+      m_lastJ = 0.0;
+    } else {
+      m_lastJ = fresh / old;
+    }
+  }
+  return m_lastJ;
 }
 
 double SF_Lorentz::JII(const double &z,const double &y,const double &eta,
-		       const double &scale,const Cluster_Amplitude *const sub) const
+		       const double &scale,const Cluster_Amplitude *const sub)
 { 
-  if (sub) return 1.0/z;
-  double fresh = p_sf->GetXPDF(scale,eta/z,m_flavs[0],m_beam);
-  double old = p_sf->GetXPDF(scale,eta,m_flavs[1],m_beam);
-  if (fresh<0.0 || old<0.0 || IsZero(old,s_pdfcut) || IsZero(fresh,s_pdfcut)) return 0.; 
-  return fresh/old;
+  if (sub) {
+    m_lastJ = 1.0/z;
+  } else {
+    const double fresh = p_sf->GetXPDF(scale,eta/z,m_flavs[0],m_beam);
+    const double old = p_sf->GetXPDF(scale,eta,m_flavs[1],m_beam);
+    if (fresh<0.0 || old<0.0 || IsZero(old,s_pdfcut) || IsZero(fresh,s_pdfcut)) {
+      m_lastJ = 0.;
+    } else {
+      m_lastJ = fresh/old;
+    }
+  }
+  return m_lastJ;
 }
 
 void Splitting_Function_Base::ResetLastInt()
@@ -374,9 +399,9 @@ bool Splitting_Function_Base::PureQCD() const
 std::string SF_Key::ID(const int mode) const
 {
   if ((m_mode==1)^(mode==1))
-    return "{"+ToString(p_v->in[0])+"}{"
+    return "{"+ToString(p_v->in[0].Bar())+"}{"
       +ToString(p_v->in[2])+"}{"+ToString(p_v->in[1])+"}";
-  return "{"+ToString(p_v->in[0])+"}{"
+  return "{"+ToString(p_v->in[0].Bar())+"}{"
     +ToString(p_v->in[1])+"}{"+ToString(p_v->in[2])+"}";
 }
 
@@ -385,8 +410,8 @@ namespace MCATNLO {
   std::ostream &operator<<(std::ostream &str,const SF_Key &k)
   {
     if (k.m_mode==0) 
-      return str<<k.m_type<<" "<<k.p_v->in[0]<<"->"<<k.p_v->in[1]<<","<<k.p_v->in[2];
-    return str<<k.m_type<<" "<<k.p_v->in[0]<<"->"<<k.p_v->in[2]<<","<<k.p_v->in[1];
+      return str<<k.m_type<<" "<<k.p_v->in[0].Bar()<<"->"<<k.p_v->in[1]<<","<<k.p_v->in[2];
+    return str<<k.m_type<<" "<<k.p_v->in[0].Bar()<<"->"<<k.p_v->in[2]<<","<<k.p_v->in[1];
   }
 
   std::ostream& operator<<(std::ostream& str, const Splitting_Function_Base &base) {

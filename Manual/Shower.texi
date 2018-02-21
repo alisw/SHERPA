@@ -21,12 +21,15 @@ The following parameters are used to steer the shower setup.
 @node SHOWER_GENERATOR
 @subsection SHOWER_GENERATOR
 
-The only shower option currently available in Sherpa is 
+The only full-fledged shower currently available in Sherpa is 
 @option{CSS}, and this is the default for this tag. See the 
 module summaries in @ref{Basic structure} for details about 
-this shower.
+this shower. For cross-checks in pure parton shower setups,
+one can use @option{Dire}. In this case, one also needs to 
+set @option{CSS_IS_AS_FAC=1}, @option{CSS_FS_AS_FAC=1}, 
+@option{CSS_IS_PT2MIN=3}, and @option{CSS_FS_PT2MIN=3}.
 
-Different shower modules are in principle supported and more
+Other shower modules are in principle supported and more
 choices will be provided by Sherpa in the near future.
 To list all available shower modules, the tag 
 @code{SHOW_SHOWER_GENERATORS=1} can be specified on the
@@ -83,9 +86,9 @@ in @mycite{Hoeche2009rj} and a novel recoil strategy for initial state
 splittings was proposed in @mycite{Hoeche2009xc}. 
 While the ordering variable is fixed, the recoil strategy for dipoles 
 with initial-state emitter and final-state spectator can be changed 
-for systematics studies. Setting @option{CSS_KIN_SCHEME=0} (default) 
+for systematics studies. Setting @option{CSS_KIN_SCHEME=0} 
 corresponds to using the recoil scheme proposed in @mycite{Hoeche2009xc}, 
-while @option{CSS_KIN_SCHEME=1} enables the original recoil strategy.
+while @option{CSS_KIN_SCHEME=1} (default) enables the original recoil strategy.
 The lower cutoff of the shower evolution can be set via @option{CSS_FS_PT2MIN}
 and @option{CSS_IS_PT2MIN} for final and initial state shower, respectively. 
 Note that this value is specified in GeV^2. Scale factors for the evaluation

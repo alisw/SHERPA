@@ -23,13 +23,22 @@ Scale_Setter_Base::Scale_Setter_Base
   p_proc(args.p_proc), p_caller(p_proc),
   p_model(args.p_model), p_cpls(args.p_cpls), p_subs(NULL),
   m_scale(stp::size), m_coupling(args.m_coupling),
-  m_nin(args.m_nin), m_nout(args.m_nout), 
-  m_htyfac(0.3), m_htyexp(1.)
+  m_nin(args.m_nin), m_nout(args.m_nout),
+  m_l1(0), m_l2(0)
 {
-  for (size_t i(0);i<stp::size;++i) m_scale[i]=rpa->gen.CplScale();
+  for (size_t i(0);i<stp::size;++i) m_scale[i]=sqr(rpa->gen.Ecms());
   if (p_proc) {
     m_nin=p_proc->NIn();
     m_nout=p_proc->NOut();
+  }
+  size_t nl(0);
+  for (size_t i(0);i<p_proc->Flavours().size();++i) {
+    if (p_proc->Flavours()[i].IsLepton()) {
+      nl++;
+      if      (nl==1) m_l1=i;
+      else if (nl==2) m_l2=i;
+      else           {m_l1=m_l2=0; break;}
+    }
   }
   m_p.resize(m_nin+m_nout);
 }
@@ -53,7 +62,8 @@ void Scale_Setter_Base::SetCouplings()
     Coupling_Map::iterator cit(p_cpls->lower_bound(helpsvv[i][0]));
     Coupling_Map::iterator eit(p_cpls->upper_bound(helpsvv[i][0]));
     if (cit!=eit) {
-      size_t idx(ToType<size_t>(helpsvv[i][1]));
+      int idx(ToType<int>(helpsvv[i][1]));
+      if (idx<0) continue;
       if (idx>=m_scale.size())
 	THROW(fatal_error,"Index too large for "+helpsvv[i][0]+".");
       for (;cit!=eit;++cit) {
@@ -108,6 +118,15 @@ double Scale_Setter_Base::HT() const
   return ht;
 }
 
+double Scale_Setter_Base::HTprime() const
+{
+  if (m_l1==0 || m_l2==0) THROW(fatal_error,"Lepton indices not set.");
+  double htp((m_p[m_l1]+m_p[m_l2]).MPerp());
+  for (size_t i(m_nin);i<m_p.size();++i)
+    if (i!=m_l1 && i!=m_l2) htp+=m_p[i].PPerp();
+  return htp;
+}
+
 Vec4D Scale_Setter_Base::PSum() const
 {
   Vec4D sum(0.0,0.0,0.0,0.0);
@@ -115,32 +134,10 @@ Vec4D Scale_Setter_Base::PSum() const
   return sum;
 }
 
-double Scale_Setter_Base::HTYweighted() const
-{
-  Vec4D psum(0.,0.,0.,0.);
-  for (size_t i(m_nin);i<m_p.size();++i) psum+=m_p[i];
-  double yboost((psum/(double)(m_p.size()-m_nin)).Y());
-  double hty(0.0);
-  for (size_t i(m_nin);i<m_p.size();++i) 
-    hty+=m_p[i].PPerp()*exp(m_htyfac*pow(abs(m_p[i].Y()-yboost),m_htyexp));
-  return hty;
-}
-
-bool Scale_Setter_Base::SetHTYweightedParameters(std::string par, 
-                                                 std::string val)
-{
-  DEBUG_FUNC(par<<" -> "<<val);
-  if      (par=="fac") m_htyfac=ToType<double>(val);
-  else if (par=="exp") m_htyexp=ToType<double>(val);
-  else                 THROW(fatal_error,"Unknown parameters.");
-  msg_Debugging()<<"fac: "<<m_htyfac<<" ,  exp: "<<m_htyexp<<std::endl;
-  return true;
-}
-
 double Scale_Setter_Base::BeamThrust() const
 {
   double tauB(0.);
-  for (size_t i(m_nin);i<m_p.size();++i) tauB+=m_p[i][0]-abs(m_p[i][3]);
+  for (size_t i(m_nin);i<m_p.size();++i) tauB+=m_p[i][0]-dabs(m_p[i][3]);
   return tauB;
 }
 

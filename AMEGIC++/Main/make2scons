@@ -2,10 +2,17 @@
 
 make_scons() {
 libname="Proc_"$(basename $(pwd))
-sources=$(for i in *.C; do printf $i | sed "s/^/'/1;s/$/',/1"; done | sed 's/,$//1')
-echo "Import('env')
+sources=$(for i in $*; do printf $i | sed "s/^/'/1;s/$/',/1" | tr '\n' ' '; done | sed 's/,$//1')
+echo "import os
+Import('env')
 lenv=env.Clone()
-proclib = lenv.SharedLibrary('${libname}',[${sources}])
+procobj = lenv.SharedObject([${sources}])
+proclib = lenv.SharedLibrary('${libname}',[])
+Depends(proclib,procobj)
+with open('${libname}.rsp',\"w\") as f:
+    for o in procobj:
+        f.write ('%s\n' %os.path.abspath(str(o)).replace('\\\\','/'))
+lenv.Append(LINKFLAGS=['@%s' % os.path.abspath('${libname}.rsp')])
 lenv.Install('\${libdir}',proclib)
 lenv.Alias('install',['\${libdir}'])" > SConscript
 }
@@ -18,20 +25,40 @@ if test -z "$2"; then
 echo "import os
 vars = Variables()
 vars.Add(PathVariable('libdir','lib path',os.getcwd()+'/Process/Amegic/lib',PathVariable.PathIsDirCreate))
-vars.Add('CXX','The C++ Compiler','g++ -Wl,--no-as-needed')
-vars.Add('CXXFLAGS','The C++ Flags',['-O2'])
-env = Environment(variables=vars,CPPPATH=['/tmp/rel-2-1-1/include/SHERPA-MC'])
+vars.Add('CXX','The C++ Compiler','mpic++ -Wl,--no-as-needed')
+vars.Add('CXXFLAGS','The C++ Flags',['-g -O2'.split(" "),''.split(" "),'-g0','-O2'])
+vars.Add(PathVariable('incdir','include path','/scratch/sherpa/rel-2-2-4/include/SHERPA-MC',PathVariable.PathIsDir))
+env = Environment(variables=vars,CPPPATH=['\${incdir}'])
 env['ENV']=os.environ
+if env['PLATFORM']=='darwin':
+   env.Append( LINKFLAGS='-Wl,-undefined -Wl,dynamic_lookup' )
 " > SConstruct;
 fi;
 test "$procdir" = "x" && exit 0;
-printf "Processing ("$(echo $procdir/P?_* $procdir/fsr* | wc -w)") ";
-for i in $procdir/P?_* $procdir/fsr*; do
+printf "Processing ("$procdir": "$(echo $procdir/?_?__* $procdir/fsr* | wc -w)") ";
+for i in $procdir/?_?__* $procdir/fsr*; do
   test -d $i || continue;
   cd $i; printf ".";
-  make_scons;
+  make_scons *.C
   subdir=$(printf $PWD | sed 's|'${basedir}'||1;s|/||1')
-  echo "SConscript('${subdir}/SConscript',exports='env')"  >> $basedir/SConstruct;
+  if test $2 -eq 1; then
+    echo "SConscript('${subdir}/SConscript',exports='env')"  >> $basedir/SConstruct;
+  fi
   cd $basedir;
 done;
+if test $2 -eq 2 && test -d $procdir; then
+  cd $procdir; printf ".";
+  make_scons $(find . -name \*.C | grep -v fsrchannels)
+  subdir=$(printf $PWD | sed 's|'${basedir}'||1;s|/||1')
+  echo "SConscript('${subdir}/SConscript',exports='env')"  >> $basedir/SConstruct;
+  for i in fsr*; do
+    if test -d $i; then
+      cd $i; printf ".";
+      subdir=$(printf $PWD | sed 's|'${basedir}'||1;s|/||1')
+      echo "SConscript('${subdir}/SConscript',exports='env')"  >> $basedir/SConstruct;
+      cd -;
+    fi
+  done
+  cd $basedir;
+fi
 echo " done";

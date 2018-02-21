@@ -16,8 +16,8 @@ using namespace PDF;
 using namespace ATOOLS;
 
 CS_Cluster_Definitions::CS_Cluster_Definitions
-(Shower *const shower,const int kmode,const int meweight,const int pdfcheck):
-  p_shower(shower), m_kmode(kmode), m_meweight(meweight), m_pdfcheck(pdfcheck) {}
+(Shower *const shower,const int kmode,const int pdfcheck,const int kfmode):
+  p_shower(shower), m_kmode(kmode), m_pdfcheck(pdfcheck), m_kfmode(kfmode) {}
 
 CParam CS_Cluster_Definitions::KPerp2
 (const Cluster_Amplitude &ampl,int i,int j,int k,
@@ -142,15 +142,14 @@ CS_Parameters CS_Cluster_Definitions::KT2
   }
   cs.m_col=col;
   KernelWeight(i,j,k,mo,cs,kmode);
-  if (cs.m_wk>0.0 &&
-      (((m_meweight&1) && (kmode&2)) || (kmode&4))) {
+  if (cs.m_wk>0.0 && (kmode&32)) {
     Cluster_Amplitude *campl(Cluster_Amplitude::New());
     campl->SetProcs(ampl->Procs<void>());
     campl->Decays()=ampl->Decays();
     campl->SetNIn(ampl->NIn());
-    campl->SetMuR2(rpa->gen.CplScale());
-    campl->SetMuF2(rpa->gen.CplScale());
-    campl->SetMuQ2(rpa->gen.CplScale());
+    campl->SetMuR2(sqr(rpa->gen.Ecms()));
+    campl->SetMuF2(sqr(rpa->gen.Ecms()));
+    campl->SetMuQ2(sqr(rpa->gen.Ecms()));
     for (size_t l(0), m(0);m<ampl->Legs().size();++m) {
       Cluster_Leg *lm(ampl->Leg(m));
       if (lm==j) continue;
@@ -189,20 +188,7 @@ double CS_Cluster_Definitions::Differential
   std::string pname(Process_Base::GenerateName(ampl));
   StringProcess_Map::const_iterator pit((*(*procs)[type]).find(pname));
   if (pit==(*(*procs)[type]).end()) return 0.0;
-  int cm(pit->second->NOut()>pit->second->Info().m_fi.NMinExternal()?1|64:0);
-  if (kmode&4) cm&=~1;
-  if (!(m_meweight&2)) {
-    SP(Color_Integrator) colint
-      (pit->second->Integrator()->ColorIntegrator());
-    if (!(colint==NULL)) {
-      while (!colint->GeneratePoint());
-      Int_Vector ni(colint->I()), nj(colint->J());
-      for (size_t i(0);i<ampl->Legs().size();++i)
-	ampl->Leg(i)->SetCol(ColorID(ni[i],nj[i]));
-    }
-  }
-  double meps=pit->second->Differential(*ampl,cm|2|4|((m_meweight&2)?64:0)|rm);
-  meps*=pit->second->SymFac();
+  double meps=pit->second->Differential(*ampl,64|rm);
   return meps;
 }
 
@@ -223,10 +209,6 @@ Flavour CS_Cluster_Definitions::ProperFlav(const Flavour &fl) const
   Flavour pfl(fl);
   switch (pfl.Kfcode()) {
   case kf_gluon_qgc: pfl=Flavour(kf_gluon); break;
-  case kf_h0_qsc: pfl=Flavour(kf_h0); break;
-  case kf_Z_qgc: pfl=Flavour(kf_Z); break;
-  case kf_Wplus_qgc: pfl=Flavour(kf_Wplus);
-    if (fl.IsAnti()) pfl=pfl.Bar(); break;
   default: break;
   }
   return pfl;
@@ -240,14 +222,17 @@ void CS_Cluster_Definitions::KernelWeight
   Splitting_Function_Base *cdip(GetSF(i,j,k,mo,cs));
   if (cdip==NULL) {
     cs.m_ws=cs.m_wk=-1.0;
-    if (m_pdfcheck && (cs.m_mode&1)) {
-      int beam=i->Id()&1?0:1;
-      if (!p_shower->ISR()->PDF(beam)->Contains(mo)) {
-	msg_Debugging()<<"Not in PDF: "<<mo<<".\n";
-	cs.m_kmode=-1;
-      }
-    }
     return;
+  }
+  if (m_pdfcheck && (cs.m_mode&1)) {
+    int beam=i->Id()&1?0:1;
+    if (p_shower->ISR()->PDF(beam) &&
+	!p_shower->ISR()->PDF(beam)->Contains(mo)) {
+      msg_Debugging()<<"Not in PDF: "<<mo<<".\n";
+      cs.m_ws=cs.m_wk=-1.0;
+      cs.m_kmode=-1;
+      return;
+    }
   }
   Flavour fls((k->Id()&3)?ProperFlav(k->Flav()).Bar():ProperFlav(k->Flav()));
   if (!(kmode&32) && !cdip->Coupling()->AllowSpec(fls)) {
@@ -256,28 +241,28 @@ void CS_Cluster_Definitions::KernelWeight
     return;
   }
   double Q2=dabs((i->Mom()+j->Mom()+k->Mom()).Abs2());
+  if (Q2<(cs.m_mode&1?
+	  p_shower->GetSudakov()->ISPT2Min():
+	  p_shower->GetSudakov()->FSPT2Min())) {
+    msg_Debugging()<<"Small Q2 "<<Q2<<"\n";
+    cs.m_ws=cs.m_wk=-1.0;
+    return;
+  }
   cs.p_sf=cdip;
   p_shower->SetMS(p_ms);
   cdip->SetFlavourSpec(fls);
   cs.m_mu2=Max(cs.m_kt2,cs.m_mode&1?
 	       p_shower->GetSudakov()->ISPT2Min():
 	       p_shower->GetSudakov()->FSPT2Min());
+  if (m_kfmode || !(kmode&16))
   cs.m_mu2*=cdip->Coupling()->CplFac(cs.m_mu2);
   if (!cdip->On()) cs.m_mu2=Max(cs.m_mu2,sqr(mo.Mass()));
   if (!(kmode&2)) return;
   if (!cdip->On()) {
-    if (AMode()==1) cs.m_wk=-1.0;
+    if (AMode()==1 || (kmode&16)) cs.m_wk=-1.0;
     else cs.m_wk=sqrt(std::numeric_limits<double>::min());
     cs.m_ws=1.0/cs.m_wk;
     msg_Debugging()<<"No Kernel. Set weight "<<cs.m_ws<<".\n";
-    if (m_pdfcheck && (cs.m_mode&1)) {
-      int beam=i->Id()&1?0:1;
-      if (p_shower->ISR()->PDF(beam) &&
-	  !p_shower->ISR()->PDF(beam)->Contains(mo)) {
-	msg_Debugging()<<"Not in PDF: "<<mo<<".\n";
-	cs.m_kmode=-1;
-      }
-    }
   }
   else {
   double scale=cs.m_kt2, eta=1.0;
@@ -290,7 +275,7 @@ void CS_Cluster_Definitions::KernelWeight
   if (cs.m_wk<=0.0 || IsBad(cs.m_wk))
     cs.m_wk=sqrt(std::numeric_limits<double>::min());
   cs.m_ws=1.0/cs.m_wk;
-  msg_Debugging()<<"Kernel weight (A="<<AMode()
+  msg_Debugging()<<"Kernel weight (A="<<AMode()<<"/NLO="<<(kmode&16)
 		 <<") [m="<<cs.m_mode<<",c="<<cs.m_col<<"] ( x = "<<eta
 		 <<" ) "<<Demangle(typeid(*cdip->Lorentz()).name()).substr(10)
 		 <<"|"<<Demangle(typeid(*cdip->Coupling()).name()).substr(10)
@@ -352,6 +337,7 @@ ATOOLS::Vec4D_Vector  CS_Cluster_Definitions::Combine
     else after[l]=lt.m_lam*ampl.Leg(m)->Mom();
     ++l;
   }
+  if (ampl.Next()) ampl.Next()->SetKin(lt.m_mode&1);
   return after;
 }
 

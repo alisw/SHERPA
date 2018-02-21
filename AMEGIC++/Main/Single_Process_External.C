@@ -50,29 +50,28 @@ AMEGIC::Single_Process_External::~Single_Process_External()
   ------------------------------------------------------------------------------*/
 
 
-int AMEGIC::Single_Process_External::InitAmplitude(Model_Base * model,Topology* top,
+int AMEGIC::Single_Process_External::InitAmplitude(Amegic_Model * model,Topology* top,
 					 vector<Process_Base *> & links,
 					 vector<Process_Base *> & errs)
 {
   Init();
-  model->GetCouplings(m_cpls);
-  if (!model->CheckFlavours(m_nin,m_nout,&m_flavs.front())) return 0;
+  model->p_model->GetCouplings(m_cpls);
+  if (!model->p_model->CheckFlavours(m_nin,m_nout,&m_flavs.front())) return 0;
   m_newlib   = false;
   string ptypename;
   ptypename = "P"+ToString(m_nin)+"_"+ToString(m_nout);
   ATOOLS::MakeDir(rpa->gen.Variable("SHERPA_CPP_PATH")+"/Process/Amegic/"+ptypename);
 
   m_Norm = SymmetryFactors() * m_pol.Spin_Average(m_nin,&m_flavs.front());
-  int oew(m_oew), oqcd(m_oqcd);
   m_pn=m_flavs.size();
-  if (oqcd==99) oqcd=m_pn-m_oew-2;  
   p_me2 = Tree_ME2_Base::GetME2(m_pinfo);
   if (!p_me2) return 0;
   p_me2->SetCouplings(m_cpls);
+  m_maxcpl[1]=m_mincpl[1]=p_me2->OrderEW();
+  m_maxcpl[0]=m_mincpl[0]=p_me2->OrderQCD();
   p_me2->FillCombinations(m_ccombs,m_cflavs);
+  p_me2->SetNorm(m_Norm);
   
-  m_oew=oew;
-  m_oqcd=oqcd;
   std::vector<Vec4D> tmoms(p_testmoms,&p_testmoms[m_nin+m_nout]);
   m_iresult=p_me2->Calc(tmoms);
   if (m_iresult==0. && !m_keep_zero_procs) return 0;
@@ -139,38 +138,23 @@ void AMEGIC::Single_Process_External::Minimize()
     p_me2=NULL;
   }
 
-  m_oqcd      = p_partner->OrderQCD();
-  m_oew       = p_partner->OrderEW();
+  m_maxcpl = p_partner->MaxOrders();
+  m_mincpl = p_partner->MinOrders();
 }
 
-double AMEGIC::Single_Process_External::Partonic(const Vec4D_Vector &_moms,const int mode) 
+double AMEGIC::Single_Process_External::Partonic(const Vec4D_Vector &moms,const int mode) 
 { 
-  if (mode==1) return m_lastxs;
-  if (!Selector()->Result()) return m_lastxs = 0.0;
+  if (mode==1) return m_mewgtinfo.m_B=m_lastxs;
+  if (!Selector()->Result()) return m_mewgtinfo.m_B=m_lastxs = 0.0;
   if (!(IsMapped() && LookUp())) {
-    p_partner->ScaleSetter()->CalculateScale(_moms);
+    p_partner->ScaleSetter()->CalculateScale(moms);
   }
-  Vec4D_Vector moms(_moms);
-  if (m_nin==2 && p_int->ISR() && p_int->ISR()->On()) {
-    Poincare cms(moms[0]+moms[1]);
-    for (size_t i(0);i<moms.size();++i) cms.Boost(moms[i]);
-  }
-  return DSigma(moms,m_lookup); 
+  return m_mewgtinfo.m_B=DSigma(moms,m_lookup);
 }
 
 double AMEGIC::Single_Process_External::DSigma(const ATOOLS::Vec4D_Vector &_moms,bool lookup)
 {
   m_lastxs = 0.;
-  if (m_nin==2) {
-    for (size_t i=0;i<m_nin+m_nout;i++) {
-      if (_moms[i][0]<m_flavs[i].Mass()) return 0.0;
-    }
-  }
-  if (m_nin==1) {
-    for (size_t i=m_nin;i<m_nin+m_nout;i++) {
-      if (_moms[i][0]<m_flavs[i].Mass()) return 0.0;
-    }
-  }
   if (p_partner == this) {
     m_lastxs = m_Norm * operator()((ATOOLS::Vec4D*)&_moms.front());
   }

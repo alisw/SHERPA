@@ -5,6 +5,8 @@
 #include "ATOOLS/Math/Function_Base.H"
 #include "PDF/Main/ISR_Handler.H"
 
+#include <vector>
+
 namespace PDF { struct PDF_Base; }
 
 namespace MODEL {
@@ -23,13 +25,18 @@ namespace MODEL {
   // up to factor 4^(i+1)
 
   class One_Running_AlphaS {
+  private:
+    bool m_pdfowned;
+
+    void InitGenericPDF(const std::string pdfname, const int member = 0);
+
   protected:
 
     int         m_order,m_pdf;
     int         m_nth,m_mzset;
     double      m_CF,m_CA;
     double      m_as_MZ,m_m2_MZ;
-    double      m_cutq2;
+    double      m_cutq2,m_cutas;
 
     AsDataSet * p_thresh;
 
@@ -51,10 +58,12 @@ namespace MODEL {
 
     // constructor
     One_Running_AlphaS(const double as_MZ,const double m2_MZ,
-		   const int order=0, const int thmode=1,
+                       const int order=0, const int thmode=1,
 		       PDF::PDF_Base *const pdf=NULL,
 		       One_Running_AlphaS *const mo=NULL);
-    
+    One_Running_AlphaS(PDF::PDF_Base *const pdf);
+    One_Running_AlphaS(const std::string pdfname, const int member=0);
+
     // destructor
     ~One_Running_AlphaS();
 
@@ -64,21 +73,24 @@ namespace MODEL {
     double AlphaS(const double q2);
     void   SelfTest();
 
-    double ShowerCutQ2();    
+    double ShowerCutQ2();
 
     // inline functions
-    inline int    Order()                { return m_order;      }
+    inline int    Order()                { return m_order;       }
     inline double Beta0(const double q2) { return Beta0(Nf(q2)); }
     inline double Beta1(const double q2) { return Beta1(Nf(q2)); }
     inline double Beta2(const double q2) { return Beta2(Nf(q2)); }
     inline double Beta3(const double q2) { return Beta3(Nf(q2)); }
-    inline double AsMZ()                 { return m_as_MZ;      }
-    int    Nf(const double q2);
+    inline double AsMZ()                 { return m_as_MZ;       }
+    inline PDF::PDF_Base * PDF()         { return p_pdf;         }
 
-    inline double CutQ2() { return m_cutq2; }    
+    int    Nf(const double q2);
+    std::vector<double> Thresholds(double q12,double q22);
+
+    inline double CutQ2() { return m_cutq2; }
 
     inline double BoundedAlphaS(const double &q2)
-    { return (*this)(std::max(q2,m_cutq2)); }
+    { return (*this)(std::max(q2, CutQ2())); }
   };
 
 
@@ -102,6 +114,8 @@ namespace MODEL {
 
     // member functions
     void SetActiveAs(PDF::isr::id id);
+    One_Running_AlphaS * GetAs() { return p_active; }
+    One_Running_AlphaS * GetAs(PDF::isr::id id);
     inline PDF::isr::id ActiveAs() { return m_active; }
 
     // proxy member functions
@@ -115,6 +129,8 @@ namespace MODEL {
     inline double Beta3(const double q2)  { return p_active->Beta3(q2); }
     inline double AsMZ()                  { return p_active->AsMZ(); }
     inline int    Nf(const double q2)     { return p_active->Nf(q2); }
+    inline std::vector<double> Thresholds(double q12,double q22)
+                                          { return p_active->Thresholds(q12,q22); }
     inline double CutQ2()                 { return p_active->CutQ2(); }
     inline double ShowerCutQ2()           { return p_active->ShowerCutQ2(); }
     inline double BoundedAlphaS(const double &q2) { return p_active->BoundedAlphaS(q2); }

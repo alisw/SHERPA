@@ -55,6 +55,10 @@ Return_Value::code Ahadic::Hadronize(Blob_List * blobs)
     if ((*blit)->Has(blob_status::needs_hadronization) &&
 	(*blit)->Type()==btp::Fragmentation) {
       blob   = (*blit);
+      // msg_Out()<<"====================================================\n"
+      // 	  <<"====================================================\n"
+      // 	  <<"====================================================\n"
+      // 	  <<(*blob)<<"\n";
       moveon = false;
       Reset();
       for (short int i=0;i<m_maxtrials;i++) {
@@ -140,7 +144,7 @@ Return_Value::code Ahadic::Hadronize(Blob_List * blobs)
   // 	       <<"=======================================================\n"
   // 	       <<(*blob)<<"\n";
   //     msg_Out()<<" nan momentum: "<<blob->OutParticle(i)->Momentum()<<"\n";
-  //     exit(0);
+  //     abort();
   //   }
   // }
   return Return_Value::Success;
@@ -195,9 +199,12 @@ Return_Value::code Ahadic::Hadronize(Blob * blob,int retry) {
   }
   assert(m_clulist.empty());
 
-  if (blob->CheckMomentumConservation().Abs2()>1.e-6) 
-    msg_Error()<<"Error in "<<METHOD<<": blob seem to be fishy.\n"
-	       <<(*blob)<<"\n";
+  if (blob->CheckMomentumConservation().Abs2()>1.e-6) {
+    msg_Error()<<METHOD<<"(): Momentum imbalance: "
+	       <<blob->CheckMomentumConservation()<<"\n";
+    msg_Debugging()<<(*blob)<<"\n";
+    return Return_Value::Retry_Event;
+  }
   return Return_Value::Success;
 }
 
@@ -227,7 +234,6 @@ bool Ahadic::SanityCheck(Blob * blob,double norm2) {
 	       <<"/ parts = "<<control::s_AHAparticles<<" vs. "<<blob->NOutP()
 	       <<"   : "<<checkmom<<" ("<<sqrt(Max(0.,checkmom.Abs2()))<<")\n"
 	       <<(*blob)<<endl;
-    exit(0);
     return false;
   }
   msg_Tracking()<<"Passed "<<METHOD<<" with "

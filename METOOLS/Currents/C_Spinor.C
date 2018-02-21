@@ -14,13 +14,14 @@ double CSpinor<Scalar>::s_accu(1.0e-12);
 template <class Scalar> std::ostream &
 METOOLS::operator<<(std::ostream &ostr,const CSpinor<Scalar> &s)
 {
-  return ostr<<(s.B()>0?(s.R()>0?"|u(":"|v("):(s.R()>0?"<u(":"<v("))<<s.On()
+  return ostr<<(s.B()>0?(s.R()>=0?(s.R()==0?"|X(":"|u("):"|v("):
+		(s.R()>=0?(s.R()==0?"<X(":"<u("):"<v("))<<s.On()
 	     <<"),"<<s.H()<<","<<s.S()<<";"<<s(0)<<","<<s(1)<<";"
 	     <<s[0]<<","<<s[1]<<","<<s[2]<<","<<s[3]<<(s.B()>0?">":"|");
 } 
 
 template <class Scalar> void CSpinor<Scalar>::
-Construct(const int h,const Vec4<Scalar> &p,Scalar m2)
+Construct(const int h,const Vec4<Scalar> &p,Scalar m2,const int ms)
 {
   if (Abs(p[1])==0.0 && Abs(p[2])==0.0 && Abs(p[3])==0.0) {
     SComplex rte(csqrt(p[0]));
@@ -48,7 +49,7 @@ Construct(const int h,const Vec4<Scalar> &p,Scalar m2)
     Spinor<Scalar> sh(1,ph); 
     m_u[2]=sh[0]; 
     m_u[3]=sh[1]; 
-    m_on=2; 
+    m_on=2;
   } 
   else {// u-(p,m) / v+(p,m) 
     Spinor<Scalar> sh(-1,ph); 
@@ -59,7 +60,7 @@ Construct(const int h,const Vec4<Scalar> &p,Scalar m2)
   } 
   if (m2<0.0) m2=p.Abs2();
   if (!ATOOLS::IsZero(m2)) {
-    Scalar sgn(m_r>0?Scalar(1.0):Scalar(-1.0));
+    Scalar sgn((m_r>0)^(ms<0)?Scalar(1.0):Scalar(-1.0));
     Scalar omp(sqrt((p[0]+ph[0])/(2.0*ph[0])));
     Scalar omm(sqrt((p[0]-ph[0])/(2.0*ph[0])));
     size_t r((m_r>0)^(h<0)?0:2);
@@ -69,6 +70,7 @@ Construct(const int h,const Vec4<Scalar> &p,Scalar m2)
     m_u[3-r]*=omp;
     m_on=3;
   }
+  if (abs(m_r)==2) m_r=0;
   if (m_b<0) {
     m_b=1;
     *this=Bar();
@@ -87,8 +89,18 @@ template <class Scalar> bool CSpinor<Scalar>::SetOn()
 template <class Scalar> std::complex<Scalar> 
 CSpinor<Scalar>::operator*(const CSpinor<Scalar> &s) const
 { 
-  if (s.m_b==m_b) THROW(fatal_error,"Equal spinor type");
+  if (s.m_b==m_b) return (*this)*s.CConj();
   return m_u[0]*s.m_u[0]+m_u[1]*s.m_u[1]+m_u[2]*s.m_u[2]+m_u[3]*s.m_u[3];
+}
+
+template <class Scalar>
+CSpinor<Scalar> CSpinor<Scalar>::CConj() const
+{ 
+  if (m_b<0)
+  return CSpinor(-m_r,-m_b,m_u[1],-m_u[0],-m_u[3],m_u[2],
+		 m_c[0],m_c[1],m_h,m_s,m_on);
+  return CSpinor(-m_r,-m_b,-m_u[1],m_u[0],m_u[3],-m_u[2],
+		 m_c[0],m_c[1],m_h,m_s,m_on);
 }
 
 template <class Scalar>
@@ -254,6 +266,11 @@ template <class Scalar>
 void CSpinor<Scalar>::Add(const CObject *c)
 {
   const CSpinor *s(static_cast<const CSpinor*>(c));
+  if (s->m_b!=m_b) {
+    CSpinor cc(s->CConj());
+    Add(&cc);
+    return;
+  }
   m_on|=s->m_on;
   if (m_on&1) {
   m_u[0]+=s->m_u[0]; 
@@ -272,6 +289,15 @@ void CSpinor<Scalar>::Divide(const double &d)
   m_u[1]/=Scalar(d); 
   m_u[2]/=Scalar(d); 
   m_u[3]/=Scalar(d);
+}
+
+template <class Scalar>
+void CSpinor<Scalar>::Multiply(const Complex &c)
+{
+  m_u[0]*=SComplex(c);
+  m_u[1]*=SComplex(c); 
+  m_u[2]*=SComplex(c); 
+  m_u[3]*=SComplex(c);
 }
 
 template <class Scalar>
@@ -299,28 +325,22 @@ CSpinor<Scalar>::s_objects;
 template <class Scalar>
 CSpinor<Scalar> *CSpinor<Scalar>::New()
 {
-  s_objects.MtxLock();
   if (s_objects.empty()) {
-    s_objects.MtxUnLock();
     return new CSpinor();
   }
   CSpinor *v(s_objects.back());
   s_objects.pop_back();
-  s_objects.MtxUnLock();
   return v;
 }
 
 template <class Scalar>
 CSpinor<Scalar> *CSpinor<Scalar>::New(const CSpinor &s)
 {
-  s_objects.MtxLock();
   if (s_objects.empty()) {
-    s_objects.MtxUnLock();
     return new CSpinor(s);
   }
   CSpinor *v(s_objects.back());
   s_objects.pop_back();
-  s_objects.MtxUnLock();
   *v=s;
   return v;
 }
@@ -330,14 +350,11 @@ CSpinor<Scalar> *CSpinor<Scalar>::New
 (const int r,const int b,const int cr,const int ca,
  const size_t &h,const size_t &s,const int on)
 {
-  s_objects.MtxLock();
   if (s_objects.empty()) {
-    s_objects.MtxUnLock();
     return new CSpinor(r,b,cr,ca,h,s,on);
   }
   CSpinor *v(s_objects.back());
   s_objects.pop_back();
-  s_objects.MtxUnLock();
   v->m_r=r;
   v->m_b=b;
   v->m_on=on;
@@ -358,9 +375,7 @@ CObject *CSpinor<Scalar>::Copy() const
 template <class Scalar>
 void CSpinor<Scalar>::Delete()
 {
-  s_objects.MtxLock();
   s_objects.push_back(this);
-  s_objects.MtxUnLock();
 }
 
 namespace METOOLS {

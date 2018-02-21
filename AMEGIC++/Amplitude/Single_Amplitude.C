@@ -193,7 +193,7 @@ void Single_Amplitude::PrintGraph()
   msg_Out()<<"Overall sign "<<sign<<endl;
 }
 
-void Single_Amplitude::Zprojecting(Flavour* fl,int ngraph,bool gc)
+void Single_Amplitude::Zprojecting(Flavour* fl,int ngraph,bool gc,bool cvp)
 {
   CFlist  = NULL;
   CCFlist = NULL;
@@ -210,7 +210,7 @@ void Single_Amplitude::Zprojecting(Flavour* fl,int ngraph,bool gc)
     CFColstringC = cgen.CF2String(CCFlist);
   }        
 
-  Zfunc_Generator zgen(BS);
+  Zfunc_Generator zgen(cvp,BS);
   zgen.BuildZlist(shand->Get_Generator(),BS,ngraph);
   zgen.LorentzConvert(Pointlist);
   zgen.MarkCut(Pointlist,0);
@@ -260,18 +260,16 @@ void Single_Amplitude::Prop_Replace(Flavour falt,int alt,int neu1,int neu2)
   plist.push_back(Ph);
 }
 
-void Single_Amplitude::SetOrderQED() {
-  int oqed =0;
-  m_oqed = GetPointlist()->FindQEDOrder(oqed);
-}
-void Single_Amplitude::SetOrderQCD() {
-  int oqcd =0;
-  m_oqcd = GetPointlist()->FindQCDOrder(oqcd);
+void Single_Amplitude::SetOrder()
+{
+  m_order.clear();
+  GetPointlist()->FindOrder(m_order);
 }
 
-int Single_Amplitude::GetOrderQED() { return m_oqed; }
-
-int Single_Amplitude::GetOrderQCD() { return m_oqcd; }
+const std::vector<int> &Single_Amplitude::GetOrder()
+{
+  return m_order;
+}
 
 
 

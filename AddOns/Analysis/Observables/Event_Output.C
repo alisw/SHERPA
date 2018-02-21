@@ -42,6 +42,7 @@ namespace ANALYSIS {
       m_wit(std::numeric_limits<size_t>::max())
     {
       m_splitt_flag=false;
+      if (reader==NULL) return;
       std::string outpath=reader->GetValue<std::string>("EVT_FILE_PATH",".");
       std::string format=reader->GetValue<std::string>("EVENT_FORMAT","None");
       std::vector<std::string> outputs;
@@ -169,7 +170,7 @@ void ATOOLS::Getter<Primitive_Observable_Base,Argument_Matrix,Event_Output>::Pri
   str<<"{\n"
      <<std::setw(width+7)<<" "<<"InList  <triggeroutlist>\n"
      <<std::setw(width+7)<<" "<<"# event output settings cf. manual, e.g.:\n"
-     <<std::setw(width+7)<<" "<<"HEPMC2_GENEVENT_OUTPUT <filename>\n"
+     <<std::setw(width+7)<<" "<<"EVENT_FORMAT HepMC_GenEvent[<filename>]\n"
      <<std::setw(width+7)<<" "<<"FILE_SIZE <n>\n"
      <<std::setw(width+7)<<" "<<"EVT_FILE_PATH <path>\n"
      <<std::setw(width+4)<<" "<<"}";

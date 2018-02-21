@@ -10,6 +10,7 @@ libPhasicSelectors_la_SOURCES =	\
 				Selector.C \
 				Variable_Selector.C \
 				Combined_Selector.C \
+				FastJet_Criterion.C \
 				Jet_Finder.C \
 				KT_Finder.C \
 				NJet_Finder.C \
@@ -32,5 +33,6 @@ localinc_HEADERS      =	\
 
 libPhasicSelectors_la_LIBADD = \
 		@CONDITIONAL_FASTJETLIBS@
-        
-INCLUDES      = @CONDITIONAL_FASTJETINCS@
+
+libPhasicSelectors_la_CPPFLAGS = $(AM_CPPFLAGS) \
+		@CONDITIONAL_FASTJETINCS@

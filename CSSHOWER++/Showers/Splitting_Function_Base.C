@@ -6,16 +6,15 @@
 #define SORT_CRITERION std::less<std::string>
 #include "ATOOLS/Org/Getter_Function.C"
 
-template class Getter_Function
+template class ATOOLS::Getter_Function
 <CSSHOWER::SF_Coupling,CSSHOWER::SF_Key,SORT_CRITERION>;
 
-template class Getter_Function
+template class ATOOLS::Getter_Function
 <void,CSSHOWER::SFC_Filler_Key,SORT_CRITERION>;
 
 #include "CSSHOWER++/Tools/Parton.H"
-#include "MODEL/Interaction_Models/Lorentz_Function.H"
-#include "MODEL/Interaction_Models/Color_Function.H"
-#include "MODEL/Interaction_Models/Single_Vertex.H"
+#include "MODEL/Main/Color_Function.H"
+#include "MODEL/Main/Single_Vertex.H"
 #include "ATOOLS/Phys/Cluster_Amplitude.H"
 #include "PDF/Main/PDF_Base.H"
 #include "ATOOLS/Math/Random.H"
@@ -33,7 +32,7 @@ double SF_Lorentz::s_kappa=2.0/3.0;
 SF_Lorentz::SF_Lorentz(const SF_Key &key):
   p_ms(key.p_ms), p_cf(key.p_cf), m_col(0)
 {
-  m_flavs[0]=key.p_v->in[0];
+  m_flavs[0]=key.p_v->in[0].Bar();
   if (key.m_mode==0) {
     m_flavs[1]=key.p_v->in[1];
     m_flavs[2]=key.p_v->in[2];
@@ -54,7 +53,7 @@ double SF_Lorentz::Lambda
 
 SF_Coupling::SF_Coupling(const SF_Key &key):
   p_lf(NULL), m_type(key.m_type),
-  m_cplfac(1.0), m_kfmode(key.m_kfmode) 
+  m_cplfac(1.0), m_kfmode(key.m_kfmode)
 {
 }
 
@@ -94,7 +93,7 @@ Splitting_Function_Base::Splitting_Function_Base(const SF_Key &key):
       return;
     }
   }
-  p_lf = SFL_Getter::GetObject(ckey.p_v->Lorentz[0]->Type(),ckey);
+  p_lf = SFL_Getter::GetObject(ckey.p_v->Lorentz[0],ckey);
   if (p_lf==NULL) {
     m_on=-1;
     return;
@@ -134,7 +133,7 @@ double Splitting_Function_Base::MEPSWeight
   double mk2(p_lf->MS()->Mass2(p_lf->FlSpec())), mc2(p_lf->MS()->Mass2(p_lf->FlC()));
   switch (m_type) {
   case cstp::FF:
-    return (8.0*M_PI)/(Q2*y)*p_lf->JFF(y,mb2/Q2,mc2/Q2,mk2/Q2,ma2/Q2);
+    return (8.0*M_PI)/(Q2*y)/p_lf->JFF(y,mb2/Q2,mc2/Q2,mk2/Q2,ma2/Q2);
   case cstp::FI:
     return (8.0*M_PI)/((Q2+mb2+mc2)*y)/p_lf->JFI(y,eta,scale);
   case cstp::IF:
@@ -150,6 +149,7 @@ double Splitting_Function_Base::operator()
   (const double z,const double y,const double eta,
    const double scale,const double Q2)
 {
+  m_lastscale = scale;
   double sf((*p_lf)(z,y,eta,scale,Q2)/m_symf/m_polfac);
   if (IsBad(sf)) {
     PRINT_INFO("Invalid weight in CSS "+
@@ -204,16 +204,16 @@ double Splitting_Function_Base::RejectionWeight
 (const double z,const double y,const double eta,
  const double scale,const double Q2) 
 {
-  double res = operator()(z,y,eta,scale,Q2)/Overestimated(z,y);
+  m_lastacceptwgt = operator()(z,y,eta,scale,Q2)/Overestimated(z,y);
 #ifdef CHECK_rejection_weight
-  if (res>1.0) {
-    msg_Error()<<METHOD<<"(): Weight is "<<res<<" in ("<<m_type<<") "
+  if (m_lastacceptwgt > 1.0) {
+    msg_Error()<<METHOD<<"(): Weight is "<<m_lastacceptwgt<<" in ("<<m_type<<") "
 	       <<p_lf->FlA()<<"->"<<p_lf->FlB()<<p_lf->FlC()
 	       <<" at z = "<<z<<", y = "<<y<<", x = "
 	       <<eta<<", Q = "<<sqrt(Q2)<<std::endl;
   }
 #endif
-  return res;
+  return m_lastacceptwgt;
 }
 
 Parton *Splitting_Function_Base::SetSpec(Parton *const spec)
@@ -263,42 +263,64 @@ bool Splitting_Function_Base::CheckPDF
 
 double SF_Lorentz::JFF(const double &y,const double &mui2,
 		       const double &muj2,const double &muk2,
-		       const double &muij2) const
+		       const double &muij2)
 { 
-  return (1.-y)*sqr(1.0-mui2-muj2-muk2)/sqrt(Lambda(1.0,muij2,muk2));
+  m_lastJ = (1.-y)*sqr(1.0-mui2-muj2-muk2)/sqrt(Lambda(1.0,muij2,muk2));
+  return m_lastJ;
 }
 
 double SF_Lorentz::JFI(const double &y,const double &eta,
-		       const double &scale) const
-{ 
-  if (scale<0.0) return 1.0;
-  double scalea(scale), scaleb(scale);
-  double fresh = p_sf->GetXPDF(scalea,eta/(1.0-y),m_flspec,m_beam);
-  double old = p_sf->GetXPDF(scaleb,eta,m_flspec,m_beam);
-  if (fresh<0.0 || old<0.0 || IsZero(old,s_pdfcut) || IsZero(fresh,s_pdfcut)) return 0.; 
-  return (1.0-y) * fresh/old;
+		       const double &scale)
+{
+  if (scale < 0.0) {
+    m_lastJ = 1.0;
+  } else {
+    const double scalea(scale), scaleb(scale);
+    const double fresh = p_sf->GetXPDF(scalea,eta/(1.0-y),m_flspec,m_beam);
+    const double old = p_sf->GetXPDF(scaleb,eta,m_flspec,m_beam);
+    if (fresh<0.0 || old<0.0 || IsZero(old,s_pdfcut) || IsZero(fresh,s_pdfcut)) {
+      m_lastJ = 0.0;
+    } else {
+      m_lastJ = (1.0 - y) * fresh / old;
+    }
+  }
+  return m_lastJ;
 }
 
 double SF_Lorentz::JIF(const double &z,const double &y,const double &eta,
-		       const double &scale) const
+		       const double &scale)
 { 
-  if (scale<0.0) return 1.0/z;
-  double scalea(scale), scaleb(scale);
-  double fresh = p_sf->GetXPDF(scalea,eta/z,m_flavs[0],m_beam);
-  double old = p_sf->GetXPDF(scaleb,eta,m_flavs[1],m_beam);
-  if (fresh<0.0 || old<0.0 || IsZero(old,s_pdfcut) || IsZero(fresh,s_pdfcut)) return 0.; 
-  return fresh/old;
+  if (scale < 0.0) {
+    m_lastJ = 1.0 / z;
+  } else {
+    const double scalea(scale), scaleb(scale);
+    const double fresh = p_sf->GetXPDF(scalea,eta/z,m_flavs[0],m_beam);
+    const double old = p_sf->GetXPDF(scaleb,eta,m_flavs[1],m_beam);
+    if (fresh<0.0 || old<0.0 || IsZero(old,s_pdfcut) || IsZero(fresh,s_pdfcut)) {
+      m_lastJ = 0.0;
+    } else {
+      m_lastJ = fresh / old;
+    }
+  }
+  return m_lastJ;
 }
 
 double SF_Lorentz::JII(const double &z,const double &y,const double &eta,
-		       const double &scale) const
+		       const double &scale)
 { 
-  if (scale<0.0) return 1.0/z;
-  double scalea(scale), scaleb(scale);
-  double fresh = p_sf->GetXPDF(scalea,eta/z,m_flavs[0],m_beam);
-  double old = p_sf->GetXPDF(scaleb,eta,m_flavs[1],m_beam);
-  if (fresh<0.0 || old<0.0 || IsZero(old,s_pdfcut) || IsZero(fresh,s_pdfcut)) return 0.; 
-  return fresh/old;
+  if (scale < 0.0) {
+    m_lastJ = 1.0 / z;
+  } else {
+    const double scalea(scale), scaleb(scale);
+    const double fresh = p_sf->GetXPDF(scalea,eta/z,m_flavs[0],m_beam);
+    const double old = p_sf->GetXPDF(scaleb,eta,m_flavs[1],m_beam);
+    if (fresh<0.0 || old<0.0 || IsZero(old,s_pdfcut) || IsZero(fresh,s_pdfcut)) {
+      m_lastJ = 0.0;
+    } else {
+      m_lastJ = fresh / old;
+    }
+  }
+  return m_lastJ;
 }
 
 void Splitting_Function_Base::ResetLastInt()
@@ -345,9 +367,9 @@ bool Splitting_Function_Base::PureQCD() const
 std::string SF_Key::ID(const int mode) const
 {
   if ((m_mode==1)^(mode==1))
-    return "{"+ToString(p_v->in[0])+"}{"
+    return "{"+ToString(p_v->in[0].Bar())+"}{"
       +ToString(p_v->in[2])+"}{"+ToString(p_v->in[1])+"}";
-  return "{"+ToString(p_v->in[0])+"}{"
+  return "{"+ToString(p_v->in[0].Bar())+"}{"
     +ToString(p_v->in[1])+"}{"+ToString(p_v->in[2])+"}";
 }
 
@@ -356,8 +378,8 @@ namespace CSSHOWER {
   std::ostream &operator<<(std::ostream &str,const SF_Key &k)
   {
     if (k.m_mode==0) 
-      return str<<k.m_type<<" "<<k.p_v->in[0]<<"->"<<k.p_v->in[1]<<","<<k.p_v->in[2];
-    return str<<k.m_type<<" "<<k.p_v->in[0]<<"->"<<k.p_v->in[2]<<","<<k.p_v->in[1];
+      return str<<k.m_type<<" "<<k.p_v->in[0].Bar()<<"->"<<k.p_v->in[1]<<","<<k.p_v->in[2];
+    return str<<k.m_type<<" "<<k.p_v->in[0].Bar()<<"->"<<k.p_v->in[2]<<","<<k.p_v->in[1];
   }
 
   std::ostream& operator<<(std::ostream& str, const Splitting_Function_Base &base) {

@@ -1,4 +1,4 @@
-/* config.h.in.  Generated from configure.in by autoheader.  */
+/* config.h.in.  Generated from configure.ac by autoheader.  */
 
 /* Architecture identified as Darwin MacOS */
 #undef ARCH_DARWIN
@@ -80,8 +80,7 @@
 /* library suffix set to .so */
 #undef LIB_SUFFIX
 
-/* Define to the sub-directory in which libtool stores uninstalled libraries.
-   */
+/* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR
 
 /* Openloops installation prefix */
@@ -107,6 +106,9 @@
 
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
+
+/* Recola installation prefix */
+#undef RECOLA_PREFIX
 
 /* Sherpa include directory */
 #undef SHERPA_INCLUDE_PATH
@@ -171,6 +173,9 @@
 /* using LHAPDF */
 #undef USING__LHAPDF
 
+/* using LHAPDF6 */
+#undef USING__LHAPDF6
+
 /* Using MCFM */
 #undef USING__MCFM
 
@@ -191,9 +196,6 @@
 
 /* using ROOT */
 #undef USING__ROOT
-
-/* using multithreading */
-#undef USING__Threading
 
 /* Version number of package */
 #undef VERSION

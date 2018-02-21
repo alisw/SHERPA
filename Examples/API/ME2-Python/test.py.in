@@ -1,5 +1,5 @@
 #!/usr/bin/env python2
-## from mpi4py import MPI
+@LOADMPIFORPY@
 import sys
 sys.path.append('@PYLIBDIR@')
 import Sherpa
@@ -12,9 +12,6 @@ try:
     Generator.InitializeTheRun(len(sys.argv),sys.argv)
     Process=Sherpa.MEProcess(Generator)
 
-    # if MPI.COMM_WORLD.Get_rank()>0:
-    #    exit(1)
-
     # Incoming flavors must be added first!
     Process.AddInFlav(11);
     Process.AddInFlav(-11);
@@ -22,19 +19,26 @@ try:
     Process.AddOutFlav(-1);
     Process.Initialize();
 
-    if Process.HasColorIntegrator(): 
-        Process.GenerateColorPoint();
-
     # First argument corresponds to particle index:
     # index 0 correspons to particle added first, index 1 is the particle added second, and so on...
     Process.SetMomentum(0, 45.6,0.,0.,45.6)
     Process.SetMomentum(1, 45.6,0.,0.,-45.6)
     Process.SetMomentum(2, 45.6,0.,45.6,0.)
     Process.SetMomentum(3, 45.6,0.,-45.6,0.)
+    print '\nSquared ME: ', Process.CSMatrixElement()
 
-    print '\nSquared matrix element:'
-    print Process.CSMatrixElement()
-    print '\n'
+    # Momentum setting via list of floats
+    Process.SetMomenta([[45.6,0.,0.,45.6],
+                        [45.6,0.,0.,-45.6],
+                        [45.6,0.,45.6,0.],
+                        [45.6,0.,-45.6,0.]])
+    print '\nSquared ME: ', Process.CSMatrixElement()
+    
+    # Random momenta
+    E_cms = 500.0
+    tp = Process.TestPoint(E_cms)
+    print '\nRandom test point: ', tp[0], tp[1], tp[2], tp[3]
+    print 'Squared ME: ', Process.CSMatrixElement(), '\n'
 
 except Sherpa.Exception as exc:
     print exc

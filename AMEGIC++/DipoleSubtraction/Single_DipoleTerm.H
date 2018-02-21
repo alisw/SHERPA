@@ -62,8 +62,6 @@ namespace AMEGIC {
 
   private:
     bool           DetermineType();
-    std::vector<PHASIC::Subprocess_Info>::iterator
-                   FindInInfo(PHASIC::Subprocess_Info& fi, int idx) const;
     void           SetLOMomenta(const ATOOLS::Vec4D*,const ATOOLS::Poincare &);
     bool           CompareLOmom(const ATOOLS::Vec4D*);
 
@@ -78,7 +76,7 @@ namespace AMEGIC {
     ATOOLS::Flavour ReMap(const ATOOLS::Flavour &fl,const size_t &id) const;
     void                AddChannels(std::list<std::string>*);
     bool                NewLibs() {return p_LO_process?p_LO_process->NewLibs():false;}
-    int                 InitAmplitude(MODEL::Model_Base *,Topology *,
+    int                 InitAmplitude(Amegic_Model *,Topology *,
 				      std::vector<Process_Base *> &,
 				      std::vector<Process_Base *> &);
     bool                SetUpIntegrator();

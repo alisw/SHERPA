@@ -6,6 +6,7 @@
 
 #include "ATOOLS/Math/MathTools.H"
 #include "ATOOLS/Phys/Cluster_Amplitude.H"
+#include "ATOOLS/Phys/Flavour.H"
 #include "ATOOLS/Org/Data_Reader.H"
 #include "ATOOLS/Org/MyStrStream.H"
 #include "ATOOLS/Org/Run_Parameter.H"
@@ -14,6 +15,7 @@
 #include "PHASIC++/Process/Process_Base.H"
 #include "PHASIC++/Process/Process_Info.H"
 #include "PHASIC++/Process/Subprocess_Info.H"
+#include "PHASIC++/Channels/Rambo.H"
 #include "PHASIC++/Main/Process_Integrator.H"
 
 #include <sstream>
@@ -21,8 +23,8 @@
 
 MEProcess::MEProcess(SHERPA::Sherpa *a_Generator) :
   m_name(""), p_amp(ATOOLS::Cluster_Amplitude::New()),
-  p_gen(a_Generator), p_proc(NULL), m_ncolinds(0),
-  m_npsp(0), m_nin(0), m_nout(0)
+  p_gen(a_Generator), p_proc(NULL), p_rambo(NULL), m_ncolinds(0),
+  m_npsp(0), m_nin(0), m_nout(0), p_colint(NULL)
 {
 }
 
@@ -30,51 +32,32 @@ MEProcess::~MEProcess()
 {
 }
 
-// TO BE REMOVED IN FINAL VERSION OR TO BE REPLACED BY PROPER METHOD TO
-// DETERMINE WHICH ME GENERATOR IS USED
-bool MEProcess::HasColorIntegrator()
-{
-  return (p_proc->Integrator()->ColorIntegrator() != 0);
-}
-
 void MEProcess::SetMomentumIndices(const std::vector<int> &pdgs)
 {
+  // fill vector m_mom_inds, such that there is a correspondence
+  // p_ampl->Leg(m_mom_inds[i]) <--> pdgs[i]
+  DEBUG_FUNC(m_nin<<"->"<<m_nout<<": "<<pdgs);
   if(pdgs.size()<m_nin+m_nout) 
     THROW(fatal_error, "Wrong number of pdg codes given.");
-  for (unsigned int i(0); i<m_nin; i++) {
-    // find the first occurence of a flavour of type pdgs[i] among the
-    // external legs
+  for (size_t i(0); i<m_nin+m_nout; i++) {
+    // find first occurence of flavour 'pdgs[i]' among external legs
+    ATOOLS::Flavour flav(abs(pdgs[i]),pdgs[i]<0?true:false);
     bool found = false;
-    for (unsigned int j(0); j < m_nin; j++) {
-      if(((long int)(p_amp->Leg(j)->Flav()))
-         ==((long int)(ATOOLS::Flavour(abs(pdgs[i]), pdgs[i]<0?false:true)))) {
-        // if the index j is already assigned, continue searching
-        if(std::find(m_mom_inds.begin(), m_mom_inds.end(), j)!=m_mom_inds.end())
+    for (size_t j(0); j<m_nin+m_nout; j++) {
+      ATOOLS::Flavour thisflav(j<m_nin?p_amp->Leg(j)->Flav().Bar():p_amp->Leg(j)->Flav());
+      if (thisflav==flav) {
+	msg_Debugging()<< flav <<" <-> "<< thisflav <<std::endl;
+        // if the index j is already assigned, continue
+        if (std::find(m_mom_inds.begin(),m_mom_inds.end(),j)!=m_mom_inds.end())
           continue;
         m_mom_inds.push_back(j);
         found=true;
         break;
       }
     }
-    if(!found) THROW(fatal_error, "Could not assign pdg code.");
+    if(!found) THROW(fatal_error, "Could not map pdg codes.");
   }
-  for (unsigned int i(m_nin); i<m_nin+m_nout; i++) {
-    // find the first occurence of a flavour of type pdgs[i] among the
-    // external legs
-    bool found = false;
-    for (unsigned int j(m_nin); j < m_nin+m_nout; j++) {
-      if(((long int)(p_amp->Leg(j)->Flav()))
-         ==((long int)(ATOOLS::Flavour(abs(pdgs[i]), pdgs[i]<0?true:false)))) {
-        // if the index j is already assigned, continue searching
-        if(std::find(m_mom_inds.begin(), m_mom_inds.end(), j)!=m_mom_inds.end())
-          continue;
-        m_mom_inds.push_back(j);
-        found=true;
-        break;
-      }
-    }
-    if(!found) THROW(fatal_error, "Could not assign pdg code.");
-  }
+  msg_Debugging()<<m_mom_inds<<std::endl;
 }
 
 size_t MEProcess::NumberOfPoints()
@@ -115,16 +98,17 @@ void MEProcess::SetMomenta(size_t n)
                     ATOOLS::ToType<double>(cur[3]),
                     ATOOLS::ToType<double>(cur[4]));
     ATOOLS::ColorID col(0,0);
+    // Flavours were added in the order given by p_proc->Flavours()
+    // Momenta need to be given in same order.
+    if (kf!=(long int)p_proc->Flavours()[id]){
+      std::stringstream err;
+      err << "Momenta must be listed flavour-ordered in run card: " << p_proc->Flavours();
+      THROW(fatal_error, err.str());
+    }
     if (cur.size()==7) col=ATOOLS::ColorID(ATOOLS::ToType<size_t>(cur[5]),
                                            ATOOLS::ToType<size_t>(cur[6]));
-    int kfamp(p_amp->Leg(id)->Flav().Kfcode());
-    if (id<m_nin) kfamp=-kfamp;
-    if (p_amp->Leg(id)->Flav().IsAnti()) kfamp=-kfamp;
-    if (kf!=kfamp) THROW(fatal_error,"Wrong momentum ordering.");
-    if (id<m_nin) p_amp->Leg(id)->SetMom(-p);
-    else          p_amp->Leg(id)->SetMom(p);
-    if (id<m_nin) p_amp->Leg(id)->SetCol(col.Conj());
-    else          p_amp->Leg(id)->SetCol(col);
+    SetMomentum(id,p);
+    SetColor(id,col);
     id++;
   }
 }
@@ -161,92 +145,92 @@ void MEProcess::SetMomentum(const size_t &index, const ATOOLS::Vec4D &p)
   else             p_amp->Leg(m_mom_inds[index])->SetMom(p);
 }
 
+void MEProcess::SetColor(const size_t &index, const ATOOLS::ColorID& col)
+{
+  if (index<m_nin) p_amp->Leg(m_mom_inds[index])->SetCol(col.Conj());
+  else             p_amp->Leg(m_mom_inds[index])->SetCol(col);
+}
+
 void MEProcess::AddInFlav(const int &id)
 {
-  p_amp->CreateLeg(ATOOLS::Vec4D(),
-                   ATOOLS::Flavour(id>0?id:-id, id>0 ? true : false));
+  DEBUG_FUNC(id);
+  ATOOLS::Flavour flav(id>0?id:-id, id>0 ? true : false);
+  p_amp->CreateLeg(ATOOLS::Vec4D(), flav);
   p_amp->SetNIn(p_amp->NIn()+1);
+  PHASIC::Process_Base::SortFlavours(p_amp);
   m_inpdgs.push_back(id);
+  m_flavs.push_back(flav);
   m_nin+=1;
 }
 
 void MEProcess::AddOutFlav(const int &id)
 {
-  p_amp->CreateLeg(ATOOLS::Vec4D(),
-                   ATOOLS::Flavour(id>0?id:-id, id>0 ? false : true));
+  DEBUG_FUNC(id);
+  ATOOLS::Flavour flav(id>0?id:-id, id>0 ? false : true);
+  p_amp->CreateLeg(ATOOLS::Vec4D(), flav);
+  PHASIC::Process_Base::SortFlavours(p_amp);
   m_outpdgs.push_back(id);
+  m_flavs.push_back(flav);
   m_nout+=1;
 }
 
 void MEProcess::AddInFlav(const int &id, const int &col1, const int &col2)
 {
-  p_amp->CreateLeg(ATOOLS::Vec4D(),
-                   ATOOLS::Flavour(id>0?id:-id, id>0 ? false : true),
+  DEBUG_FUNC(id<<" ("<<col1<<","<<col2<<")");
+  ATOOLS::Flavour flav(id>0?id:-id, id>0 ? false : true);
+  p_amp->CreateLeg(ATOOLS::Vec4D(), flav,
                    ATOOLS::ColorID(col1, col2));
   p_amp->SetNIn(p_amp->NIn()+1);
+  PHASIC::Process_Base::SortFlavours(p_amp);
   m_inpdgs.push_back(id);
+  m_flavs.push_back(flav);
   m_nin+=1;
 }
 
 void MEProcess::AddOutFlav(const int &id, const int &col1, const int &col2)
 {
-  p_amp->CreateLeg(ATOOLS::Vec4D(),
-                   ATOOLS::Flavour(id>0?id:-id, id>0 ? false : true),
+  DEBUG_FUNC(id<<" ("<<col1<<","<<col2<<")");
+  ATOOLS::Flavour flav(id>0?id:-id, id>0 ? false : true);
+  p_amp->CreateLeg(ATOOLS::Vec4D(), flav,
                    ATOOLS::ColorID(col1, col2));
+  PHASIC::Process_Base::SortFlavours(p_amp);
   m_outpdgs.push_back(id);
+  m_flavs.push_back(flav);
   m_nout+=1;
 }
 
 double MEProcess::GenerateColorPoint()
 {
-  SP(PHASIC::Color_Integrator) CI = (p_proc->Integrator()->ColorIntegrator());
-  if (CI == 0)
-    THROW(fatal_error, "No color integrator. Make sure Comix is used.");
-  CI->GeneratePoint();
+  if (p_colint==0) THROW(fatal_error, "No color integrator. Make sure Comix is used.");
+  p_colint->GeneratePoint();
   for (size_t i=0; i<p_amp->Legs().size(); ++i)
-    p_amp->Leg(i)->SetCol(ATOOLS::ColorID(CI->I()[i],CI->J()[i]));
-  return CI->GlobalWeight();
+    p_amp->Leg(i)->SetCol(ATOOLS::ColorID(p_colint->I()[i],p_colint->J()[i]));
+  SetColors();
+  return p_colint->GlobalWeight();
 }
 
 void MEProcess::SetColors()
 { 
+  if (p_colint==0) THROW(fatal_error, "No color integrator. Make sure Comix is used.");
   PHASIC::Int_Vector ci(p_amp->Legs().size());
   PHASIC::Int_Vector cj(p_amp->Legs().size());
-  SP(PHASIC::Color_Integrator) CI = (p_proc->Integrator()->ColorIntegrator());
-  if (CI==0)
-    THROW(fatal_error, "No color integrator. Make sure Comix is used.");
-  CI->GeneratePoint();
-  for (size_t i=0; i<p_amp->Legs().size(); ++i)
-    {
+  for (size_t i=0; i<p_amp->Legs().size(); ++i){
       ci[i] = p_amp->Leg(i)->Col().m_i;
       cj[i] = p_amp->Leg(i)->Col().m_j;
     }
-  CI->SetI(ci);
-  CI->SetJ(cj);
+  p_colint->SetI(ci);
+  p_colint->SetJ(cj);
 }
 
 PHASIC::Process_Base* MEProcess::FindProcess()
 {
   SHERPA::Matrix_Element_Handler* me_handler = p_gen->GetInitHandler()->GetMatrixElementHandler();
-  PHASIC::Process_Base::SortFlavours(p_amp);
   m_name = PHASIC::Process_Base::GenerateName(p_amp);
   for (unsigned int i(0); i<me_handler->ProcMaps().size(); i++)
-    {
-      PHASIC::StringProcess_Map::const_iterator pit(me_handler->ProcMaps()[i]->find(PHASIC::nlo_type::lo)->second->find(m_name));
-      //FOR DEBUGGING PURPOSES
-      // std::cout << "Initialized Processes: " << std::endl;
-      // for (PHASIC::StringProcess_Map::const_iterator 
-      // 	     it(me_handler->ProcMaps()[i]->find(PHASIC::nlo_type::lo)->second->begin()); 
-      // 	   it !=me_handler->ProcMaps()[i]->find(PHASIC::nlo_type::lo)->second->end();
-      // 	   ++it)
-      // 	{
-      // 	  std::cout << "Process " << (it->first)<< std::endl;
-      // 	}
-      if(pit == me_handler->ProcMaps()[i]->find(PHASIC::nlo_type::lo)->second->end())
-	continue;
-      else{
-	return pit->second;
-      }
+    for (PHASIC::NLOTypeStringProcessMap_Map::const_iterator sit(me_handler->ProcMaps()[i]->begin());
+	 sit!=me_handler->ProcMaps()[i]->end();++sit) {
+      PHASIC::StringProcess_Map::const_iterator pit(sit->second->find(m_name));
+      if (pit!=sit->second->end()) return pit->second;
     }
   return NULL;
 }
@@ -256,20 +240,19 @@ void MEProcess::Initialize()
   p_proc = FindProcess();
   // if no process was found, assume there is only
   // one initialized in the run card and take that one
+  DEBUG_FUNC((p_proc?p_proc->Name():"no process set yet"));
   if(!p_proc){
     SHERPA::Matrix_Element_Handler* me_handler = p_gen->GetInitHandler()
       ->GetMatrixElementHandler();
     PHASIC::Process_Vector procs = me_handler->AllProcesses();
     if (procs.size()>1) THROW(fatal_error,"More than one process initialised.");
     p_proc=procs[0];
+    msg_Debugging()<<"Process: "<<p_proc->Name()<<std::endl;
     // fill cluster amplitude according to process
-    for (size_t i(0);i<p_proc->NIn()+p_proc->NOut();++i){
-      ATOOLS::Flavour fl=p_proc->Flavours()[i];
-      if (i<p_proc->NIn()) fl=fl.Bar();
-      p_amp->CreateLeg(ATOOLS::Vec4D(),fl);
-      m_inpdgs.push_back(fl.IsAnti()?-fl.Kfcode():fl.Kfcode());
+    for (size_t i(0);i<p_proc->Flavours().size();++i) {
+      if(i<p_proc->NIn()) AddInFlav((long int)p_proc->Flavours()[i]);
+      else               AddOutFlav((long int)p_proc->Flavours()[i]);
     }
-    p_amp->SetNIn(m_nin=p_proc->NIn());
   }
   m_name=p_proc->Name();
   for (unsigned int i = 0; i<p_amp->Legs().size(); i++) {
@@ -322,23 +305,50 @@ void MEProcess::Initialize()
   for (std::vector<int>::const_iterator it=m_outpdgs.begin();
        it!=m_outpdgs.end(); it++) allpdgs.push_back(*it);
   SetMomentumIndices(allpdgs);
+  if(p_proc->Integrator()->ColorIntegrator()!=NULL)
+    p_colint = p_proc->Integrator()->ColorIntegrator();
+  
+  p_rambo = new PHASIC::Rambo(m_nin,m_nout,
+			      &m_flavs.front(),
+			      p_proc->Generator());
+}
+
+ATOOLS::Vec4D_Vector MEProcess::TestPoint(const double& E){
+  ATOOLS::Vec4D_Vector p; p.resize(m_nin+m_nout);
+  if (m_nin==1) {
+    p[0]=ATOOLS::Vec4D(m_flavs[0].Mass(),0.0,0.0,0.0);
+    if (m_nout==1) { p[1]=p[0];  return p;}
+  }
+  else {
+    double m[2]={m_flavs[0].Mass(),m_flavs[1].Mass()};
+    if (E<m[0]+m[1]) THROW(fatal_error, "sqrt(s) smaller than particle masses");
+    double x=1.0/2.0+(m[0]*m[0]-m[1]*m[1])/(2.0*E*E);
+    p[0]=ATOOLS::Vec4D(x*E,0.0,0.0,sqrt(ATOOLS::sqr(x*E)-m[0]*m[0]));
+    p[1]=ATOOLS::Vec4D((1.0-x)*E,ATOOLS::Vec3D(-p[0]));
+  }
+  p_rambo->GeneratePoint(&p[0],(PHASIC::Cut_Data*)(NULL));
+  SetMomenta(p);
+  GenerateColorPoint();
+  return p;
 }
 
 double MEProcess::MatrixElement()
 {
-  if (!HasColorIntegrator()) return p_proc->Differential(*p_amp);
-  SP(PHASIC::Color_Integrator) ci(p_proc->Integrator()->ColorIntegrator());
-  ci->SetWOn(false);
-  double res(p_proc->Differential(*p_amp));
-  ci->SetWOn(true);
+  if(p_colint!=NULL) p_colint->SetWOn(false);
+  double res(p_proc->Differential(*p_amp,1|4));
+  if(p_colint!=NULL) p_colint->SetWOn(true);
+  // if(res!=0.0){
+  //   PRINT_VAR(*p_amp);
+  //   PRINT_VAR(res);
+  //   exit(0);
+  // }
   return res;
 }
 
 double MEProcess::CSMatrixElement()
 {
-  if (!HasColorIntegrator()) return p_proc->Differential(*p_amp);
-  SP(PHASIC::Color_Integrator) ci(p_proc->Integrator()->ColorIntegrator());
-  ci->SetWOn(false);
+  if (p_colint==NULL) return MatrixElement();
+  GenerateColorPoint();
   double r_csme(0.);
   std::vector<std::vector<int> >::const_iterator it;
   std::vector<int>::const_iterator jt;
@@ -361,9 +371,8 @@ double MEProcess::CSMatrixElement()
     if(ind!=m_ncolinds/2)  THROW(fatal_error, "Internal Error");
     if(indbar!=m_ncolinds) THROW(fatal_error, "Internal Error");
     SetColors();
-    r_csme+=p_proc->Differential(*p_amp);
+    r_csme+=MatrixElement();
   }
-  ci->SetWOn(true);
   return r_csme;
 }
 

@@ -20,8 +20,12 @@ using namespace ATOOLS;
 using namespace PHASIC;
 using namespace std;
 
-Signal_Processes::Signal_Processes(Matrix_Element_Handler * mehandler) :
-  p_mehandler(mehandler), p_atensor(NULL), m_overweight(0.0)
+Signal_Processes::Signal_Processes(Matrix_Element_Handler * mehandler,
+                                   Variations * variations) :
+  p_mehandler(mehandler),
+  p_variations(variations),
+  m_overweight(0.0),
+  m_variationweights(p_variations)
 {
   m_name="Signal_Processes";
   m_type=eph::Perturbative;
@@ -30,14 +34,12 @@ Signal_Processes::Signal_Processes(Matrix_Element_Handler * mehandler) :
   if (p_remnants[0]==NULL || p_remnants[1]==NULL)
     THROW(critical_error,"No beam remnant handler found.");
   Data_Reader read(" ",";","!","=");
+  read.AddComment("#");
   m_setcolors=read.GetValue<int>("SP_SET_COLORS",0);
   m_cmode=ToType<int>(rpa->gen.Variable("METS_CLUSTER_MODE"));
+  m_docmode=read.GetValue<int>("SP_DOC_MODE",1);
 }
 
-Signal_Processes::~Signal_Processes()
-{
-  if (p_atensor) delete p_atensor;
-}
 
 Return_Value::code Signal_Processes::Treat(Blob_List * bloblist, double & weight)
 {
@@ -46,23 +48,26 @@ Return_Value::code Signal_Processes::Treat(Blob_List * bloblist, double & weight
     MODEL::as->SetActiveAs(PDF::isr::hard_process);
     while (true) {
       if (m_overweight>0.0) {
-	if (m_overweight<ran->Get()) {
-	  m_overweight=0.0;
-	  CleanUp();
-	  continue;
-	}
-	double overweight(m_overweight-1.0);
-	if (!FillBlob(bloblist,blob))
-	  THROW(fatal_error,"Internal error");
-	(*blob)["Trials"]->Set(0.0);
-	m_overweight=Max(overweight,0.0);
-	weight = p_mehandler->WeightInfo().m_weight;
-	return Return_Value::Success; 
+        if (m_overweight<ran->Get()) {
+          m_overweight=0.0;
+          CleanUp();
+          continue;
+        }
+        double overweight(m_overweight-1.0);
+        if (!FillBlob(bloblist,blob))
+          THROW(fatal_error,"Internal error");
+        (*blob)["Trials"]->Set(0.0);
+        m_overweight=Max(overweight,0.0);
+        weight = p_mehandler->WeightInfo().m_weight;
+        return Return_Value::Success; 
       }
+      m_variationweights = Variation_Weights(p_variations);
+      p_mehandler->SetVariationWeights(&m_variationweights);
       if (p_mehandler->GenerateOneEvent() &&
-	  FillBlob(bloblist,blob)) {
-	weight = p_mehandler->WeightInfo().m_weight;
-	return Return_Value::Success; 
+          FillBlob(bloblist,blob)) {
+        weight = p_mehandler->WeightInfo().m_weight;
+        p_mehandler->SetVariationWeights(NULL);
+        return Return_Value::Success; 
       }
       else return Return_Value::New_Event;
     }
@@ -81,10 +86,35 @@ bool Signal_Processes::FillBlob(Blob_List *const bloblist,Blob *const blob)
       proc->Parent()->Info().m_fi.NLOType()!=nlo_type::lo) {
     MCatNLO_Process* mcatnloproc=dynamic_cast<MCatNLO_Process*>(proc->Parent());
     if (mcatnloproc) {
-      if (mcatnloproc->WasSEvent())
+      if (mcatnloproc->WasSEvent()) {
         blob->SetTypeSpec(proc->Parent()->Name()+"+S");
-      else
+
+        if (m_docmode) {
+          // If documentation mode is enabled, add disconnected blob of original
+          // configuration, e.g. for parton-level stitching samples a posteriori
+          Process_Base* bproc = mcatnloproc->BProc()->Selected();
+          Blob* docblob = bloblist->AddBlob(btp::Unspecified);
+          for (unsigned int i=0;i<bproc->NIn();i++) {
+            Particle* particle = new Particle(0,bproc->Flavours()[i],
+                                              bproc->Integrator()->Momenta()[i]);
+            particle->SetNumber(0);
+            particle->SetStatus(part_status::documentation);
+            particle->SetInfo('m');
+            docblob->AddToInParticles(particle);
+          }
+          for (unsigned int i=bproc->NIn(); i<bproc->NIn()+bproc->NOut();i++) {
+            Particle* particle = new Particle(0,bproc->Flavours()[i],
+                                              bproc->Integrator()->Momenta()[i]);
+            particle->SetNumber(0);
+            particle->SetStatus(part_status::documentation);
+            particle->SetInfo('M');
+            docblob->AddToOutParticles(particle);
+          }
+        }
+      }
+      else {
         blob->SetTypeSpec(proc->Parent()->Name()+"+H");
+      }
       if (m_setcolors) ampl=mcatnloproc->GetAmplitude();
     }
   }
@@ -154,35 +184,48 @@ bool Signal_Processes::FillBlob(Blob_List *const bloblist,Blob *const blob)
     blob->AddData("Resummation_Scale",new Blob_Data<double>(ampl->MuQ2()));
   }
   if (ampl) ampl->Delete();
-  PHASIC::Weight_Info winfo(p_mehandler->WeightInfo());
+  ATOOLS::Weight_Info winfo(p_mehandler->WeightInfo());
   double weight(winfo.m_weight);
+  double weightfactor(1.0);
   if (p_mehandler->EventGenerationMode()==1) {
     m_overweight=p_mehandler->WeightFactor()-1.0;
-    if (m_overweight<0.0) m_overweight=0.0;
-    else weight/=m_overweight+1.0;
+    if (m_overweight<0.0) {
+      m_overweight=0.0;
+    } else {
+      weightfactor = 1.0 / (m_overweight + 1.0);
+      weight *= weightfactor;
+      m_variationweights *= weightfactor;
+    }
   }
+
+  // fill variation weights such that later event phases can update them
+  blob->AddData("Variation_Weights", new Blob_Data<Variation_Weights>(m_variationweights));
+  if (p_mehandler->EventGenerationMode()==1 && weightfactor != 1.0) {
+    // reset variation weights as they might be reused for the next "event"
+    // which might compensate that we have divided out the overweight now
+    m_variationweights *= 1.0 / weightfactor;
+  }
+
   blob->AddData("Weight",new Blob_Data<double>(weight));
   blob->AddData("MEWeight",new Blob_Data<double>(winfo.m_dxs));
   blob->AddData("Weight_Norm",new Blob_Data<double>
 		(p_mehandler->Sum()*rpa->Picobarn()));
   blob->AddData("Trials",new Blob_Data<double>(winfo.m_ntrial));
   blob->AddData("Enhance",new Blob_Data<double>
-		(p_mehandler->Process()->Integrator()->EnhanceFactor()));
+                (proc->Integrator()->EnhanceFactor()));
   blob->AddData("Factorisation_Scale",new Blob_Data<double>
                 (sqrt(winfo.m_pdf.m_muf12*winfo.m_pdf.m_muf22)));
-  blob->AddData("PDFInfo",new Blob_Data<PHASIC::PDF_Info>(winfo.m_pdf));
-  blob->AddData("OQCD",new Blob_Data<int>
-		(p_mehandler->Process()->OrderQCD()));
-  blob->AddData("OEW",new Blob_Data<int>
-		(p_mehandler->Process()->OrderEW()));
+  blob->AddData("PDFInfo",new Blob_Data<ATOOLS::PDF_Info>(winfo.m_pdf));
+  blob->AddData("Orders",new Blob_Data<std::vector<double> >
+		(p_mehandler->Process()->MaxOrders()));
   blob->AddData("NLOQCDType",new Blob_Data<std::string>
-		(ToString(p_mehandler->Process()->Info().m_fi.m_nloqcdtype)));
+                (ToString(proc->Info().m_fi.m_nloqcdtype)));
   blob->AddData("NLOEWType",new Blob_Data<std::string>
-		(ToString(p_mehandler->Process()->Info().m_fi.m_nloewtype)));
+                (ToString(proc->Info().m_fi.m_nloewtype)));
 
-  ME_wgtinfo* wgtinfo=proc->GetMEwgtinfo();
+  ME_Weight_Info* wgtinfo=proc->GetMEwgtinfo();
   if (wgtinfo) {
-    blob->AddData("ME_wgtinfo",new Blob_Data<ME_wgtinfo*>(wgtinfo));
+    blob->AddData("MEWeightInfo",new Blob_Data<ME_Weight_Info*>(wgtinfo));
     blob->AddData("Renormalization_Scale",new Blob_Data<double>(wgtinfo->m_mur2));
   }
   NLO_subevtlist* nlos=proc->GetSubevtList();
@@ -216,11 +259,10 @@ bool Signal_Processes::FillBlob(Blob_List *const bloblist,Blob *const blob)
     vector<int> spin_i(parts.size(), -1), spin_j(parts.size(), -1);
     vector<Particle*> partsonly(parts.size());
     for (size_t i=0; i<parts.size(); ++i) partsonly[i]=parts[i].first;
-    if (p_atensor) delete p_atensor;
-    p_atensor=new Amplitude2_Tensor(partsonly, permutation, 0, amps, cols,
-                                    spin_i, spin_j);
-    DEBUG_VAR(*p_atensor);
-    blob->AddData("ATensor",new Blob_Data<Amplitude2_Tensor*>(p_atensor));
+    Amplitude2_Tensor* atensor = new Amplitude2_Tensor
+      (partsonly, permutation, 0, amps, spin_i, spin_j);
+    DEBUG_VAR(*atensor);
+    blob->AddData("ATensor",new Blob_Data<SP(METOOLS::Amplitude2_Tensor)>(atensor));
   }
   return success;
 }

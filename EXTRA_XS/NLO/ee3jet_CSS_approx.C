@@ -4,6 +4,7 @@
 #include "EXTRA_XS/Main/ME2_Base.H"
 #include "MODEL/Main/Running_AlphaS.H"
 #include "MODEL/Main/Model_Base.H"
+#include "MODEL/UFO/UFO_Model.H"
 #include "PHASIC++/Process/Process_Info.H"
 #include "ATOOLS/Org/Data_Reader.H"
 
@@ -41,7 +42,7 @@ XS_ee3jet_CSS_approx::XS_ee3jet_CSS_approx
   pico.m_fi.m_nloqcdtype=nlo_type::lo;
   PRINT_INFO(pico);
   p_bornme = dynamic_cast<ME2_Base*>(PHASIC::Tree_ME2_Base::GetME2(pico));
-  m_alphasdef = (*MODEL::as)(rpa->gen.CplScale());
+  m_alphasdef = MODEL::as->Default();
   PRINT_INFO("initialised XS_ee3jet_CSS_approx2");
 }
 
@@ -85,6 +86,7 @@ Tree_ME2_Base *ATOOLS::Getter
 <Tree_ME2_Base,Process_Info,XS_ee3jet_CSS_approx>::
 operator()(const Process_Info &pi) const
 {
+  if (dynamic_cast<UFO::UFO_Model*>(MODEL::s_model)) return NULL;
   Data_Reader read(" ",";","!","=");
   if (read.GetValue<int>("EXTRAXS_CSS_APPROX_ME",0)==0) return NULL;
   if (pi.m_fi.NLOType()!=nlo_type::lo) return NULL;
@@ -93,7 +95,8 @@ operator()(const Process_Info &pi) const
   if (fl[0].IsLepton() && fl[1]==fl[0].Bar() &&
       fl[2].IsGluon()  &&
       fl[3].IsQuark()  && fl[3]==fl[4].Bar()) {
-    if ((pi.m_oqcd==1 || pi.m_oqcd==99) && (pi.m_oew==2 || pi.m_oew==99)) {
+    if (pi.m_maxcpl[0]==1 && pi.m_maxcpl[1]==2 &&
+	pi.m_mincpl[0]==1 && pi.m_mincpl[1]==2) {
       return new XS_ee3jet_CSS_approx(pi,fl);
     }
   }

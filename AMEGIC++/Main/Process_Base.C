@@ -8,6 +8,7 @@
 #include "ATOOLS/Org/Run_Parameter.H"
 #include "PHASIC++/Channels/Multi_Channel.H"
 #include "PHASIC++/Channels/Single_Channel.H"
+#include "ATOOLS/Org/Shell_Tools.H"
 #include "ATOOLS/Org/Data_Reader.H"
 #include "ATOOLS/Org/Exception.H"
 #include "ATOOLS/Org/Message.H"
@@ -63,9 +64,20 @@ void AMEGIC::Process_Base::Init()
   for (size_t i(0);i<m_pinfo.m_ii.m_ps.size();++i)
     p_pl[i]=ExtractPolInfo(m_pinfo.m_ii.m_ps[i]);
   p_pinfo->GetTotalPolList(p_pl+NIn());
-  SetOrderQCD(m_pinfo.m_oqcd);
-  SetOrderEW(m_pinfo.m_oew);
-  SetNTchanmin(m_pinfo.m_ntchan);
+  m_mincpl.resize(m_pinfo.m_mincpl.size());
+  for (size_t i(0);i<m_mincpl.size();++i) {
+    m_mincpl[i]=m_pinfo.m_mincpl[i];
+    if (m_mincpl[i]!=m_pinfo.m_mincpl[i])
+      THROW(not_implemented,"Non-integer couplings not supported by Amegic");
+  }
+  m_maxcpl.resize(m_pinfo.m_maxcpl.size());
+  for (size_t i(0);i<m_maxcpl.size();++i) {
+    m_maxcpl[i]=m_pinfo.m_maxcpl[i];
+    if (m_maxcpl[i]!=m_pinfo.m_maxcpl[i])
+      THROW(not_implemented,"Non-integer couplings not supported by Amegic");
+  }
+  SetNTchanmin(m_pinfo.m_ntchanmin);
+  SetNTchanmax(m_pinfo.m_ntchanmax);
   p_b    = new int[NIn()+NOut()];
   for (size_t i=0;i<NIn();i++) p_b[i] = -1; 
   for (size_t i=NIn();i<NIn()+NOut();i++) p_b[i] = 1; 
@@ -208,6 +220,10 @@ ATOOLS::Flavour AMEGIC::Process_Base::ReMap(const ATOOLS::Flavour& f0,const std:
 
   else {
     DO_STACK_TRACE;
+    PRINT_VAR(this<<" "<<Name()<<" "<<Demangle(typeid(*this).name()));
+    PRINT_VAR(p_mapproc<<" "<<p_mapproc->Name()<<" "<<Demangle(typeid(*p_mapproc).name()));
+    PRINT_VAR(((Process_Base*)this)->Parent()<<" "<<((Process_Base*)this)->Parent()->Name());
+    PRINT_VAR(p_mapproc->Parent()<<" "<<p_mapproc->Parent()->Name());
     THROW(critical_error,"Flavour map incomplete!");
   }
   return f0;
@@ -231,6 +247,10 @@ ATOOLS::Flavour AMEGIC::Process_Base::ReMap
     if (ifl.IsBoson()) return ifl;
     else {
       DO_STACK_TRACE;
+      PRINT_VAR(this<<" "<<Name()<<" "<<Demangle(typeid(*this).name()));
+      PRINT_VAR(p_mapproc<<" "<<p_mapproc->Name()<<" "<<Demangle(typeid(*p_mapproc).name()));
+      PRINT_VAR(((Process_Base*)this)->Parent()<<" "<<((Process_Base*)this)->Parent()->Name());
+      PRINT_VAR(p_mapproc->Parent()<<" "<<p_mapproc->Parent()->Name());
       THROW(critical_error,"Flavour map incomplete!");
     }
   }
@@ -249,4 +269,15 @@ bool AMEGIC::Process_Base::FlavCompare(PHASIC::Process_Base *const proc)
   for (size_t i(0);i<m_nin+m_nout;++i)
     if (m_flavs[i].IsAnti()!=proc->Flavours()[i].IsAnti()) flavsok=false;
   return flavsok;
+}
+
+std::string  AMEGIC::Process_Base::CreateLibName()
+{
+  std::string name(m_name);
+  size_t bpos(name.find("__QCD("));
+  if (bpos!=std::string::npos) {
+    size_t epos(name.find(')',bpos));
+    if (epos!=std::string::npos) name.erase(bpos,epos-bpos+1);
+  }
+  return ShellName(name);
 }

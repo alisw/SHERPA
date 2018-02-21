@@ -5,16 +5,12 @@
 #include "ATOOLS/Phys/Flavour.H"
 #include "ATOOLS/Org/CXXFLAGS.H"
 
-#ifdef USING__Threading
-#include <pthread.h>
-#endif
-
 namespace ATOOLS {
 
   struct ColorID {
     int m_i, m_j;
     inline ColorID(const int &i=-1,const int &j=-1): m_i(i), m_j(j) {}
-    inline ColorID Conj() { return ColorID(m_j,m_i); }
+    inline ColorID Conj() const { return ColorID(m_j,m_i); }
     inline bool operator==(const ColorID &c) const 
     { return c.m_i==m_i && c.m_j==m_j; }
     inline bool Singlet() { return m_i==m_j; }
@@ -28,31 +24,11 @@ namespace ATOOLS {
   class Cluster_Leg;
 
   class ClusterLeg_PVector: public std::vector<Cluster_Leg*> {
-  private:
-
-#ifdef USING__Threading
-    pthread_mutex_t m_mtx;
-#endif
-
   public:
 
     ClusterLeg_PVector();
 
     ~ClusterLeg_PVector();
-
-    inline void MtxLock()
-    {
-#ifdef USING__Threading
-      pthread_mutex_lock(&m_mtx);
-#endif
-    }
-
-    inline void MtxUnLock()
-    {
-#ifdef USING__Threading
-      pthread_mutex_unlock(&m_mtx);
-#endif
-    }
 
   };// end of class ClusterLeg_PVector
 
@@ -65,6 +41,7 @@ namespace ATOOLS {
     Vec4D   m_p;
     Flavour m_fl;
     ColorID m_c;
+    bool m_fromdec;
 
     double  m_kt2[2];
 
@@ -79,7 +56,7 @@ namespace ATOOLS {
 		       const Vec4D &p,const Flavour &fl,
 		       const ColorID &c=ColorID()):
       p_ampl(ampl), m_id(0), m_st(0), m_n(0), m_d(0), m_k(0),
-      m_p(p), m_fl(fl), m_c(c)
+      m_p(p), m_fl(fl), m_c(c), m_fromdec(false)
     { m_kt2[0]=m_kt2[1]=-1.0; }
 
     inline ~Cluster_Leg() {}
@@ -115,6 +92,10 @@ namespace ATOOLS {
     inline size_t K() const    { return m_k;  }
 
     inline double KT2(const int i) const { return m_kt2[i]; }
+
+    inline void SetFromDec(const bool &val){m_fromdec=val;}
+    inline bool FromDec() const {return m_fromdec;}
+
 
   };// end of class Cluster_Leg
 

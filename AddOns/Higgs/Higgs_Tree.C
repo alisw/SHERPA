@@ -5,6 +5,7 @@
 #include "ATOOLS/Org/Data_Reader.H"
 #include "ATOOLS/Org/Message.H"
 #include "ATOOLS/Org/Exception.H"
+#include "MODEL/UFO/UFO_Model.H"
 
 #include "Wrappers.H"
 #include "dilog.h"
@@ -77,9 +78,9 @@ double Higgs_Tree::Calc(const Vec4D_Vector &p)
   DEBUG_FUNC(this<<", m_mode = "<<m_mode);
   double muR=p_aqcd->Scale();
   if (muR>0.0) muR=sqrt(muR);
-  else muR=sqrt(rpa->gen.CplScale());
+  else muR=rpa->gen.Ecms();
   mu_sq=sqr(muR);
-  alpha0=s_model->ScalarConstant("alpha_QED(0)");
+  alpha0=s_model->ScalarConstant("alpha_QED");
   msg_Debugging()<<"\\mu_R = "<<muR<<" -> alpha = "
 		 <<alpha0<<", alpha_s = "<<alpha_s(muR)<<"\n";
   for (size_t i(0);i<p.size();++i)
@@ -397,7 +398,16 @@ void Higgs_Tree::FillCombinations
 
 int Higgs_Tree::OrderQCD(const int &id)
 {
-  return m_n==4?2:3;
+  if (m_int == 4) {  // background only
+    return (m_n == 4) ? 0 : 1;
+  } else if ((m_int & 4) == 0) {  // signal only
+    return (m_n == 4) ? 2 : 3;
+  } else {
+    // mixed case, can not return a well-defined value; for reweighting you
+    // have to generate the contributions separately, in particular
+    // interference terms are not supported yet
+    return 99;
+  }
 }
 
 int Higgs_Tree::OrderEW(const int &id)
@@ -451,6 +461,7 @@ Tree_ME2_Base *ATOOLS::Getter<Tree_ME2_Base,Process_Info,Higgs_Tree>::
 operator()(const Process_Info &pi) const
 {
   DEBUG_FUNC(pi);
+  if (dynamic_cast<UFO::UFO_Model*>(MODEL::s_model)) return NULL;
   if (pi.m_loopgenerator!="Higgs") return NULL;
   if (pi.m_fi.m_nloewtype!=nlo_type::lo) return NULL;
   if (pi.m_fi.m_nloqcdtype==nlo_type::lo ||

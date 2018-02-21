@@ -45,50 +45,12 @@ PS_Generator::PS_Generator(Process_Base *const xs):
   else msg_Info()<<METHOD<<"(): Set channel mass threshold "<<m_chmass<<".\n";
   m_chmass*=rpa->gen.Ecms();
   p_xs->ConstructPSVertices(this);
+  AddSC();
   AddSTCC();
-#ifdef USING__Threading
-  int helpi(0);
-  if (!read.ReadFromFile(helpi,"COMIX_PG_THREADS")) helpi=0;
-  else msg_Tracking()<<METHOD<<"(): Set number of threads "<<helpi<<".\n";
-  if (helpi>0) {
-    m_cts.resize(helpi);
-    for (size_t i(0);i<m_cts.size();++i) {
-      CDBG_PG_TID *tid(new CDBG_PG_TID(this));
-      m_cts[i] = tid;
-      pthread_cond_init(&tid->m_s_cnd,NULL);
-      pthread_cond_init(&tid->m_t_cnd,NULL);
-      pthread_mutex_init(&tid->m_s_mtx,NULL);
-      pthread_mutex_init(&tid->m_t_mtx,NULL);
-      pthread_mutex_lock(&tid->m_s_mtx);
-      pthread_mutex_lock(&tid->m_t_mtx);
-      tid->m_s=1;
-      int tec(0);
-      if ((tec=pthread_create(&tid->m_id,NULL,&TCalcJL,(void*)tid)))
-	THROW(fatal_error,"Cannot create thread "+ToString(i));
-    }
-  }
-#endif
 }
 
 PS_Generator::~PS_Generator()
 {
-#ifdef USING__Threading
-  for (size_t i(0);i<m_cts.size();++i) {
-    CDBG_PG_TID *tid(m_cts[i]);
-    tid->m_s=0;
-    pthread_cond_wait(&tid->m_s_cnd,&tid->m_s_mtx);
-    int tec(0);
-    if ((tec=pthread_join(tid->m_id,NULL)))
-      THROW(fatal_error,"Cannot join thread"+ToString(i));
-    pthread_mutex_unlock(&tid->m_t_mtx);
-    pthread_mutex_unlock(&tid->m_s_mtx);
-    pthread_mutex_destroy(&tid->m_t_mtx);
-    pthread_mutex_destroy(&tid->m_s_mtx);
-    pthread_cond_destroy(&tid->m_t_cnd);
-    pthread_cond_destroy(&tid->m_s_cnd);
-    delete tid;
-  }
-#endif
   CleanUp();
 }
 
@@ -130,61 +92,14 @@ void PS_Generator::SetColors(const Int_Vector &rc,
   }
 }
 
-#ifdef USING__Threading
-void *PS_Generator::TCalcJL(void *arg)
-{
-  CDBG_PG_TID *tid((CDBG_PG_TID*)arg);
-  while (true) {
-    // wait for generator to signal
-    pthread_mutex_lock(&tid->m_s_mtx);
-    pthread_mutex_unlock(&tid->m_s_mtx);
-    pthread_cond_signal(&tid->m_s_cnd);
-    if (tid->m_s==0) return NULL;
-    // worker routine
-    for (tid->m_i=tid->m_b;tid->m_i<tid->m_e;++tid->m_i) 
-      tid->p_psg->m_cur[tid->m_n][tid->m_i]->Evaluate();
-    // signal generator to continue
-    pthread_cond_wait(&tid->m_t_cnd,&tid->m_t_mtx);
-  }
-  return NULL;
-}
-#endif
-
 void PS_Generator::CalcJL()
 {
   for (size_t i(0);i<m_cur[1].size();++i) 
-    m_cur[1][i]->ConstructJ(Vec4D(),0,m_cl[i][0],m_cl[i][1]);
+    m_cur[1][i]->ConstructJ(Vec4D(),0,m_cl[i][0],m_cl[i][1],0);
   if (m_zmode>0) {
     for (size_t n(2);n<m_n;++n) {
-#ifdef USING__Threading
-      if (m_cts.empty()) {
-	for (size_t i(0);i<m_cur[n].size();++i) 
-	  m_cur[n][i]->Evaluate();
-      }
-      else {
-	// start calculator threads
-	size_t d(m_cur[n].size()/m_cts.size());
-	if (m_cur[n].size()%m_cts.size()>0) ++d;
-	for (size_t j(0), i(0);j<m_cts.size()&&i<m_cur[n].size();++j) {
-	  CDBG_PG_TID *tid(m_cts[j]);
-	  tid->m_n=n;
-	  tid->m_b=i;
-	  tid->m_e=Min(i+=d,m_cur[n].size());
-	  pthread_cond_wait(&tid->m_s_cnd,&tid->m_s_mtx);
-	}
-	// suspend calculator threads
-	for (size_t j(0), i(0);j<m_cts.size()&&i<m_cur[n].size();++j) {
-	  i+=d;
-	  CDBG_PG_TID *tid(m_cts[j]);
-	  pthread_mutex_lock(&tid->m_t_mtx);
-	  pthread_mutex_unlock(&tid->m_t_mtx);
-	  pthread_cond_signal(&tid->m_t_cnd);
-	}
-      }
-#else
       for (size_t i(0);i<m_cur[n].size();++i) 
 	m_cur[n][i]->Evaluate();
-#endif
     }
     for (size_t n(m_n-2);n>=2;--n)
       for (size_t i(0);i<m_cur[n].size();++i)
@@ -239,8 +154,7 @@ bool PS_Generator::AddCurrent
   cur->SetDirection(ref->Direction());
   cur->SetCut(ref->Cut());
   cur->SetOnShell(ref->OnShell());
-  cur->SetOrderEW(ref->OrderEW());
-  cur->SetOrderQCD(ref->OrderQCD());
+  // cur->SetOrder(ref->Order());
   cur->SetNTChannel(ref->NTChannel());
   cur->SetSCC(scc);
   m_cur[n].push_back(cur);
@@ -265,10 +179,10 @@ int PS_Generator::DecayType(const Current *jc,
       jc->Flav().Mass()!=0.0 ||
       ja->Flav().Mass()!=0.0 || jb->Flav().Mass()!=0.0) return 0;
   if (ja->Flav()==jc->Flav() &&
-      jb->Flav()==jc->Flav()) return 0;// temporary (->4)
+      jb->Flav()==jc->Flav()) return 2|4;
   if (ja->Flav()==jb->Flav().Bar()) return 0;// temporary (->1)
   if (ja->Flav()==jc->Flav()) return 2;
-  if (jb->Flav()==jc->Flav()) return 3;
+  if (jb->Flav()==jc->Flav()) return 4;
   return 0;
 }
 
@@ -277,10 +191,10 @@ public:
 
   bool operator()(const Vertex_Key &ka,const Vertex_Key &kb) const
   {
-    if (ka.p_a<kb.p_a) return true;
-    if (ka.p_a>kb.p_a) return false;
-    if (ka.p_b<kb.p_b) return true;
-    if (ka.p_b>kb.p_b) return false;
+    if (ka.m_j.front()<kb.m_j.front()) return true;
+    if (ka.m_j.front()>kb.m_j.front()) return false;
+    if (ka.m_j.back()<kb.m_j.back()) return true;
+    if (ka.m_j.back()>kb.m_j.back()) return false;
     if (ka.p_c<kb.p_c) return true;
     if (ka.p_c>kb.p_c) return false;
     return false;
@@ -288,7 +202,41 @@ public:
 
 };
 
-bool PS_Generator::Construct(Amplitude *const ampl)
+void PS_Generator::AddSubChannel
+(NLO_subevtlist *const subs,const Vertex_Key &vkey)
+{
+  if (subs==NULL || subs->empty()) return;
+  NLO_subevt *csub(NULL);
+  for (int l=0;l<2;++l) {
+    if (vkey.m_j[l]->Id().size()>1) continue;
+    size_t ii(vkey.m_j[l]->Id().front());
+    size_t jj(vkey.m_j[1-l]->Id().front());
+    if (vkey.m_j[1-l]->Id().size()>1) {
+      size_t idj=(1<<m_n)-1-(1<<ii)-vkey.m_j[1-l]->CId();
+      if (IdCount(idj)>1) {
+	idj=(1<<m_n)-1-vkey.p_c->CId();
+	if (IdCount(idj)>1) continue;
+      }
+      jj=ID(idj).front();
+    }
+    for (size_t k(0);k<subs->size()-1;++k)
+      if ((ii==(*subs)[k]->m_i && jj==(*subs)[k]->m_j) ||
+	  (jj==(*subs)[k]->m_i && ii==(*subs)[k]->m_j)) {
+	csub=(*subs)[k];
+	break;
+      }
+    if (csub) break;
+  }
+  if (csub==NULL) return;
+  Vertex_Key *dummy(Vertex_Key::New(Current_Vector(),NULL,NULL));
+  PS_Vertex *vtx(new PS_Vertex(*dummy));
+  dummy->Delete();
+  vtx->AddJ(vkey.m_j);
+  vtx->SetJC(vkey.p_c);
+  vtx->SetDip(csub);
+}
+
+bool PS_Generator::Construct(Amplitude *const ampl,NLO_subevtlist *const subs)
 {
   m_pmsinit=0;
   Current_Matrix curs(ampl->Currents());
@@ -304,6 +252,7 @@ bool PS_Generator::Construct(Amplitude *const ampl)
     m_cl.resize(m_n,Int_Vector(2));
     m_cur.resize(m_n);
   }
+  Vertex_Key *dummy(Vertex_Key::New(Current_Vector(),NULL,NULL));
   for (size_t n(1);n<m_n;++n) {
     for (size_t j(0);j<curs[n].size();++j) {
       if (curs[n][j]->Sub() ||
@@ -314,8 +263,7 @@ bool PS_Generator::Construct(Amplitude *const ampl)
 	    (n==1 ||
 	     (m_cur[n][i]->Flav().Mass()==curs[n][j]->Flav().Mass() &&
 	      m_cur[n][i]->Flav().Width()==curs[n][j]->Flav().Width() &&
-	      m_cur[n][i]->OrderEW()==curs[n][j]->OrderEW() &&
-	      m_cur[n][i]->OrderQCD()==curs[n][j]->OrderQCD() &&
+	      // m_cur[n][i]->Order()==curs[n][j]->Order() &&
 	      m_cur[n][i]->NTChannel()==curs[n][j]->NTChannel()))) {
 	  Current *ref(m_cbmap[m_cur[n][i]]);
 	  for (CB_MMap::const_iterator cit(m_cmap.lower_bound(ref));
@@ -332,35 +280,55 @@ bool PS_Generator::Construct(Amplitude *const ampl)
 	  const Vertex_Vector &in(curs[n][j]->In());
 	  const Vertex_Vector &rin(cit->second->In());
 	  for (size_t i(0);i<in.size();++i) {
-	    if (curs[n][j]->In()[i]->JE()) continue;
-	    Current *ja(curs[n][j]->In()[i]->JA());
-	    Current *jb(curs[n][j]->In()[i]->JB());
+	    if (curs[n][j]->In()[i]->J().size()>2) continue;
+	    Current *ja(curs[n][j]->In()[i]->J(0));
+	    Current *jb(curs[n][j]->In()[i]->J(1));
 	    if (ja->PSInfo()<jb->PSInfo()) std::swap<Current*>(ja,jb);
 	    for (CB_MMap::const_iterator ait(m_cmap.lower_bound(ja));
 		 ait!=m_cmap.upper_bound(ja);++ait)
 	      for (CB_MMap::const_iterator bit(m_cmap.lower_bound(jb));
 		   bit!=m_cmap.upper_bound(jb);++bit) {
-		Vertex_Key vkey(ait->second,bit->second,NULL,cit->second,NULL);
-		int type(DecayType(curs[n][j],ja,jb));
+		Current_Vector jj(2);
+		jj[0]=ait->second;
+		jj[1]=bit->second;
+		Vertex_Key *vkey(Vertex_Key::New(jj,cit->second,NULL));
+		int type(DecayType(cit->second,ait->second,bit->second)), mtype(0);
 		bool vf(false);
-		for (size_t k(0);k<rin.size();++k) 
-		  if (vkey.p_a==rin[k]->JA() && vkey.p_b==rin[k]->JB() &&
-		      type==((PS_Vertex*)rin[k])->Type()) {
+		for (size_t k(0);k<rin.size();++k)
+		  if (jj[0]==rin[k]->J(0) && jj[1]==rin[k]->J(1) &&
+		      (type==((PS_Vertex*)rin[k])->Type() ||
+		       (type&((PS_Vertex*)rin[k])->Type()))) {
+		    mtype|=((PS_Vertex*)rin[k])->Type();
 		    vf=true;
-		    break;
 		  }
-		if (vf || v3.find(vkey)!=v3.end()) continue;
-		v3.insert(vkey);
-		PS_Vertex *vtx(new PS_Vertex(vkey));
-		vtx->SetJA(vkey.p_a);
-		vtx->SetJB(vkey.p_b);
-		vtx->SetJC(vkey.p_c);
+		if ((vf && type==mtype) || v3.find(*vkey)!=v3.end()) continue;
+		v3.insert(*vkey);
+		PS_Vertex *vtx(new PS_Vertex(*dummy));
+		vtx->AddJ(vkey->m_j);
+		vtx->SetJC(vkey->p_c);
 		vtx->SetType(type);
+		if (type==(2|4)) {
+		  vtx->SetType(2);
+		  vtx = new PS_Vertex(*dummy);
+		  vtx->AddJ(vkey->m_j);
+		  vtx->SetJC(vkey->p_c);
+		  vtx->SetType(4);
+		}
+		AddSubChannel(subs,*vkey);
+		vkey->Delete();
 	      }
 	  }
 	}
 	continue;
       }
+      const Vertex_Vector &in(curs[n][j]->In());
+      bool valid(in.empty());
+      for (size_t i(0);i<in.size();++i)
+	if (in[i]->J().size()<3) {
+	  valid=true;
+	  break;
+	}
+      if (!valid) continue;
       curs[n][j]->Print();
       if (curs[n][j]->Flav().Width()<s_pwmin &&
 	  !curs[n][j]->Cut() && curs[n][j]->Flav().Mass()>0.0 &&
@@ -368,11 +336,10 @@ bool PS_Generator::Construct(Amplitude *const ampl)
 	AddCurrent(curs[n][j],curs[n][j]->Flav(),n,1);
       else AddCurrent(curs[n][j],curs[n][j]->Flav(),n);
       std::set<Vertex_Key,CB_PSSort> v3;
-      const Vertex_Vector &in(curs[n][j]->In());
       for (size_t i(0);i<in.size();++i) {
-	if (curs[n][j]->In()[i]->JE()) continue;
-	Current *ja(curs[n][j]->In()[i]->JA());
-	Current *jb(curs[n][j]->In()[i]->JB());
+	if (curs[n][j]->In()[i]->J().size()>2) continue;
+	Current *ja(curs[n][j]->In()[i]->J(0));
+	Current *jb(curs[n][j]->In()[i]->J(1));
 	if (ja->PSInfo()<jb->PSInfo()) std::swap<Current*>(ja,jb);
 	for (CB_MMap::const_iterator ait(m_cmap.lower_bound(ja));
 	     ait!=m_cmap.upper_bound(ja);++ait)
@@ -380,14 +347,26 @@ bool PS_Generator::Construct(Amplitude *const ampl)
 	       bit!=m_cmap.upper_bound(jb);++bit)
 	    for (CB_MMap::const_iterator cit(m_cmap.lower_bound(curs[n][j]));
 		 cit!=m_cmap.upper_bound(curs[n][j]);++cit) {
-	      Vertex_Key vkey(ait->second,bit->second,NULL,cit->second,NULL);
-	      if (v3.find(vkey)!=v3.end()) continue;
-	      v3.insert(vkey);
-	      PS_Vertex *vtx(new PS_Vertex(vkey));
-	      vtx->SetJA(vkey.p_a);
-	      vtx->SetJB(vkey.p_b);
-	      vtx->SetJC(vkey.p_c);
-	      vtx->SetType(DecayType(curs[n][j],ja,jb));
+	      Current_Vector jj(2);
+	      jj[0]=ait->second;
+	      jj[1]=bit->second;
+	      Vertex_Key *vkey(Vertex_Key::New(jj,cit->second,NULL));
+	      if (v3.find(*vkey)!=v3.end()) continue;
+	      v3.insert(*vkey);
+	      PS_Vertex *vtx(new PS_Vertex(*dummy));
+	      vtx->AddJ(vkey->m_j);
+	      vtx->SetJC(vkey->p_c);
+	      int type(DecayType(curs[n][j],ja,jb));
+	      vtx->SetType(type);
+	      if (type==(2|4)) {
+		vtx->SetType(2);
+		vtx = new PS_Vertex(*dummy);
+		vtx->AddJ(vkey->m_j);
+		vtx->SetJC(vkey->p_c);
+		vtx->SetType(4);
+	      }
+	      AddSubChannel(subs,*vkey);
+	      vkey->Delete();
 	    }
       }
       for (CB_MMap::const_iterator cit(m_cmap.lower_bound(curs[n][j]));
@@ -395,6 +374,7 @@ bool PS_Generator::Construct(Amplitude *const ampl)
 	cit->second->Print();
     }
   }
+  dummy->Delete();
   }
   msg_Debugging()<<"}\n";
   for (size_t j(m_n-2);j>1;--j)
@@ -431,8 +411,8 @@ bool PS_Generator::Construct(Amplitude *const ampl)
 	mass=0.0;
       }
       for (size_t k(0);k<m_cur[i][j]->In().size();++k)
-	mass=Max(mass,mmin[m_cur[i][j]->In()[k]->JA()->CId()]+
-		 mmin[m_cur[i][j]->In()[k]->JB()->CId()]);
+	mass=Max(mass,mmin[m_cur[i][j]->In()[k]->J(0)->CId()]+
+		 mmin[m_cur[i][j]->In()[k]->J(1)->CId()]);
       if (mmin.find(cid)==mmin.end()) mmin[cid]=mass;
       else mmin[cid]=Max(mmin[cid],mass);
       if (i==m_n-1) {
@@ -481,12 +461,37 @@ bool PS_Generator::Construct(Amplitude *const ampl)
   return true;
 }
 
+void PS_Generator::AddSC()
+{
+#ifdef DEBUG__BG
+  DEBUG_FUNC("");
+#endif
+  for (size_t n(2);n<m_n-1;++n) {
+    size_t oldsize(m_cur[n].size());
+    for (size_t j(0);j<oldsize;++j) {
+      if (((PS_Current*)m_cur[n][j])->Dip()) continue;
+      for (size_t i(0);i<m_cur[n][j]->NIn();++i) {
+	NLO_subevt *dip(((PS_Vertex*)m_cur[n][j]->In()[i])->Dip());
+	if (dip) {
+ 	  delete m_cur[n][j]->In()[i];
+	  ((Vertex_Vector*)&m_cur[n][j]->In())->erase
+	    (((Vertex_Vector*)&m_cur[n][j]->In())->begin()+i);
+	  AddExtraCurrent(m_cur[n][j],n,m_cur[n][j]->Flav().Mass(),
+			  m_cur[n][j]->Flav().Width());
+	  ((PS_Current*)m_cur[n].back())->SetDip(dip);
+	  break;
+	}
+      }
+    }
+  }
+}
+
 void PS_Generator::AddSTCC()
 {
 #ifdef DEBUG__BG
   DEBUG_FUNC("");
 #endif
-  for (size_t n(2);n<m_n-2;++n) {
+  for (size_t n(2);n<m_n;++n) {
     size_t oldsize(m_cur[n].size());
     for (size_t j(0);j<oldsize;++j) {
       if (((PS_Current*)m_cur[n][j])->SCC()) continue;
@@ -514,18 +519,19 @@ void PS_Generator::AddExtraCurrent
 (Current *const cur,const size_t &n,
  const double &m,const double &w,Current *const scc)
 {
-  AddCurrent(cur,cur->Flav(),n,1,m,w);
+  AddCurrent(cur,cur->Flav(),n,1,m,w,scc);
 #ifdef DEBUG__BG
   msg_Debugging()<<"  Add "<<m_cur[n].back()->PSInfo()
 		 <<(scc?" ("+scc->PSInfo()+") ":"")<<" {\n";
 #endif
+  Vertex_Key *dummy(Vertex_Key::New(Current_Vector(),NULL,NULL));
   const Vertex_Vector &in(cur->In());
   for (size_t i(0);i<in.size();++i) {
-    Vertex_Key vkey(in[i]->JA(),in[i]->JB(),NULL,m_cur[n].back(),NULL);
-    PS_Vertex *vtx(new PS_Vertex(vkey));
-    vtx->SetJA(vkey.p_a);
-    vtx->SetJB(vkey.p_b);
-    vtx->SetJC(vkey.p_c);
+    PS_Vertex *vtx(new PS_Vertex(*dummy));
+    vtx->AddJ(in[i]->J());
+    vtx->SetJC(m_cur[n].back());
+    vtx->SetDip(((PS_Vertex*)in[i])->Dip());
+    vtx->SetType(((PS_Vertex*)in[i])->Type());
 #ifdef DEBUG__BG
     msg_Debugging()<<"    "<<*vtx<<"\n";
 #endif
@@ -535,18 +541,19 @@ void PS_Generator::AddExtraCurrent
 #endif
   const Vertex_Vector &out(cur->Out());
   for (size_t i(0);i<out.size();++i) {
-    Current *ja(out[i]->JA()), *jb(out[i]->JB());
-    if (ja==cur) ja=m_cur[n].back();
-    else jb=m_cur[n].back();
-    Vertex_Key vkey(ja,jb,NULL,out[i]->JC(),NULL);
-    PS_Vertex *vtx(new PS_Vertex(vkey));
-    vtx->SetJA(vkey.p_a);
-    vtx->SetJB(vkey.p_b);
-    vtx->SetJC(vkey.p_c);
+    Current_Vector j(out[i]->J());
+    if (j[0]==cur) j[0]=m_cur[n].back();
+    else j[1]=m_cur[n].back();
+    PS_Vertex *vtx(new PS_Vertex(*dummy));
+    vtx->AddJ(j);
+    vtx->SetJC(out[i]->JC());
+    vtx->SetDip(((PS_Vertex*)out[i])->Dip());
+    vtx->SetType(((PS_Vertex*)out[i])->Type());
 #ifdef DEBUG__BG
     msg_Debugging()<<"    "<<*vtx<<"\n";
 #endif
   }
+  dummy->Delete();
 #ifdef DEBUG__BG
   msg_Debugging()<<"  }\n";
 #endif
@@ -573,8 +580,8 @@ void PS_Generator::SetPrefMasses(Cut_Data *const cuts)
       }
       if ((cid&3)==1 || (cid&3)==2) mass=0.0;
       for (size_t k(0);k<m_cur[n][j]->In().size();++k) {
-	mass=Max(mass,mmin[m_cur[n][j]->In()[k]->JA()->CId()]+
-		 mmin[m_cur[n][j]->In()[k]->JB()->CId()]);
+	mass=Max(mass,mmin[m_cur[n][j]->In()[k]->J(0)->CId()]+
+		 mmin[m_cur[n][j]->In()[k]->J(1)->CId()]);
       }
       if (mmin.find(cid)==mmin.end()) mmin[cid]=mass;
       else mmin[cid]=Max(mmin[cid],mass);

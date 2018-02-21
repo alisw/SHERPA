@@ -16,7 +16,6 @@
 #include "PDF/Main/Shower_Base.H"
 #include "PDF/Main/Cluster_Definitions_Base.H"
 #include "PDF/Main/ISR_Handler.H"
-#include "MODEL/Interaction_Models/Interaction_Model_Base.H"
 #include "MODEL/Main/Model_Base.H"
 #include "ATOOLS/Math/Random.H"
 #include "ATOOLS/Org/Run_Parameter.H"
@@ -72,7 +71,7 @@ namespace PHASIC {
 
     SP(Color_Integrator) p_ci;
 
-    size_t m_cnt, m_rej, m_mode, m_cmode, m_cmoders;
+    size_t m_cnt, m_rej, m_mode, m_cmode, m_cmodebvi, m_cmoders;
     double m_lfrac, m_aqed, m_wthres, m_rsf, m_csf;
     int    m_rproc, m_sproc, m_vproc, m_nproc, m_nfgsplit;
 
@@ -238,8 +237,15 @@ METS_Scale_Setter::METS_Scale_Setter
   if (m_nproc) m_mode=2;
   m_cmode=ToType<int>(rpa->gen.Variable("METS_CLUSTER_MODE"));
   Data_Reader read(" ",";","!","=");
+  m_cmodebvi=read.GetValue<int>("METS_CLUSTER_MODE_BVI",512);
   m_cmoders=read.GetValue<int>("METS_CLUSTER_MODE_RS",1);
-  if (m_cmoders!=1) msg_Info()<<METHOD<<"(): Set RS cluster mode "<<m_cmoders<<".\n";
+  static bool printed(false);
+  if (!printed) {
+    if (m_cmode!=0)      msg_Info()<<METHOD<<"(): METS cluster mode set to "<<ID(m_cmode)<<std::endl;
+    if (m_cmodebvi!=512) msg_Info()<<METHOD<<"(): METS BVI cluster mode set to "<<ID(m_cmodebvi)<<std::endl;
+    if (m_cmoders!=1)    msg_Info()<<METHOD<<"(): METS RS cluster mode set to "<<ID(m_cmoders)<<std::endl;
+    printed=true;
+  }
   if (!read.ReadFromFile(m_wthres,"METS_WARNING_THRESHOLD")) m_wthres=0.1;
   if (core=="" && !read.ReadFromFile(core,"CORE_SCALE")) core="DEFAULT";
   p_core=Core_Scale_Getter::GetObject(core,Core_Scale_Arguments(p_proc,core));
@@ -271,6 +277,14 @@ void METS_Scale_Setter::PreCalc(const Vec4D_Vector &p,const size_t &mode)
   proc->Generator()->PreCluster(proc,p);
 }
 
+
+// modes
+//    1 -- deterministic clustering
+//    2 -- for R proc:  probabilisticly choose one S for scale
+//   16 -- ignore ordering when clustering
+//  512 -- exclusive clustering
+// 4096 -- only first deterministic clustered
+
 double METS_Scale_Setter::CalculateStrict
 (const Vec4D_Vector &momenta,const size_t &mode)
 {
@@ -282,6 +296,7 @@ double METS_Scale_Setter::CalculateStrict
     proc->Shower()->GetClusterDefinitions();
   proc->Generator()->SetClusterDefinitions(cd);
   int camode(cd->AMode()?512:0);
+  if (m_nproc) camode|=m_cmodebvi;
   if (m_rproc) camode|=4096;
   if (m_cmoders&1) {
     if (m_rproc) camode|=1;
@@ -289,6 +304,7 @@ double METS_Scale_Setter::CalculateStrict
   }
   Cluster_Amplitude *ampl=NULL;
   if (m_rproc && (m_cmoders&2)) {
+    msg_Debugging()<<"rproc"<<std::endl;
     NLO_subevtlist *subs=proc->GetRSSubevtList();
     double sum=0.0, psum=0.0;
     for (size_t i(0);i<subs->size()-1;++i) {
@@ -308,11 +324,14 @@ double METS_Scale_Setter::CalculateStrict
     }
   }
   if (ampl==NULL) {
+    msg_Debugging()<<"no ampl, ask generator"<<std::endl;
+    msg_Tracking()<<METHOD<<"(): Clustering "<<proc->Name()<<" with mode "<<ID(m_cmode|camode|mode)<<std::endl;
     ampl=
     (proc->Generator()->
      ClusterConfiguration(proc,momenta,m_cmode|camode|mode));
   }
   if (ampl==NULL) {
+    msg_Debugging()<<"still no ampl"<<std::endl;
     msg_Debugging()<<METHOD<<"(): No CSS history for '"
 		   <<proc->Name()<<"'. Set \\hat{s}.\n";
     ++m_rej;
@@ -372,7 +391,7 @@ double METS_Scale_Setter::Calculate(const Vec4D_Vector &momenta,const size_t &mo
     ops[ampl->Legs().size()-4].push_back
       (std::pair<size_t,double>(m_decids[i]->m_id,0.0));
   double kt2core(ampl->Legs().size()>4?0.0:CoreScale(ampl).m_kt2);
-  ampl->SetOrderQCD(p_caller->OrderQCD());
+  ampl->SetOrderQCD(p_caller->MaxOrder(0));
   while (ampl->Legs().size()>4) {
     msg_Debugging()<<"Actual = "<<*ampl<<"\n";
     std::set<CS_Params> &trials(alltrials[ampl->Legs().size()-5]);
@@ -613,6 +632,7 @@ PDF::CParam METS_Scale_Setter::CoreScale(Cluster_Amplitude *const ampl) const
 double METS_Scale_Setter::SetScales
 (const double &muf2,Cluster_Amplitude *ampl,const size_t &mode)
 {
+  DEBUG_FUNC("kt="<<muf2<<", #legs="<<ampl->Legs().size()<<", mode="<<mode);
   double mur2(m_rsf*muf2);
   m_scale[stp::size+stp::res]=m_scale[stp::res]=muf2;
   if (ampl) {
@@ -681,7 +701,7 @@ double METS_Scale_Setter::SetScales
     else {
       mur2=pow(mur2,1.0/oqcd);
       as=pow(as,1.0/oqcd);
-      mur2=MODEL::as->WDBSolve(as,m_rsf*mum2,m_rsf*1.01*rpa->gen.CplScale());
+      mur2=MODEL::as->WDBSolve(as,m_rsf*mum2,m_rsf*1.01*sqr(rpa->gen.Ecms()));
       if (!IsEqual((*MODEL::as)(mur2),as))
 	msg_Error()<<METHOD<<"(): Failed to determine \\mu."<<std::endl; 
     }
@@ -750,12 +770,11 @@ void METS_Scale_Setter::KT2
   if (cs.p_dec) mij2=(pi+pj).Abs2();
   if (li->Flav().Strong() && lj->Flav().Strong() &&
       cs.m_fl.Strong()) cs.m_oqcd=1;
-  cs.m_op2=cs.m_kt2;
   if ((li->Id()&3)==0) {
     if ((lj->Id()&3)==0) {
       if ((lk->Id()&3)==0) {
 	Kin_Args ffp(ClusterFFDipole(mi2,mj2,mij2,mk2,pi,pj,pk,3));
-	double kt2=2.0*(pi*pj)*ffp.m_z*(1.0-ffp.m_z)
+	double kt2=cs.m_kt2=2.0*(pi*pj)*ffp.m_z*(1.0-ffp.m_z)
 	  -sqr(1.0-ffp.m_z)*mi2-sqr(ffp.m_z)*mj2;
 	if (ffp.m_stat<0) kt2=-1.0;
  	cs.SetParams(kt2,ffp.m_z,ffp.m_y,ffp.m_pi,ffp.m_pk,ffp.m_lam);
@@ -764,7 +783,7 @@ void METS_Scale_Setter::KT2
       }
       else {
 	Kin_Args fip(ClusterFIDipole(mi2,mj2,mij2,mk2,pi,pj,-pk,3));
-	double kt2=2.0*(pi*pj)*fip.m_z*(1.0-fip.m_z)
+	double kt2=cs.m_kt2=2.0*(pi*pj)*fip.m_z*(1.0-fip.m_z)
 	  -sqr(1.0-fip.m_z)*mi2-sqr(fip.m_z)*mj2;
 	Vec4D sum(rpa->gen.PBeam(0)+rpa->gen.PBeam(1));
 	if ((cs.m_k==0 && fip.m_pk[3]<0.0) ||
@@ -781,7 +800,7 @@ void METS_Scale_Setter::KT2
     if ((lj->Id()&3)==0) {
       if ((lk->Id()&3)==0) {
 	Kin_Args ifp(ClusterIFDipole(mi2,mj2,mij2,mk2,0.0,-pi,pj,pk,pk,3|4));
-	double kt2=-2.0*(pi*pj)*(1.0-ifp.m_z)-mj2-sqr(1.0-ifp.m_z)*mi2;
+	double kt2=cs.m_kt2=-2.0*(pi*pj)*(1.0-ifp.m_z)-mj2-sqr(1.0-ifp.m_z)*mi2;
 	Vec4D sum(rpa->gen.PBeam(0)+rpa->gen.PBeam(1));
 	if ((cs.m_i==0 && ifp.m_pi[3]<0.0) ||
 	    (cs.m_i==1 && ifp.m_pi[3]>0.0) ||
@@ -793,7 +812,7 @@ void METS_Scale_Setter::KT2
       }
       else {
 	Kin_Args iip(ClusterIIDipole(mi2,mj2,mij2,mk2,-pi,pj,-pk,3));
-	double kt2=-2.0*(pi*pj)*(1.0-iip.m_z)-mj2-sqr(1.0-iip.m_z)*mi2;
+	double kt2=cs.m_kt2=-2.0*(pi*pj)*(1.0-iip.m_z)-mj2-sqr(1.0-iip.m_z)*mi2;
 	Vec4D sum(rpa->gen.PBeam(0)+rpa->gen.PBeam(1));
 	if ((cs.m_i==0 && iip.m_pi[3]<0.0) ||
 	    (cs.m_i==1 && iip.m_pi[3]>0.0) ||
@@ -805,6 +824,7 @@ void METS_Scale_Setter::KT2
       }
     }
   }
+  cs.m_op2=1.0/cs.m_kt2;
 }
   
 bool METS_Scale_Setter::Combine(Cluster_Amplitude &ampl,int i,int j,int k,

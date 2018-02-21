@@ -29,7 +29,7 @@ namespace COMIX {
     PSGenerator_Set m_psset;
 
     double m_w, m_dxs, m_x[2];
-    bool   m_checkpoles;
+    bool   m_checkpoles, m_allowmap;
 
     ATOOLS::NLO_subevtlist m_subs;
 
@@ -39,9 +39,11 @@ namespace COMIX {
 
     double SetZero();
 
-    double GetKPTerms(const ATOOLS::Flavour_Vector &fl,const int mode);
+    void FillMEWeights(ATOOLS::ME_Weight_Info &wgtinfo) const;
 
-    void FillMEWeights(ATOOLS::ME_wgtinfo &wgtinfo) const;
+    void UpdateKPTerms(const int mode);
+    double KPTerms(const int mode,
+                   double scalefac2=1.0);
 
   public:
 

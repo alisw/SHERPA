@@ -3,6 +3,7 @@
 
 #include "METOOLS/Explicit/Dipole_Info.H"
 #include "ATOOLS/Phys/Flavour.H"
+#include "ATOOLS/Org/STL_Tools.H"
 
 #include <string>
 
@@ -19,14 +20,28 @@ namespace METOOLS {
   class Lorentz_Calculator;
 
   struct Vertex_Key {
+  private:
 
-    Current  *p_a, *p_b, *p_c, *p_e, *p_k, *p_kt;
+    Vertex_Key
+    (const std::vector<Current*> &j,
+     Current *const c,MODEL::Model_Base *const model,
+     MODEL::Single_Vertex *const mv=NULL,const std::string &p="",
+     Vertex *const v=NULL,Color_Calculator *const cc=NULL,
+     Lorentz_Calculator *const lc=NULL);
+
+  public:
+
+    Current *p_c, *p_k, *p_kt;
+    std::vector<Current*> m_j;
 
     MODEL::Model_Base    *p_model;
     MODEL::Single_Vertex *p_mv;
 
     std::string m_p;
     size_t      m_n;
+    mutable int m_d;
+
+    mutable std::string m_id;
 
     mutable Vertex *p_v;
 
@@ -35,27 +50,24 @@ namespace METOOLS {
 
     Dipole_Info *p_dinfo;
 
-    Vertex_Key
-    (Current *const a,Current *const b,Current *const e,
+    static ATOOLS::AutoDelete_Vector<Vertex_Key> s_objects;
+
+    static Vertex_Key *New
+    (const std::vector<Current*> &j,
      Current *const c,MODEL::Model_Base *const model,
      MODEL::Single_Vertex *const mv=NULL,const std::string &p="",
      Vertex *const v=NULL,Color_Calculator *const cc=NULL,
      Lorentz_Calculator *const lc=NULL);
 
+    void Delete();
+
     std::string Type() const;
 
-    std::string ID(const int dir=0) const;
+    const std::string &ID() const;
 
-    ATOOLS::Flavour FlA() const;
-    ATOOLS::Flavour FlB() const;
-
-    Vertex_Key SwapAB() const;
-    Vertex_Key SwapBE() const;
-    Vertex_Key SwapEA() const;
+    ATOOLS::Flavour Fl(const size_t &i) const;
 
     Current *J(const size_t &i) const;
-
-    bool operator<(const Vertex_Key &k) const;
 
   };// end of struct Vertex_Key
 

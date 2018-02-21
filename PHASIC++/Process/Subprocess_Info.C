@@ -32,8 +32,10 @@ std::ostream &PHASIC::operator<<(std::ostream &ostr,const Subprocess_Info &info)
 }
 
 Subprocess_Info::Subprocess_Info
-(const ATOOLS::Flavour &fl,const std::string &id,const std::string &pol):
-  m_fl(fl), m_id(id), m_pol(pol), m_nmax(0), m_nmin(100), m_tag(0), m_osf(0),
+(const ATOOLS::Flavour &fl,const std::string &id,
+ const std::string &pol,const std::string &mpl):
+  m_fl(fl), m_id(id), m_pol(pol), m_mpl(mpl),
+  m_nmax(0), m_nmin(100), m_tag(0), m_osf(0),
   m_nloqcdtype(nlo_type::lo), m_nloewtype(nlo_type::lo) {}
 
 Subprocess_Info::~Subprocess_Info()
@@ -80,7 +82,7 @@ size_t Subprocess_Info::NTotalExternal() const
 void Subprocess_Info::SetExternal(const std::vector<ATOOLS::Flavour> &fl,size_t &n)
 {
   if (m_ps.empty()) m_fl=fl[n++];
-  else for (size_t i(0);i<m_ps.size();++i) m_ps[i].SetExternal(fl);
+  else for (size_t i(0);i<m_ps.size();++i) m_ps[i].SetExternal(fl,n);
 }
 
 void Subprocess_Info::SetExternal(const std::vector<ATOOLS::Flavour> &fl)
@@ -326,6 +328,18 @@ void Subprocess_Info::SetTags(int& start)
   }
 }
 
+void Subprocess_Info::SetTags(const std::vector<int>& tags)
+{
+  int n=0;
+  SetTags(tags,n);
+}
+
+void Subprocess_Info::SetTags(const std::vector<int>& tags,int &n)
+{
+  if (m_ps.size()==0) m_tag=tags[n++];
+  else for (size_t i=0;i<m_ps.size();++i) m_ps[i].SetTags(tags,n);
+}
+
 void Subprocess_Info::GetTags(std::vector<int>& tags) const
 {
   if (m_ps.size()==0) {
@@ -357,9 +371,50 @@ int Subprocess_Info::Combine
   }
 }
 
+void Subprocess_Info::ExtractMPL(std::vector<Flavour_Vector> &fl) const
+{
+  if (m_ps.size()) {
+    for (size_t i=0;i<m_ps.size();++i) m_ps[i].ExtractMPL(fl);
+    return;
+  }
+  if (m_mpl=="") {
+    fl.push_back(Flavour_Vector(1,m_fl));
+    return;
+  }
+  fl.push_back(Flavour_Vector());
+  std::string mpl(m_mpl);
+  for (size_t pos(mpl.find(','));pos!=std::string::npos;
+       mpl=mpl.substr(pos+1),pos=mpl.find(',')) {
+    std::string cur(mpl.substr(0,pos));
+    fl.back().push_back(Flavour(ToType<long int>(cur)));
+  }
+  fl.back().push_back(Flavour(ToType<long int>(mpl)));
+}
+
+bool Subprocess_Info::operator<(const Subprocess_Info &pi) const
+{
+  if (m_ps.size()<pi.m_ps.size()) return true;
+  if (m_ps.size()>pi.m_ps.size()) return false;
+  if (m_ps.empty()) return m_fl<pi.m_fl;
+  for (size_t i(0);i<m_ps.size();++i) {
+    if (m_ps[i]<pi.m_ps[i]) return true;
+    if (!(m_ps[i]==pi.m_ps[i])) return false;
+  }
+  return false;
+}
+
+bool Subprocess_Info::operator==(const Subprocess_Info &pi) const
+{
+  if (m_ps.size()!=pi.m_ps.size()) return false;
+  if (m_ps.empty()) return m_fl==pi.m_fl;
+  for (size_t i(0);i<m_ps.size();++i)
+    if (!(m_ps[i]==pi.m_ps[i])) return false;
+  return true;
+}
+
 void Subprocess_Info::Print(std::ostream &ostr,const size_t &ni) const
 {
-  ostr<<std::string(ni,' ')<<m_fl;
+  ostr<<std::string(ni,' ')<<m_fl<<" "<<m_mpl;
   if (m_id!="") ostr<<"["<<m_id<<"]";
   if (m_osf) ostr<<" OS";
   if (m_ps.size()>0) {

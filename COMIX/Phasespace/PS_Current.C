@@ -13,10 +13,20 @@ void PS_Current::SetSCC(Current *const scc)
   m_psinfo="";
   m_psinfo=PSInfo();
   if (p_scc) m_psinfo+="_SC"+p_scc->PSInfo();
+  if (p_dip) m_psinfo+="_DS"+p_dip->PSInfo();
+}
+
+void PS_Current::SetDip(NLO_subevt *const dip)
+{
+  p_dip=dip;
+  m_psinfo="";
+  m_psinfo=PSInfo();
+  if (p_scc) m_psinfo+="_SC"+p_scc->PSInfo();
+  if (p_dip) m_psinfo+="_DS"+p_dip->PSInfo();
 }
 
 void PS_Current::ConstructJ(const ATOOLS::Vec4D &p,const int ch,
-			    const int cr,const int ca)
+			    const int cr,const int ca,const int mode)
 {
   m_p=p;
   ResetJ();

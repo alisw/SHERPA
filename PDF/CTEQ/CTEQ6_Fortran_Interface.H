@@ -8,7 +8,6 @@ namespace PDF {
 
   class CTEQ6_Fortran_Interface : public PDF_Base {
   private:
-    std::string m_set;
     int         m_anti;
     double      m_f[11], m_x, m_Q;
     bool        m_calculated[11];
@@ -19,8 +18,9 @@ namespace PDF {
 
     PDF_Base * GetCopy();
 
-    void   CalculateSpec(double,double);
-    double GetXPDF(const ATOOLS::Flavour);
+    void   CalculateSpec(const double&, const double&);
+    double GetXPDF(const ATOOLS::Flavour&);
+    double GetXPDF(const kf_code&, bool);
 
     static void Error();
 

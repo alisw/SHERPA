@@ -6,6 +6,7 @@
 #include "ATOOLS/Org/MyStrStream.H"
 #include "ATOOLS/Math/Variable.H"
 #include "AddOns/Analysis/Tools/Particle_Qualifier.H"
+#include "ATOOLS/Org/My_MPI.H"
 
 #ifdef PROFILE__all
 #define PROFILE__Analysis_Handler
@@ -30,6 +31,9 @@ Analysis_Handler::Analysis_Handler():
   Analysis_Interface("Internal"),
   m_weighted(0), m_write(false)
 {
+  if(s_kftable.find(kf_bjet)==s_kftable.end()) // if not initialized yet
+  s_kftable[kf_bjet] = new
+    Particle_Info(kf_bjet,0.,0.,0,1, 2,1,1,1,0,"bj","bj","bj","bj",1,1);
 }
 
 Analysis_Handler::~Analysis_Handler()
@@ -126,12 +130,8 @@ bool Analysis_Handler::Init()
   std::string infile(InputFile());
   if (infile.find('|')!=std::string::npos)
     infile=infile.substr(0,infile.find('|'));
-  reader.SetInputFile(infile);
+  reader.SetInputFile(infile+"|BEGIN_ANALYSIS|END_ANALYSIS");
   reader.AddComment("#");
-  reader.SetFileBegin("BEGIN_ANALYSIS");
-  reader.SetFileEnd("END_ANALYSIS");
-  reader.AddFileBegin("BEGIN_ANALYSIS{");
-  reader.AddFileEnd("}END_ANALYSIS");
   for (size_t i=0;i<s_maxanalyses;++i) {
     reader.SetOccurrence(i);
     reader.RescanInFile();
@@ -250,6 +250,9 @@ bool Analysis_Handler::ApproveTerminate()
 bool Analysis_Handler::WriteOut()
 {
   if (!m_write) return true;
+#ifdef USING__MPI
+  if (MPI::COMM_WORLD.Get_rank()==0)
+#endif
   if (OutputPath()[OutputPath().length()-1]=='/') {
     if (!MakeDir(OutputPath())) {
       msg_Error()<<"Analysis_Handler::Finish(..): "

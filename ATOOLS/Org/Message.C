@@ -93,38 +93,20 @@ std::ostream &ATOOLS::operator<<(std::ostream &str,const tm::code modifier)
 indentbuf::indentbuf(std::streambuf* basebuf) :
   m_basebuf(basebuf), m_indent(0), at_start(true)
 {
-#ifdef USING__Threading
-  pthread_mutex_init(&m_mtx,NULL);
-#endif
 }
 
 indentbuf::~indentbuf()
 {
-#ifdef USING__Threading
-  pthread_mutex_destroy(&m_mtx);
-#endif
 }
 
 void indentbuf::Indent(size_t i)
 {
-#ifdef USING__Threading
-  pthread_mutex_lock(&m_mtx);
-#endif
   m_indent+=i;
-#ifdef USING__Threading
-  pthread_mutex_unlock(&m_mtx);
-#endif
 }
 
 void indentbuf::DeIndent(size_t i)
 {
-#ifdef USING__Threading
-  pthread_mutex_lock(&m_mtx);
-#endif
   if (m_indent>=i) m_indent-=i;
-#ifdef USING__Threading
-  pthread_mutex_unlock(&m_mtx);
-#endif
 }
 
 std::streambuf::int_type indentbuf::overflow(int_type ch)
@@ -286,16 +268,20 @@ std::ostream &Message::IODebugging() const
 
 std::string Message::ExtractMethodName(std::string cmethod) const   
 { 
+  for (size_t pos(cmethod.find(", "));
+       pos!=std::string::npos;pos=cmethod.find(", ")) cmethod.erase(pos+1,1);
+  for (size_t pos(cmethod.find("> >"));
+       pos!=std::string::npos;pos=cmethod.find("> >")) cmethod.erase(pos+1,1);
   std::string cclass("<no class>"), method("<no method>");
   cmethod=cmethod.substr(0,ATOOLS::Min(cmethod.length(),cmethod.find("(")));
   size_t pos;
   while ((pos=cmethod.find(" "))!=std::string::npos) 
     cmethod=cmethod.substr(pos+1);
   pos=cmethod.find("::");
-  while (pos!=std::string::npos) {
+  for (size_t bpos(cmethod.find("<"));pos!=std::string::npos && pos<bpos;bpos-=pos+2) {
     cclass=cmethod.substr(0,pos);
     cmethod=cmethod.substr(pos+2);
-    pos=cmethod.find("::");
+    pos=cmethod.rfind("::");
     method=cmethod.substr(0,ATOOLS::Min(cmethod.length(),pos));
   }
   if (cclass=="<no class>") return cmethod;

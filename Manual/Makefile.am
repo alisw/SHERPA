@@ -9,23 +9,20 @@ MAKEFLAGS=-j1
 info_TEXINFOS = Sherpa.texi
 
 Sherpa_TEXINFOS = \
-	4thGen.texi \
 	API.texi \
-	ADD.texi \
-	AGC.texi \
 	Beam.texi \
         BFactory.texi \
 	Bibliography.texi \
 	Commands.texi \
-	CrossSection.texi \
 	Customization.texi \
 	CustomScale.texi \
-	EHC.texi \
+	HEFT.texi \
 	Events.texi \
 	Examples.texi \
-	FeynRules.texi \
+	UFO.texi \
 	Fragmentation.texi \
 	HardDecays.texi \
+	HERA_DIS.texi \
 	InclusiveCrossSections.texi \
 	Input.texi \
 	Integration.texi \
@@ -33,23 +30,25 @@ Sherpa_TEXINFOS = \
 	ISR.texi \
 	LHC_HInt.texi \
 	LHC_HJets.texi \
+	LHC_HJets_FiniteMt.texi \
 	LHC_Jets.texi \
 	LEP_Jets.texi \
 	LHC_TTBar.texi \
 	LHC_TTH.texi \
 	LHC_TTW.texi \
 	LHC_Vbb.texi \
+	LHC_VHJets.texi \
 	LHC_WJets.texi \
 	LHC_ZJets.texi \
+	LHC_VVJets.texi \
 	NLO_NTuples.texi \
 	Macros.texi \
-	Merging.texi \
 	ME.texi \
 	ME2.texi \
 	MI.texi \
 	MinBias.texi \
 	MinimumBiasEvents.texi \
-	Model.texi \
+	Models.texi \
 	MPIEvents.texi \
 	MSSM.texi \
 	NewModel.texi \
@@ -60,13 +59,13 @@ Sherpa_TEXINFOS = \
 	Processes.texi \
 	RNG.texi \
 	Run.texi \
+	ScaleVars.texi \
 	Selector.texi \
 	Sherpa.texi \
 	Shower.texi \
 	SM.texi \
 	SoftQED.texi \
 	Starting.texi \
-	THDM.texi \
 	Tips.texi \
 	version.texi
 

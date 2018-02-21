@@ -6,42 +6,6 @@
 
 using namespace ATOOLS;
 
-ME_wgtinfo::ME_wgtinfo():
-  m_nx(0), m_w0(0.0), p_wx(NULL),
-  m_y1(1.0), m_y2(1.0), m_mur2(0.0) {}
-
-ME_wgtinfo::~ME_wgtinfo()
-{
-  if (m_nx>0) delete [] p_wx;
-}
-
-ME_wgtinfo &ME_wgtinfo::operator*=(const double &scal)
-{
-  m_w0*=scal;
-  for (int i=0;i<m_nx;i++) p_wx[i]*=scal;
-  return *this;
-}
-
-void ME_wgtinfo::Flip()
-{
-  std::swap<double>(m_x1,m_x2);
-  std::swap<double>(m_y1,m_y2);
-  if (m_nx>=10) for (int i=0;i<4;i++) std::swap<double>(p_wx[i+2],p_wx[i+6]);
-  if (m_nx>=18) for (int i=0;i<4;i++) std::swap<double>(p_wx[i+10],p_wx[i+14]);
-}
-
-void ME_wgtinfo::AddMEweights(int n)
-{
-  m_nx=n;
-  p_wx=new double[m_nx];
-  for (int i=0;i<m_nx;i++) p_wx[i]=0.;
-}
-
-namespace ATOOLS {
-  template <> Blob_Data<ME_wgtinfo*>::~Blob_Data() {}
-  template class Blob_Data<ME_wgtinfo*>;
-}
-
 bool IDip_ID::operator<(const IDip_ID &di) const
 {
   if (m_ijt<di.m_ijt) return true;
@@ -74,6 +38,7 @@ NLO_subevt::~NLO_subevt()
     delete[] p_mom;
     delete[] p_id;
   }
+  if (p_ampl) p_ampl->Delete();
 }
 
 void NLO_subevt::CopyXSData(const NLO_subevt *sub)
@@ -126,6 +91,11 @@ std::string NLO_subevt::IDString(const int mode) const
   return tag;
 }
 
+std::string NLO_subevt::PSInfo() const
+{
+  return "["+ToString(m_i)+","+ToString(m_j)+","+ToString(m_k)+"]";
+}
+
 NLO_subevtlist &NLO_subevtlist::operator*=(const double scal)
 {
   for (const_iterator it=begin();it!=end();it++) {
@@ -155,14 +125,14 @@ namespace ATOOLS
     ATOOLS::Flavour_Vector flavs;
     for (size_t i(0);i<sevt.m_n;++i) {
       flavs.push_back(sevt.p_fl[i]);
-      ids.push_back(sevt.p_id[i]);
+      if (sevt.p_id) ids.push_back(sevt.p_id[i]);
     }
     return ostr<<sevt.m_pname<<" "<<(Dip_ID)(sevt)
 	       <<", idx "<<sevt.m_idx
                <<" {\n  fl: "<<flavs<<", id: "<<ids
                <<"\n  result = "<<sevt.m_result
                <<",  ME = "<<sevt.m_me<<" ("<<sevt.m_trig
-	       <<")\n  Q = "<<sqrt(sevt.m_mu2[stp::res])
+               <<")\n  \\mu_Q = "<<sqrt(sevt.m_mu2[stp::res])
 	       <<",  \\mu_F = "<<sqrt(sevt.m_mu2[stp::fac])
 	       <<", \\mu_R = "<<sqrt(sevt.m_mu2[stp::ren])
 	       <<", k_T = "<<sqrt(sevt.m_kt2)<<"\n}";

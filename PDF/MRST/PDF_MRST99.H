@@ -12,7 +12,6 @@ namespace PDF {
 
     static c_mrst * p_proton;
     s_partoncontent m_content;
-    int             m_set;
     std::string     m_path;
     int             m_anti;
     bool            m_overscaled;
@@ -23,8 +22,9 @@ namespace PDF {
 
     PDF_Base * GetCopy();
 
-    void   CalculateSpec(double,double);
-    double GetXPDF(const ATOOLS::Flavour); 
+    void   CalculateSpec(const double&,const double&);
+    double GetXPDF(const ATOOLS::Flavour&);
+    double GetXPDF(const kf_code&,bool);
 
   };
 

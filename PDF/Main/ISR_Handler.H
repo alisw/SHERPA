@@ -5,10 +5,6 @@
 #include "ATOOLS/Math/Poincare.H"
 #include "PDF/Main/ISR_Base.H"
 
-#ifdef USING__Threading
-#include <pthread.h> 
-#endif 
-
 namespace ATOOLS { class Blob_Data_Base; }
 namespace BEAM   { class Beam_Base;      }
 
@@ -52,15 +48,8 @@ namespace PDF {
 
     double m_xf1[2], m_xf2[2];
 
-#ifdef USING__Threading
-    pthread_mutex_t m_mtx;
-#endif
-
     bool CheckRemnantKinematics(const ATOOLS::Flavour &flav,
 				double &x,int beam,bool swaped);
-
-    void MtxLock();
-    void MtxUnLock();
 
   public:
 
@@ -83,9 +72,11 @@ namespace PDF {
     bool MakeISR(const double &sp,const double &y,
 		 ATOOLS::Vec4D_Vector &p,const ATOOLS::Flavour_Vector &flavs);
 
-    double Weight(const int mode,
-		  ATOOLS::Vec4D p1,ATOOLS::Vec4D p2,double Q12,double Q22,
-		  ATOOLS::Flavour fl1,ATOOLS::Flavour fl2,int warn=1);
+    double PDFWeight(const int mode,
+                     ATOOLS::Vec4D p1,ATOOLS::Vec4D p2,double Q12,double Q22,
+                     ATOOLS::Flavour fl1,ATOOLS::Flavour fl2,int warn=1);
+    double Flux(const ATOOLS::Vec4D& p1, const ATOOLS::Vec4D& p2);
+    double CalcX(const ATOOLS::Vec4D& p);
 
     bool BoostInCMS(ATOOLS::Vec4D *p,const size_t n);
     bool BoostInLab(ATOOLS::Vec4D *p,const size_t n);
@@ -116,8 +107,15 @@ namespace PDF {
     inline std::string Name() { return m_name; }
     inline std::string Type() { return m_type; }
 
+    // PDF getters/setters, the latter can be used to temporarily swap PDFs
+    // (e.g. for reweighting purposes)
+    inline void             SetPDF(PDF_Base *pdf)
+    { SetPDF(pdf, 0); SetPDF(pdf, 1); }
+    inline void             SetPDF(PDF_Base *pdf, const size_t beam)
+    { p_isrbase[beam]->SetPDF(pdf); }
     inline PDF_Base        *PDF(const size_t beam)  
     { return p_isrbase[beam]->PDF();     }
+
     inline ATOOLS::Flavour  Flav(const size_t beam) 
     { return p_isrbase[beam]->Flavour(); }
 
@@ -139,7 +137,8 @@ namespace PDF {
     inline double X1() const { return m_x[0]; }
     inline double X2() const { return m_x[1]; }
 
-    inline double MuF2(int i) const { return m_mu2[i]; }
+    inline double  MuF2(int i) const { return m_mu2[i]; }
+    inline void SetMuF2(double mu2, int i) { m_mu2[i]=mu2; }
 
     inline double XF1(int i) const { return m_xf1[i]; }
     inline double XF2(int i) const { return m_xf2[i]; }

@@ -22,7 +22,10 @@
 
   % decays
   HARD_DECAYS On;
-  HDH_ONLY_DECAY {24,12,-11}|{24,14,-13}|{-24,-12,11}|{-24,-14,13}
+  HDH_STATUS[24,2,-1]=0
+  HDH_STATUS[24,4,-3]=0
+  HDH_STATUS[-24,-2,1]=0
+  HDH_STATUS[-24,-4,3]=0
   STABLE[24] 0; STABLE[6] 0; WIDTH[6] 0;
 
   NLO_SMEAR_THRESHOLD 1;
@@ -31,7 +34,7 @@
 
 (processes){
   Process : 93 93 ->  6 -6 93{NJET};
-  Order_EW 0; CKKW sqr(QCUT/E_CMS);
+  Order (*,0); CKKW sqr(QCUT/E_CMS);
   NLO_QCD_Mode MC@NLO {LJET};
   ME_Generator Amegic {LJET};
   RS_ME_Generator Comix {LJET};

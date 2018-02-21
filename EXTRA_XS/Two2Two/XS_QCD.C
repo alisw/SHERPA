@@ -5,6 +5,7 @@
 #include "MODEL/Main/Running_AlphaQED.H"
 #include "MODEL/Main/Model_Base.H"
 #include "PHASIC++/Process/Process_Base.H"
+#include "MODEL/UFO/UFO_Model.H"
 
 #include "EXTRA_XS/Main/ME2_Base.H"
 
@@ -37,6 +38,7 @@ DECLARE_TREEME2_GETTER(XS_q1q2_q1q2,"1XS_q1q2_q1q2")
 Tree_ME2_Base *ATOOLS::Getter<Tree_ME2_Base,Process_Info,XS_q1q2_q1q2>::
 operator()(const Process_Info &pi) const
 {
+  //if (dynamic_cast<UFO::UFO_Model*>(MODEL::s_model)) return NULL;
   if (pi.m_fi.m_nloewtype!=nlo_type::lo ||
       pi.m_fi.m_nloqcdtype!=nlo_type::lo) return NULL;
   Flavour_Vector fl=pi.ExtractFlavours();
@@ -45,7 +47,8 @@ operator()(const Process_Info &pi) const
       fl[0]!=fl[1] &&
       ((fl[2]==fl[0] && fl[3]==fl[1]) ||
        (fl[3]==fl[0] && fl[2]==fl[1]))) {
-    if (pi.m_oqcd==2 && pi.m_oew==0) {
+    if (pi.m_maxcpl[0]==2 && pi.m_maxcpl[1]==0 &&
+	pi.m_mincpl[0]==2 && pi.m_mincpl[1]==0) {
       return new XS_q1q2_q1q2(pi,fl);
     }
   }
@@ -60,8 +63,7 @@ XS_q1q2_q1q2::XS_q1q2_q1q2(const Process_Info& pi, const Flavour_Vector& fl):
   m_r=!(fl[0] == fl[2]);
   m_a=fl[0].IsAnti();
   m_p=fl[1].IsAnti();
-  m_g=sqrt(4.*M_PI*MODEL::s_model->ScalarFunction(std::string("alpha_S"),
-                                                  rpa->gen.CplScale()));
+  m_g=sqrt(4.*M_PI*MODEL::s_model->ScalarConstant("alpha_S"));
   m_m12=sqr(m_flavs[0].Mass());
   m_m22=sqr(m_flavs[1].Mass());
   m_oew=0; m_oqcd=2;
@@ -140,6 +142,7 @@ DECLARE_TREEME2_GETTER(XS_q1qbar1_q2qbar2,"1XS_q1qbar1_q2qbar2")
 Tree_ME2_Base *ATOOLS::Getter<Tree_ME2_Base,Process_Info,XS_q1qbar1_q2qbar2>::
 operator()(const Process_Info &pi) const
 {
+  //if (dynamic_cast<UFO::UFO_Model*>(MODEL::s_model)) return NULL;
   if (pi.m_fi.m_nloewtype!=nlo_type::lo ||
       pi.m_fi.m_nloqcdtype!=nlo_type::lo) return NULL;
   Flavour_Vector fl=pi.ExtractFlavours();
@@ -147,7 +150,8 @@ operator()(const Process_Info &pi) const
   if (fl[0].IsQuark() && fl[1]==fl[0].Bar() &&
       fl[2].IsQuark() && fl[3]==fl[2].Bar() &&
       fl[0]!=fl[2] && fl[0]!=fl[3]) {
-    if (pi.m_oqcd==2 && pi.m_oew==0) {
+    if (pi.m_maxcpl[0]==2 && pi.m_maxcpl[1]==0 &&
+	pi.m_mincpl[0]==2 && pi.m_mincpl[1]==0) {
       return new XS_q1qbar1_q2qbar2(pi,fl); 
     }
   }
@@ -163,8 +167,7 @@ XS_q1qbar1_q2qbar2::XS_q1qbar1_q2qbar2(const Process_Info& pi,
   m_r=!(fl[0].IsAnti()==fl[2].IsAnti());
   m_a=fl[0].IsAnti();
   m_p=1-m_a;
-  m_g=sqrt(4.*M_PI*MODEL::s_model->ScalarFunction(std::string("alpha_S"),
-                                                  rpa->gen.CplScale()));
+  m_g=sqrt(4.*M_PI*MODEL::s_model->ScalarConstant("alpha_S"));
   m_m12=sqr(m_flavs[0].Mass());
   m_m32=sqr(m_flavs[2].Mass());
   m_oew=0; m_oqcd=2;
@@ -222,13 +225,15 @@ DECLARE_TREEME2_GETTER(XS_q1q1_q1q1,"1XS_q1q1_q1q1")
 Tree_ME2_Base *ATOOLS::Getter<Tree_ME2_Base,Process_Info,XS_q1q1_q1q1>::
 operator()(const Process_Info &pi) const
 {
+  //if (dynamic_cast<UFO::UFO_Model*>(MODEL::s_model)) return NULL;
   if (pi.m_fi.m_nloewtype!=nlo_type::lo ||
       pi.m_fi.m_nloqcdtype!=nlo_type::lo) return NULL;
   Flavour_Vector fl=pi.ExtractFlavours();
   if (fl.size()!=4) return NULL;
   if (fl[0].IsQuark() && fl[1]==fl[0] &&
       fl[2]==fl[0] && fl[3]==fl[0]) { 
-    if (pi.m_oqcd==2 && pi.m_oew==0) {
+    if (pi.m_maxcpl[0]==2 && pi.m_maxcpl[1]==0 &&
+	pi.m_mincpl[0]==2 && pi.m_mincpl[1]==0) {
       return new XS_q1q1_q1q1(pi,fl); 
     }
   }
@@ -241,8 +246,7 @@ XS_q1q1_q1q1::XS_q1q1_q1q1(const Process_Info& pi, const Flavour_Vector& fl):
   DEBUG_FUNC(PHASIC::Process_Base::GenerateName(pi.m_ii,pi.m_fi));
   for (short int i=0;i<4;i++) p_colours[i][0] = p_colours[i][1] = 0;
   m_a=fl[0].IsAnti();
-  m_g=sqrt(4.*M_PI*MODEL::s_model->ScalarFunction(std::string("alpha_S"),
-                                                  rpa->gen.CplScale()));
+  m_g=sqrt(4.*M_PI*MODEL::s_model->ScalarConstant("alpha_S"));
   m_m12=sqr(m_flavs[0].Mass());
   m_oew=0; m_oqcd=2;
   m_cfls[PropID(0,2)].push_back(kf_gluon);
@@ -323,6 +327,7 @@ DECLARE_TREEME2_GETTER(XS_q1qbar1_q1qbar1,"1XS_q1qbar1_q1qbar1")
 Tree_ME2_Base *ATOOLS::Getter<Tree_ME2_Base,Process_Info,XS_q1qbar1_q1qbar1>::
 operator()(const Process_Info &pi) const
 {
+  //if (dynamic_cast<UFO::UFO_Model*>(MODEL::s_model)) return NULL;
   if (pi.m_fi.m_nloewtype!=nlo_type::lo ||
       pi.m_fi.m_nloqcdtype!=nlo_type::lo) return NULL;
   Flavour_Vector fl=pi.ExtractFlavours();
@@ -330,7 +335,8 @@ operator()(const Process_Info &pi) const
   if (fl[0].IsQuark() && fl[1]==fl[0].Bar() &&
       ((fl[2]==fl[0] && fl[3]==fl[1]) ||
        (fl[3]==fl[0] && fl[2]==fl[1]))) { 
-    if (pi.m_oqcd==2 && pi.m_oew==0) {
+    if (pi.m_maxcpl[0]==2 && pi.m_maxcpl[1]==0 &&
+	pi.m_mincpl[0]==2 && pi.m_mincpl[1]==0) {
       return new XS_q1qbar1_q1qbar1(pi,fl); 
     }
   }
@@ -346,8 +352,7 @@ XS_q1qbar1_q1qbar1::XS_q1qbar1_q1qbar1(const Process_Info& pi,
   m_a=fl[0].IsAnti();
   m_p=1-m_a;
   m_r=(fl[0]!=fl[2]);
-  m_g=sqrt(4.*M_PI*MODEL::s_model->ScalarFunction(std::string("alpha_S"),
-                                                  rpa->gen.CplScale()));
+  m_g=sqrt(4.*M_PI*MODEL::s_model->ScalarConstant("alpha_S"));
   m_m12=sqr(m_flavs[0].Mass());
   m_oew=0; m_oqcd=2;
   m_cfls[PropID(0,1)].push_back(kf_gluon);
@@ -436,13 +441,15 @@ DECLARE_TREEME2_GETTER(XS_q1qbar1_gg,"1XS_q1qbar1_gg")
 Tree_ME2_Base *ATOOLS::Getter<Tree_ME2_Base,Process_Info,XS_q1qbar1_gg>::
 operator()(const Process_Info &pi) const
 {
+  //if (dynamic_cast<UFO::UFO_Model*>(MODEL::s_model)) return NULL;
   if (pi.m_fi.m_nloewtype!=nlo_type::lo ||
       pi.m_fi.m_nloqcdtype!=nlo_type::lo) return NULL;
   Flavour_Vector fl=pi.ExtractFlavours();
   if (fl.size()!=4) return NULL;
   if (fl[0].IsQuark() && fl[1]==fl[0].Bar() &&
       fl[2].IsGluon() && fl[3].IsGluon()) { 
-    if (pi.m_oqcd==2 && pi.m_oew==0) {
+    if (pi.m_maxcpl[0]==2 && pi.m_maxcpl[1]==0 &&
+	pi.m_mincpl[0]==2 && pi.m_mincpl[1]==0) {
       return new XS_q1qbar1_gg(pi,fl); 
     }
   }
@@ -457,8 +464,7 @@ XS_q1qbar1_gg::XS_q1qbar1_gg(const Process_Info& pi, const Flavour_Vector& fl):
   m_a=fl[0].IsAnti();
   m_p=1-m_a;
   m_m12=sqr(m_flavs[0].Mass());
-  m_g=sqrt(4.*M_PI*MODEL::s_model->ScalarFunction(std::string("alpha_S"),
-                                                  rpa->gen.CplScale()));
+  m_g=sqrt(4.*M_PI*MODEL::s_model->ScalarConstant("alpha_S"));
   m_oew=0; m_oqcd=2;
   m_cfls[PropID(0,1)].push_back(kf_gluon);
   m_cfls[PropID(2,3)].push_back(kf_gluon);
@@ -547,13 +553,15 @@ DECLARE_TREEME2_GETTER(XS_gg_q1qbar1,"1XS_gg_q1qbar1")
 Tree_ME2_Base *ATOOLS::Getter<Tree_ME2_Base,Process_Info,XS_gg_q1qbar1>::
 operator()(const Process_Info &pi) const
 {
+  //if (dynamic_cast<UFO::UFO_Model*>(MODEL::s_model)) return NULL;
   if (pi.m_fi.m_nloewtype!=nlo_type::lo ||
       pi.m_fi.m_nloqcdtype!=nlo_type::lo) return NULL;
   Flavour_Vector fl=pi.ExtractFlavours();
   if (fl.size()!=4) return NULL;
   if (fl[0].IsGluon() && fl[1].IsGluon() && 
       fl[2].IsQuark() && fl[3]==fl[2].Bar()) { 
-    if (pi.m_oqcd==2 && pi.m_oew==0) {
+    if (pi.m_maxcpl[0]==2 && pi.m_maxcpl[1]==0 &&
+	pi.m_mincpl[0]==2 && pi.m_mincpl[1]==0) {
       return new XS_gg_q1qbar1(pi,fl); 
     }
   }
@@ -566,8 +574,7 @@ XS_gg_q1qbar1::XS_gg_q1qbar1(const Process_Info& pi, const Flavour_Vector& fl):
   DEBUG_FUNC(PHASIC::Process_Base::GenerateName(pi.m_ii,pi.m_fi));
   for (short int i=0;i<4;i++) p_colours[i][0] = p_colours[i][1] = 0;
   m_r=fl[2].IsAnti();
-  m_g=sqrt(4.*M_PI*MODEL::s_model->ScalarFunction(std::string("alpha_S"),
-                                                  rpa->gen.CplScale()));
+  m_g=sqrt(4.*M_PI*MODEL::s_model->ScalarConstant("alpha_S"));
   m_m32=sqr(m_flavs[2].Mass());
   m_oew=0; m_oqcd=2;
   m_cfls[PropID(0,1)].push_back(kf_gluon);
@@ -657,6 +664,7 @@ DECLARE_TREEME2_GETTER(XS_q1g_q1g,"1XS_q1g_q1g")
 Tree_ME2_Base *ATOOLS::Getter<Tree_ME2_Base,Process_Info,XS_q1g_q1g>::
 operator()(const Process_Info &pi) const
 {
+  //if (dynamic_cast<UFO::UFO_Model*>(MODEL::s_model)) return NULL;
   if (pi.m_fi.m_nloewtype!=nlo_type::lo ||
       pi.m_fi.m_nloqcdtype!=nlo_type::lo) return NULL;
   Flavour_Vector fl=pi.ExtractFlavours();
@@ -667,7 +675,8 @@ operator()(const Process_Info &pi) const
       ((fl[1].IsQuark() && fl[0].IsGluon()) && 
        ((fl[2]==fl[1] && fl[3].IsGluon()) || 
         (fl[3]==fl[1] && fl[2].IsGluon()))))  { 
-    if (pi.m_oqcd==2 && pi.m_oew==0) {
+    if (pi.m_maxcpl[0]==2 && pi.m_maxcpl[1]==0 &&
+	pi.m_mincpl[0]==2 && pi.m_mincpl[1]==0) {
       return new XS_q1g_q1g(pi,fl); 
     }
   }
@@ -694,8 +703,7 @@ XS_q1g_q1g::XS_q1g_q1g(const Process_Info& pi, const Flavour_Vector& fl):
   m_a=fl[m_iniq].IsAnti();
   m_p=1-m_a;
   m_mq2=sqr(m_flavs[m_iniq].Mass());
-  m_g=sqrt(4.*M_PI*MODEL::s_model->ScalarFunction(std::string("alpha_S"),
-                                                  rpa->gen.CplScale()));
+  m_g=sqrt(4.*M_PI*MODEL::s_model->ScalarConstant("alpha_S"));
   m_oew=0; m_oqcd=2;
   m_cfls[PropID(0,1)].push_back(fl[m_iniq].Bar());
   m_cfls[PropID(2,3)].push_back(fl[m_finq]);
@@ -794,13 +802,15 @@ DECLARE_TREEME2_GETTER(XS_gg_gg,"1XS_gg_gg")
 Tree_ME2_Base *ATOOLS::Getter<Tree_ME2_Base,Process_Info,XS_gg_gg>::
 operator()(const Process_Info &pi) const
 {
+  //if (dynamic_cast<UFO::UFO_Model*>(MODEL::s_model)) return NULL;
   if (pi.m_fi.m_nloewtype!=nlo_type::lo ||
       pi.m_fi.m_nloqcdtype!=nlo_type::lo) return NULL;
   Flavour_Vector fl=pi.ExtractFlavours();
   if (fl.size()!=4) return NULL;
   if (fl[0].IsGluon() && fl[1].IsGluon() &&
       fl[2].IsGluon() && fl[3].IsGluon()) { 
-    if (pi.m_oqcd==2 && pi.m_oew==0) {
+    if (pi.m_maxcpl[0]==2 && pi.m_maxcpl[1]==0 &&
+	pi.m_mincpl[0]==2 && pi.m_mincpl[1]==0) {
       return new XS_gg_gg(pi,fl); 
     }
   }
@@ -812,8 +822,7 @@ XS_gg_gg::XS_gg_gg(const Process_Info& pi, const Flavour_Vector& fl):
 {
   DEBUG_FUNC(PHASIC::Process_Base::GenerateName(pi.m_ii,pi.m_fi));
   for (short int i=0;i<4;i++) p_colours[i][0] = p_colours[i][1] = 0;
-  m_g=sqrt(4.*M_PI*MODEL::s_model->ScalarFunction(std::string("alpha_S"),
-                                                  rpa->gen.CplScale()));
+  m_g=sqrt(4.*M_PI*MODEL::s_model->ScalarConstant("alpha_S"));
   m_oew=0; m_oqcd=2;
   m_cfls[PropID(0,1)].push_back(kf_gluon);
   m_cfls[PropID(0,2)].push_back(kf_gluon);

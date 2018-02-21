@@ -43,7 +43,7 @@ namespace METOOLS {
     CV(const Current_Key &key);
 
     void ConstructJ(const ATOOLS::Vec4D &p,const int ch,
-		    const int cr,const int ca);
+		    const int cr,const int ca,const int mode);
     void SetGauge(const ATOOLS::Vec4D &k);
 
     void AddPropagator();
@@ -142,7 +142,7 @@ CV<SType>::EML(const Vec4D &p,const int cr,const int ca)
 
 template <typename SType>
 void CV<SType>::ConstructJ(const ATOOLS::Vec4D &p,const int ch,
-			   const int cr,const int ca)
+			   const int cr,const int ca,const int mode)
 {
   this->m_p=p;
   if (this->m_fl.Mass()==0.0 && p[1]==0.0 && p[2]==0.0)
@@ -215,7 +215,7 @@ void CV<SType>::AddPropagator()
 #endif
   for (size_t i(0);i<m_j.size();++i) {
   CVec4Type_Vector *j(m_j[i].template Get<CVec4Type>());
-  if (!this->m_fl.Strong()) {
+  if (!this->m_fl.IsGluon()) {
     if (!this->m_msv)
       for (typename CVec4Type_Vector::iterator 
 	     jit(j->begin());jit!=j->end();++jit)

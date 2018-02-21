@@ -63,27 +63,17 @@ Single_LOProcess_MHV::~Single_LOProcess_MHV()
 
 
 
-int Single_LOProcess_MHV::InitAmplitude(Model_Base * model,Topology* top,
+int Single_LOProcess_MHV::InitAmplitude(Amegic_Model * model,Topology* top,
 					vector<Process_Base *> & links,
-					vector<Process_Base *> & errs)
+					vector<Process_Base *> & errs,int checkloopmap)
 {
   m_type = 21;
-  if (!model->CheckFlavours(m_nin,m_nout,&m_flavs.front())) return 0;
-  model->GetCouplings(m_cpls);
+  if (!model->p_model->CheckFlavours(m_nin,m_nout,&m_flavs.front())) return 0;
+  model->p_model->GetCouplings(m_cpls);
   
   m_partonlist.clear();
   for (size_t i=0;i<m_nin;i++) if (m_flavs[i].Strong()) m_partonlist.push_back(i);
   for (size_t i=m_nin;i<m_nin+m_nout;i++) if (m_flavs[i].Strong()) m_partonlist.push_back(i);
-
-  if (m_gen_str>1) {
-    ATOOLS::MakeDir(rpa->gen.Variable("SHERPA_CPP_PATH")+"/Process/Amegic/"+m_ptypename);
-  }
-  string newpath=rpa->gen.Variable("SHERPA_CPP_PATH");
-  ATOOLS::MakeDir(newpath);
-  if (!FileExists(newpath+"/makelibs")) {
-    Copy(rpa->gen.Variable("SHERPA_SHARE_PATH")+"/makelibs",
-	     newpath+"/makelibs");
-  }
 
   p_hel    = new Helicity(m_nin,m_nout,&m_flavs.front(),p_pl);
   p_BS     = new Basic_Sfuncs(m_nin+m_nout,m_nin+m_nout,&m_flavs.front(),p_b);  
@@ -100,19 +90,21 @@ int Single_LOProcess_MHV::InitAmplitude(Model_Base * model,Topology* top,
   int *plist = new int[m_nin+m_nout];
   for (size_t i=0;i<m_nin;i++) plist[i] = fl[i];
   for (size_t i=m_nin;i<m_nin+m_nout;i++) plist[i]=-fl[i];
-  p_MHVamp = FullAmplitude_MHV_Handler(model,&m_cpls,m_nin+m_nout,plist,p_momlist,m_ownamps,127,127); 
+  p_MHVamp = FullAmplitude_MHV_Handler(model->p_model,&m_cpls,m_nin+m_nout,plist,p_momlist,m_ownamps,127,127); 
 
   delete [] plist;
   //////////////////////////////////////////////
 
-  p_shand  = new String_Handler(m_gen_str,p_BS,model->GetVertex()->GetCouplings());
+  p_shand  = new String_Handler(m_gen_str,p_BS,model->p_model->GetCouplings());
 
-  int oew(m_oew), oqcd(m_oqcd), ntchanmin(m_ntchanmin);
-  p_ampl   = new Amplitude_Handler(m_nin+m_nout,fl,p_b,p_pinfo,model,top,oqcd,oew,ntchanmin,
-				   &m_cpls,p_BS,p_shand,m_print_graphs,0);
-  m_oew=oew;
-  m_oqcd=oqcd;
+  size_t ntchanmin(m_ntchanmin);
+  size_t ntchanmax(m_ntchanmax);
+  p_ampl   = new Amplitude_Handler(m_nin+m_nout,fl,p_b,p_pinfo,
+                                   model,top,m_maxcpl,m_mincpl,
+                                   ntchanmin,ntchanmax,
+                                   &m_cpls,p_BS,p_shand,m_print_graphs,0,true);
   m_ntchanmin=ntchanmin;
+  m_ntchanmax=ntchanmax;
   if (p_ampl->GetGraphNumber()==0) {
     msg_Tracking()<<"Single_LOProcess_MHV::InitAmplitude : No diagrams for "<<m_name<<"."<<endl;
     return 0;
@@ -140,18 +132,6 @@ int Single_LOProcess_MHV::InitAmplitude(Model_Base * model,Topology* top,
 
   switch (Tests()) {
   case 1 :
-    for (size_t j=0;j<links.size();j++) if (Type()==links[j]->Type()) {
-      if (FlavCompare(links[j]) && ATOOLS::IsEqual(links[j]->Result(),Result())) {
-	if (CheckMapping(links[j])) {
-	  msg_Tracking()<<"Single_LOProcess_MHV::InitAmplitude : "<<std::endl
-			<<"   Found a partner for process "<<m_name<<" : "<<links[j]->Name()<<std::endl;
-	  p_partner   = (Single_LOProcess_MHV*)links[j];
-	  m_pslibname = links[j]->PSLibName();
-	  InitFlavmap(p_partner);
-	  break;
-	}
-      } 
-    }
     if (p_partner==this) links.push_back(this);
     msg_Info()<<".";
     
@@ -167,24 +147,15 @@ int Single_LOProcess_MHV::InitAmplitude(Model_Base * model,Topology* top,
 }
 
 
-int Single_LOProcess_MHV::InitAmplitude(Model_Base * model,Topology* top,
+int Single_LOProcess_MHV::InitAmplitude(Amegic_Model * model,Topology* top,
 					vector<Process_Base *> & links,
 					vector<Process_Base *> & errs,
 					std::vector<ATOOLS::Vec4D>* epol,std::vector<double> * pfactors)
 {
   m_type = 11;
-  if (!model->CheckFlavours(m_nin,m_nout,&m_flavs.front())) return 0;
-  model->GetCouplings(m_cpls);
+  if (!model->p_model->CheckFlavours(m_nin,m_nout,&m_flavs.front())) return 0;
+  model->p_model->GetCouplings(m_cpls);
   
-  if (m_gen_str>1) {
-    ATOOLS::MakeDir(rpa->gen.Variable("SHERPA_CPP_PATH")+"/Process/Amegic/"+m_ptypename);
-  }
-  string newpath=rpa->gen.Variable("SHERPA_CPP_PATH");
-  ATOOLS::MakeDir(newpath);
-  if (!FileExists(newpath+"/makelibs")) {
-    Copy(rpa->gen.Variable("SHERPA_SHARE_PATH")+"/makelibs",
-	     newpath+"/makelibs");
-  }
   int cnt=0;
 
   vector<int> fi_tags;
@@ -240,22 +211,46 @@ int Single_LOProcess_MHV::InitAmplitude(Model_Base * model,Topology* top,
   int *plist = new int[m_nin+m_nout];
   for (size_t i=0;i<m_nin;i++) plist[i]=fl[i];
   for (size_t i=m_nin;i<m_nin+m_nout;i++) plist[i]=-fl[i];
-  p_MHVamp = FullAmplitude_MHV_Handler(model,&m_cpls,m_nin+m_nout,plist,p_momlist,m_ownamps,m_emit,m_spect); 
+  p_MHVamp = FullAmplitude_MHV_Handler(model->p_model,&m_cpls,m_nin+m_nout,plist,p_momlist,m_ownamps,m_emit,m_spect); 
 
   delete [] plist;
   //////////////////////////////////////////////
 
-  p_shand  = new String_Handler(m_gen_str,p_BS,model->GetVertex()->GetCouplings());
+  p_shand  = new String_Handler(m_gen_str,p_BS,model->p_model->GetCouplings());
 
-  int oew(m_oew), oqcd(m_oqcd), ntchanmin(m_ntchanmin);
-  p_ampl   = new Amplitude_Handler(m_nin+m_nout,&m_flavs.front(),p_b,p_pinfo,model,top,oqcd,oew,ntchanmin,
-				   &m_cpls,p_BS,p_shand,m_print_graphs,0);
-  m_oew=oew;
-  m_oqcd=oqcd;
+  size_t ntchanmin(m_ntchanmin);
+  size_t ntchanmax(m_ntchanmax);
+  p_ampl   = new Amplitude_Handler(m_nin+m_nout,&m_flavs.front(),p_b,p_pinfo,
+                                   model,top,m_maxcpl,m_mincpl,
+                                   ntchanmin,ntchanmax,
+                                   &m_cpls,p_BS,p_shand,m_print_graphs,0,true);
   m_ntchanmin=ntchanmin;
+  m_ntchanmax=ntchanmax;
   if (p_ampl->GetGraphNumber()==0) {
     msg_Tracking()<<"Single_LOProcess_MHV::InitAmplitude : No diagrams for "<<m_name<<"."<<endl;
     return 0;
+  }
+
+  map<string,Complex> cplmap;
+  for (size_t j=0;j<links.size();j++) if (Type()==links[j]->Type()) {
+    cplmap.clear();
+    if (FlavCompare(links[j]) && p_ampl->CompareAmplitudes(links[j]->GetAmplitudeHandler(),m_sfactor,cplmap)) {
+      if (p_hel->Compare(links[j]->GetHelicity(),m_nin+m_nout)) {
+	Single_LOProcess_MHV *pp=dynamic_cast<Single_LOProcess_MHV*>(links[j]);
+	if (m_emit!=pp->m_emit || m_spect!=pp->m_spect ||
+	    p_sub->m_ijt!=pp->p_sub->m_ijt || p_sub->m_kt!=pp->p_sub->m_kt ||
+	    p_sub->m_i!=pp->p_sub->m_i || p_sub->m_j!=pp->p_sub->m_j || p_sub->m_k!=pp->p_sub->m_k) continue;
+	m_sfactor = sqr(m_sfactor);
+	msg_Tracking()<<"AMEGIC::Single_Process_MHV::InitAmplitude : Found compatible process for "<<Name()<<" : "<<links[j]->Name()<<endl;
+	  
+	p_partner = (Single_LOProcess_MHV*)links[j];
+	m_iresult = p_partner->Result()*m_sfactor;
+	InitFlavmap(p_partner);
+
+	Minimize();
+	return 1;
+      }
+    }
   }
 
   p_ampl->FillPointlist();
@@ -265,18 +260,6 @@ int Single_LOProcess_MHV::InitAmplitude(Model_Base * model,Topology* top,
 //   PRINT_INFO("Tests Result: "<<tr);
   switch (tr) {
   case 1 :
-    for (size_t j=0;j<links.size();j++) if (Type()==links[j]->Type()) {
-      if (FlavCompare(links[j]) && ATOOLS::IsEqual(links[j]->Result(),Result())) {
-	if (CompareTestMoms(links[j]->GetTestMoms())) {
-	  msg_Tracking()<<"Single_LOProcess_MHV::InitAmplitude : "<<std::endl
-			<<"   Found a partner for process "<<m_name<<" : "<<links[j]->Name()<<std::endl;
-	  p_partner   = (Single_LOProcess_MHV*)links[j];
-	  m_pslibname = links[j]->PSLibName();
-	  InitFlavmap(p_partner);
-	  break;
-	}
-      } 
-    }
     if (p_partner==this) links.push_back(this);
     Minimize();
    
@@ -400,11 +383,13 @@ int Single_LOProcess_MHV::Tests(std::vector<double> * pfactors) {
     if (p_hel->On(i)) {
       for (size_t j=i+1;j<p_hel->MaxHel();j++) {
 	if (p_hel->On(j)) {
+#ifdef FuckUp_Helicity_Mapping
 	  if (ATOOLS::IsEqual(M_doub[i],M_doub[j])) {
 	    p_hel->SwitchOff(j);
 	    p_hel->SetPartner(i,j);
 	    p_hel->IncMultiplicity(i);
 	  }
+#endif
 	}
       }
     }

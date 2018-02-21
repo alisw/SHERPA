@@ -7,7 +7,6 @@
 namespace PDF {
   class LHAPDF_Fortran_Interface : public PDF_Base {
   private:
-    std::string m_set;
     int         m_smember;
     int         m_anti;
     double      m_f[13];
@@ -16,9 +15,10 @@ namespace PDF {
     LHAPDF_Fortran_Interface(const ATOOLS::Flavour,std::string,int);
     PDF_Base * GetCopy();
 
-    void   CalculateSpec(double,double);
+    void   CalculateSpec(const double&,const double&);
     double AlphaSPDF(const double &);
-    double GetXPDF(const ATOOLS::Flavour);
+    double GetXPDF(const ATOOLS::Flavour&);
+    double GetXPDF(const kf_code&,bool);
 
     void SetPDFMember();
 

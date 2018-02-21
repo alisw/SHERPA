@@ -11,7 +11,6 @@
 #include "PHASIC++/Main/Helicity_Integrator.H"
 #include "PHASIC++/Process/ME_Generator_Base.H"
 #include "PHASIC++/Scales/KFactor_Setter_Base.H"
-#include "MODEL/Interaction_Models/Interaction_Model_Base.H"
 #include "ATOOLS/Math/Random.H"
 #include "ATOOLS/Org/Run_Parameter.H"
 #include "ATOOLS/Org/Data_Reader.H"
@@ -29,17 +28,8 @@ COMIX::Single_Process::Single_Process():
   COMIX::Process_Base(this),
   p_bg(NULL), p_map(NULL),
   p_loop(NULL), p_kpterms(NULL),
-  m_checkpoles(false)
+  m_checkpoles(false), m_allowmap(true)
 {
-  int helpi;
-  Data_Reader reader(" ",";","!","=");
-  reader.AddComment("#");
-  reader.SetInputPath(rpa->GetPath());
-  reader.SetInputFile(rpa->gen.Variable("ME_DATA_FILE"));
-  if (reader.ReadFromFile(helpi,"CHECK_POLES")) {
-    m_checkpoles = helpi;
-    msg_Tracking()<<"Set infrared poles check mode "<<m_checkpoles<<" .\n";
-  }
 }
 
 COMIX::Single_Process::~Single_Process()
@@ -80,7 +70,7 @@ bool COMIX::Single_Process::Initialize
   }
   std::string mapfile(rpa->gen.Variable("SHERPA_CPP_PATH")
 		      +"/Process/Comix/"+m_name+".map");
-  if (FileExists(mapfile)) {
+  if (FileExists(mapfile,1)) {
     msg_Tracking()<<METHOD<<"(): Map file '"<<mapfile<<"' found.\n";
     My_In_File mapstream(mapfile);
     if (mapstream.Open()) {
@@ -117,10 +107,13 @@ bool COMIX::Single_Process::Initialize
     smode|=16;
     if (m_checkpoles) smode|=8;
   }
+  std::vector<int> mincpl(m_pinfo.m_mincpl.size());
+  std::vector<int> maxcpl(m_pinfo.m_maxcpl.size());
+  for (size_t i(0);i<mincpl.size();++i) mincpl[i]=m_pinfo.m_mincpl[i]*2;
+  for (size_t i(0);i<maxcpl.size();++i) maxcpl[i]=m_pinfo.m_maxcpl[i]*2;
   if (p_bg->Initialize(m_nin,m_nout,flavs,isf,fsf,&*p_model,
-		       &m_cpls,smode,m_pinfo.m_oew,m_pinfo.m_oqcd,
-		       m_pinfo.m_maxoew,m_pinfo.m_maxoqcd,
-		       m_pinfo.m_ntchan,m_pinfo.m_mtchan,m_name)) {
+		       &m_cpls,smode,maxcpl,mincpl,
+		       m_pinfo.m_ntchanmin,m_pinfo.m_ntchanmax,m_name)) {
     if (smode&1) {
       NLO_subevtlist *subs(GetSubevtList());
       for (size_t i(0);i<subs->size()-1;++i)
@@ -138,15 +131,20 @@ bool COMIX::Single_Process::Initialize
 			  p_bg->DInfo()->AMax(2),
 			  p_bg->DInfo()->AMax(1),
 			  p_bg->DInfo()->AMax(3));
-      m_wgtinfo.AddMEweights(18);
+      m_mewgtinfo.m_type|=mewgttype::VI|mewgttype::KP;
+      if (smode&4) m_mewgtinfo.m_type|=mewgttype::B;
     }
     if (smode&16) {
       smode&=~16;
       Process_Info cinfo(m_pinfo);
       cinfo.m_fi.m_nloqcdtype=nlo_type::loop;
-      cinfo.m_oew=p_bg->MaxOrderEW()+
+      cinfo.m_maxcpl[1]=p_bg->MaxCpl()[1]/2.0+
 	((cinfo.m_fi.m_nloewtype&nlo_type::loop)?1:0);
-      cinfo.m_oqcd=p_bg->MaxOrderQCD()+
+      cinfo.m_mincpl[1]=p_bg->MinCpl()[1]/2.0+
+	((cinfo.m_fi.m_nloewtype&nlo_type::loop)?1:0);
+      cinfo.m_maxcpl[0]=p_bg->MaxCpl()[0]/2.0+
+	((cinfo.m_fi.m_nloqcdtype&nlo_type::loop)?1:0);
+      cinfo.m_mincpl[0]=p_bg->MinCpl()[0]/2.0+
 	((cinfo.m_fi.m_nloqcdtype&nlo_type::loop)?1:0);
       p_loop = PHASIC::Virtual_ME2_Base::GetME2(cinfo);
       if (p_loop==NULL) {
@@ -154,12 +152,28 @@ bool COMIX::Single_Process::Initialize
 	THROW(not_implemented,"No virtual ME for this process");
       }
       p_loop->SetCouplings(m_cpls);
-      if (m_wgtinfo.m_nx==0) m_wgtinfo.AddMEweights(2);
+      p_loop->SetNorm(1.0/(isf*fsf));
+      m_mewgtinfo.m_type|=mewgttype::VI;
+      int helpi;
+      Data_Reader reader(" ",";","!","=");
+      reader.AddComment("#");
+      reader.SetInputPath(rpa->GetPath());
+      reader.SetInputFile(rpa->gen.Variable("ME_DATA_FILE"));
+      if (reader.ReadFromFile(helpi,"CHECK_POLES")) {
+	m_checkpoles=helpi;
+	msg_Tracking()<<"Set pole check mode "<<m_checkpoles<<".\n";
+      }
     }
     p_bg->SetLoopME(p_loop);
     nlo_type::code nlot(nlo_type::loop|nlo_type::vsub);
-    m_oew=p_bg->MaxOrderEW()+((m_pinfo.m_fi.m_nloewtype&nlot)?1:0);
-    m_oqcd=p_bg->MaxOrderQCD()+((m_pinfo.m_fi.m_nloqcdtype&nlot)?1:0);
+    m_maxcpl[1]=p_bg->MaxCpl()[1]/2.0
+      +((m_pinfo.m_fi.m_nloewtype&nlot)?1:0);
+    m_mincpl[1]=p_bg->MinCpl()[1]/2.0
+      +((m_pinfo.m_fi.m_nloewtype&nlot)?1:0);
+    m_maxcpl[0]=p_bg->MaxCpl()[0]/2.0
+      +((m_pinfo.m_fi.m_nloqcdtype&nlot)?1:0);
+    m_mincpl[0]=p_bg->MinCpl()[0]/2.0
+      +((m_pinfo.m_fi.m_nloqcdtype&nlot)?1:0);
     (*pmap)[m_name]=m_name;
     return true;
   }
@@ -188,7 +202,6 @@ bool COMIX::Single_Process::Initialize
 
 void COMIX::Single_Process::MapSubEvts(const int mode)
 {
-  m_wgtinfo.AddMEweights(p_map->m_wgtinfo.m_nx);
   m_subs.resize(p_map->p_bg->SubEvts().size());
   const NLO_subevtlist &subs(p_bg->SubEvts());
   const NLO_subevtlist &rsubs(p_map->p_bg->SubEvts());
@@ -225,8 +238,9 @@ bool COMIX::Single_Process::MapProcess()
     for (size_t i(0);i<p_umprocs->size();++i)
       if ((*p_umprocs)[i]->Name()==mapname) {
 	p_mapproc=p_map=(*p_umprocs)[i];
-	m_oew=p_map->m_oew;
-	m_oqcd=p_map->m_oqcd;
+	m_maxcpl=p_map->m_maxcpl;
+	m_mincpl=p_map->m_mincpl;
+	m_mewgtinfo.m_type=p_map->m_mewgtinfo.m_type;
 	if (p_map->p_kpterms) {
 	  p_kpterms = new KP_Terms
 	    (p_map,p_map->p_kpterms->MassKern()?1:0);
@@ -234,7 +248,6 @@ bool COMIX::Single_Process::MapProcess()
 			      p_map->p_bg->DInfo()->AMax(2),
 			      p_map->p_bg->DInfo()->AMax(1),
 			      p_map->p_bg->DInfo()->AMax(3));
-	  m_wgtinfo.AddMEweights(18);
 	}
 	msg_Tracking()<<"Mapped '"<<m_name<<"' -> '"<<mapname<<"'.\n";
 	std::string mapfile(rpa->gen.Variable("SHERPA_CPP_PATH")
@@ -268,7 +281,7 @@ bool COMIX::Single_Process::MapProcess()
   }
   std::string ampfile(rpa->gen.Variable("SHERPA_CPP_PATH")
 		      +"/Process/Comix/"+m_name+".map");
-  if (!FileExists(ampfile)) {
+  if (!FileExists(ampfile,1) && m_allowmap) {
   for (size_t i(0);i<p_umprocs->size();++i) {
     msg_Debugging()<<METHOD<<"(): Try mapping '"
 		   <<Name()<<"' -> '"<<(*p_umprocs)[i]->Name()<<"'\n";
@@ -291,7 +304,7 @@ bool COMIX::Single_Process::MapProcess()
 #endif
       std::string mapfile(rpa->gen.Variable("SHERPA_CPP_PATH")
 			  +"/Process/Comix/"+m_name+".map");
-      if (!FileExists(mapfile)) {
+      if (!FileExists(mapfile,1)) {
 	My_Out_File map(mapfile);
 	if (map.Open()) {
 	  *map<<m_name<<" "<<mapname<<"\n"<<m_fmap.size()<<"\n";
@@ -360,8 +373,10 @@ double COMIX::Single_Process::Partonic
 (const Vec4D_Vector &p,const int mode) 
 {
   Single_Process *sp(p_map!=NULL?p_map:this);
-  if (mode==1)
-    return m_lastxs=m_dxs+m_w*GetKPTerms(m_flavs,mode);
+  if (mode==1) {
+    UpdateKPTerms(mode);
+    return m_lastxs=m_dxs+KPTerms(mode);
+  }
   if (m_zero || !Selector()->Result()) return m_lastxs;
   for (size_t i(0);i<m_nin+m_nout;++i) {
     m_p[i]=p[i];
@@ -386,34 +401,46 @@ double COMIX::Single_Process::Partonic
     m_w=p_int->ColorIntegrator()->GlobalWeight();
     if (p_int->HelicityIntegrator()!=NULL) 
       m_w*=p_int->HelicityIntegrator()->Weight();
-    m_w*=sp->KFactor();
+    double kf(sp->KFactor());
+    m_w*=kf;
     m_dxs*=m_w;
     if (m_pinfo.m_fi.NLOType()&nlo_type::rsub) {
       const NLO_subevtlist &rsubs(sp->p_bg->SubEvts());
-      for (size_t i(0);i<rsubs.size()-1;++i)
+      for (size_t i(0);i<rsubs.size()-1;++i) {
 	rsubs[i]->Mult(sp->p_bg->KT2Trigger(rsubs[i],m_mcmode));
+	rsubs[i]->Mult(sp->KFactorSetter()->KFactor(*rsubs[i])/kf);
+      }
       if (p_map==NULL) p_bg->SubEvts().MultME(m_w);
       else {
-	for (size_t i(0);i<rsubs.size();++i)
+	for (size_t i(0);i<rsubs.size();++i) {
 	  m_subs[i]->CopyXSData(rsubs[i]);
+	  for (Cluster_Amplitude *campl(m_subs[i]->p_ampl);
+	       campl;campl=campl->Next()) {
+	    for (size_t i(0);i<campl->Legs().size();++i) {
+	      Flavour fl(campl->Leg(i)->Flav());
+	      fl=ReMap(i<m_nin?fl.Bar():fl,campl->Leg(i)->Id());
+	      campl->Leg(i)->SetFlav(i<m_nin?fl.Bar():fl);
+	    }
+	  }
+	}
 	m_subs.MultME(m_w);
       }
     }
   }
-  double kpterms(m_w*GetKPTerms(m_flavs,mode));
-  if (m_wgtinfo.m_nx) {
-    FillMEWeights(m_wgtinfo);
-    m_wgtinfo*=m_w;
-    m_wgtinfo.m_w0=m_dxs;
+  UpdateKPTerms(mode);
+  double kpterms(KPTerms(mode));
+  if (m_mewgtinfo.m_wren.size() || m_mewgtinfo.m_wfac.size()) {
+    FillMEWeights(m_mewgtinfo);
+    m_mewgtinfo*=m_w;
+    m_mewgtinfo.m_KP=kpterms;
   }
   return m_lastxs=m_dxs+kpterms;
 }
 
-double COMIX::Single_Process::GetKPTerms
-(const Flavour_Vector &fl,const int mode)
+void COMIX::Single_Process::UpdateKPTerms(const int mode)
 {
   m_x[0]=m_x[1]=1.0;
-  if (!(m_pinfo.m_fi.NLOType()&nlo_type::vsub)) return 0.0;
+  if (!(m_pinfo.m_fi.NLOType()&nlo_type::vsub)) return;
   if (mode==0) {
     Single_Process *sp(p_map!=NULL?p_map:this);
     double eta0=1.0, eta1=1.0;
@@ -433,6 +460,12 @@ double COMIX::Single_Process::GetKPTerms
     p_kpterms->Calculate
       (p_int->Momenta(),m_x[0],m_x[1],eta0,eta1,w);
   }
+}
+
+double COMIX::Single_Process::KPTerms(const int mode,
+                                      double scalefac2)
+{
+  if (!(m_pinfo.m_fi.NLOType()&nlo_type::vsub)) return 0.0;
   double eta0(0.0), eta1(0.0);
   if (mode==0) {
     eta0=p_int->Momenta()[0].PPlus()/rpa->gen.PBeam(0).PPlus();
@@ -442,10 +475,11 @@ double COMIX::Single_Process::GetKPTerms
     eta0=p_int->Momenta()[0].PPlus()/rpa->gen.PBeam(1).PMinus();
     eta1=p_int->Momenta()[1].PMinus()/rpa->gen.PBeam(0).PPlus();
   }
-  return p_kpterms->Get(m_x[0],m_x[1],eta0,eta1,fl,mode);
+  return m_w * p_kpterms->Get(m_x[0], m_x[1], eta0, eta1,
+                              m_flavs, mode, scalefac2);
 }
 
-void COMIX::Single_Process::FillMEWeights(ME_wgtinfo &wgtinfo) const
+void COMIX::Single_Process::FillMEWeights(ME_Weight_Info &wgtinfo) const
 {
   wgtinfo.m_y1=m_x[0];
   wgtinfo.m_y2=m_x[1];
@@ -473,7 +507,7 @@ bool COMIX::Single_Process::Tests()
            rpa->gen.Variable("SHERPA_CPP_PATH")+script);
     m_gpath+=std::string("/Comix");
     MakeDir(m_gpath,448);
-    p_bg->WriteOutGraphs(m_gpath+"/"+m_name+".tex");
+    p_bg->WriteOutGraphs(m_gpath+"/"+ShellName(m_name)+".tex");
   }
   if (p_int->HelicityScheme()==hls::sample) {
     p_int->SetHelicityIntegrator(new Helicity_Integrator());
@@ -489,9 +523,11 @@ bool COMIX::Single_Process::Tests()
   for (size_t i(0);i<ids.size();++i) {
     ids[i]=i;
     acts[i]=m_flavs[i].Strong();
-    if (!m_flavs[i].IsFermion()) types[i]=0;
-    else if (m_flavs[i].IsAnti()) types[i]=i<m_nin?1:-1;
-    else types[i]=i<m_nin?-1:1;
+    if (acts[i]) {
+      if (abs(m_flavs[i].StrongCharge())==8) types[i]=0;
+      else if (m_flavs[i].IsAnti()) types[i]=i<m_nin?1:-1;
+      else types[i]=i<m_nin?-1:1;
+    }
   }
   if (!p_int->ColorIntegrator()->
       ConstructRepresentations(ids,types,acts)) return false;
@@ -502,9 +538,11 @@ bool COMIX::Single_Process::Tests()
   for (size_t i(0);i<dids.size();++i) {
     dids[i]=dinfos[i]->m_id;
     acts[i]=dinfos[i]->m_fl.Strong();
-    if (!dinfos[i]->m_fl.IsFermion()) types[i]=0;
-    else if (dinfos[i]->m_fl.IsAnti()) types[i]=-1;
-    else types[i]=1;
+    if (acts[i]) {
+      if (dinfos[i]->m_fl.StrongCharge()==8) types[i]=0;
+      else if (dinfos[i]->m_fl.IsAnti()) types[i]=-1;
+      else types[i]=1;
+    }
   }
   p_int->ColorIntegrator()->SetDecayIds(dids,types,acts);
   Phase_Space_Handler::TestPoint(&m_p.front(),&Info(),Generator(),1);
@@ -548,7 +586,7 @@ void COMIX::Single_Process::ConstructPSVertices(PS_Generator *ps)
 {
   if (m_psset.find(ps)!=m_psset.end()) return;
   m_psset.insert(ps);
-  if (p_bg!=NULL) ps->Construct(p_bg);
+  if (p_bg!=NULL) ps->Construct(p_bg,GetSubevtList());
   else p_map->ConstructPSVertices(ps);
 }
 

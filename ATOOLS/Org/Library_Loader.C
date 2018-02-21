@@ -16,18 +16,17 @@ using namespace ATOOLS;
 
 Library_Loader *ATOOLS::s_loader(NULL);
 
-Library_Loader::Library_Loader(): m_wait(3600), m_check(true)
+Library_Loader::Library_Loader(): m_wait(3600), m_check(false)
 {
-  m_paths=EnvironmentVariable(LD_PATH_NAME);
+  m_paths.push_back(rpa->gen.Variable("SHERPA_RUN_PATH"));
   m_paths.push_back(rpa->gen.Variable("SHERPA_LIBRARY_PATH"));
+  const std::vector<std::string> &paths(EnvironmentVariable(LD_PATH_NAME));
+  m_paths.insert(m_paths.end(),paths.begin(),paths.end());
 }
 
 bool Library_Loader::CreateLockFile(const std::string &lockname)
 {
-  if (!m_check) {
-    msg_Debugging()<<"not checking lock file"<<std::endl;
-  }
-  else {
+  if (m_check) {
   msg_Debugging()<<"checking lock file '"<<lockname<<"' ... "<<std::flush;
   struct stat buffer;
   if (!stat(lockname.c_str(),&buffer)) {
@@ -48,20 +47,36 @@ bool Library_Loader::CreateLockFile(const std::string &lockname)
     }
   }
   msg_Debugging()<<" not found"<<std::endl;
-  }
   msg_Debugging()<<"creating lock file '"<<lockname<<"' ... "<<std::flush;
   std::ofstream *lock(new std::ofstream(lockname.c_str()));
   delete lock;
   msg_Debugging()<<" done"<<std::endl;
+  }
   return true;
 }
 
 bool Library_Loader::RemoveLockFile(const std::string &lockname)
 {
+  if (m_check) {
   msg_Debugging()<<"deleting lock file '"<<lockname<<"' ... "<<std::flush;
   remove(lockname.c_str());
   msg_Debugging()<<" done"<<std::endl;
+  }
   return true;
+}
+
+void Library_Loader::UnloadLibrary(const std::string &name,void *module)
+{
+  std::map<std::string,void*>::iterator lit(m_libs.find(name));
+  if (lit!=m_libs.end()) m_libs.erase(lit);
+  dlclose(module);
+}
+
+bool Library_Loader::LibraryIsLoaded(const std::string &name)
+{
+  std::map<std::string,void*>::iterator lit(m_libs.find(name));
+  if (lit!=m_libs.end()) return true;
+  return false;
 }
 
 void *Library_Loader::LoadLibrary(const std::string &name)
@@ -99,8 +114,8 @@ void *Library_Loader::LoadLibrary(const std::string &name)
     }
   }
   msg_Debugging()<<"} failed"<<std::endl;
-  msg_Error()<<METHOD<<"(): Failed to load library 'lib"
-	     <<name<<LIB_SUFFIX<<"'."<<std::endl;
+  msg_Info()<<METHOD<<"(): Failed to load library 'lib"
+	    <<name<<LIB_SUFFIX<<"'."<<std::endl;
   return NULL;
 }
 
@@ -124,9 +139,31 @@ void *Library_Loader::GetLibraryFunction(const std::string &libname,
   return func;
 }
 
-void Library_Loader::AddPath(const std::string &path)
+void *Library_Loader::GetLibraryFunction(const std::string &libname,
+					 const std::string &funcname,
+					 void *&module)
+{
+  msg_Debugging()<<"executing library function '"<<funcname
+		 <<"' from 'lib"<<libname<<LIB_SUFFIX<<"' ... "<<std::flush;
+  if (module==NULL) module=LoadLibrary(libname);
+  if (module==NULL) return NULL;
+  void *func(dlsym(module,funcname.c_str()));
+  char *error(dlerror());
+  if (error!=NULL) {
+    msg_Debugging()<<"failed"<<std::endl;
+    msg_Error()<<error<<std::endl;
+    msg_Error()<<METHOD<<"(): Failed to load function '"
+	       <<funcname<<"'."<<std::endl;
+    return NULL;
+  }
+  msg_Debugging()<<"done"<<std::endl;
+  return func;
+}
+
+void Library_Loader::AddPath(const std::string &path,const int mode)
 { 
   for (size_t i(0);i<m_paths.size();++i)
     if (m_paths[i]==path) return;
-  m_paths.push_back(path); 
+  if (mode) m_paths.push_back(path); 
+  else m_paths.insert(m_paths.begin(),path);
 }

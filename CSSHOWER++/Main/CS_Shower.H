@@ -3,6 +3,7 @@
 
 #include "PDF/Main/Shower_Base.H"
 #include "CSSHOWER++/Main/CS_Cluster_Definitions.H"
+#include "CSSHOWER++/Main/Color_Setter.H"
 #include "CSSHOWER++/Showers/Shower.H"
 #include "ATOOLS/Phys/Blob_List.H"
 
@@ -32,7 +33,7 @@ namespace CSSHOWER {
   private:
  
     PDF::ISR_Handler * p_isr;
-    int m_weightmode, m_kmode, m_respectq2;
+    int m_weightmode, m_kmode, m_respectq2, m_type;
     size_t m_maxem, m_nem, m_recocheck;
     
     Shower          * p_shower;
@@ -41,8 +42,9 @@ namespace CSSHOWER {
     All_Singlets *p_next, *p_refs;
 
     ATOOLS::Mass_Selector *p_ms;
+    Color_Setter *p_cs;
 
-    ATOOLS::Cluster_Amplitude *p_ampl, *p_rampl;
+    ATOOLS::Cluster_Amplitude *p_rampl;
 
     Flav_ME_Map m_xsmap;
 
@@ -73,7 +75,7 @@ namespace CSSHOWER {
 
     // constructor 
     CS_Shower(PDF::ISR_Handler *const isr, MODEL::Model_Base *const model,
-	      ATOOLS::Data_Reader *const dataread); 
+	      ATOOLS::Data_Reader *const dataread,const int type); 
 
     // destructor
     ~CS_Shower();

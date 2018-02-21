@@ -3,8 +3,7 @@
 
 #include "ATOOLS/Phys/Flavour.H"
 
-#include "MODEL/Main/Model_Base.H"
-#include "MODEL/Interaction_Models/Vertex.H"
+#include "AMEGIC++/Amplitude/Vertex.H"
 #include "AMEGIC++/Main/Topology.H"
 #include "AMEGIC++/Amplitude/Single_Amplitude.H"
 #include "AMEGIC++/Amplitude/Zfunctions/Basic_Sfuncs.H"
@@ -29,9 +28,11 @@ namespace AMEGIC {
     static int NMAX;
     ATOOLS::Flavour     * fl;
     int                    * b;
-    MODEL::Model_Base      * p_model;
+    Amegic_Model        * p_model;
     Topology               * top;
-    int                      N,nEW,nQCD,ntchan_min;
+    int                      N;
+    size_t                   ntchan_min,ntchan_max;
+    std::vector<double> order;
 
     Single_Topology        * single_top;
     std::vector<Pre_Amplitude> prea;
@@ -40,14 +41,25 @@ namespace AMEGIC {
 
     bool                     m_create_4V;
     
-    MODEL::Vertex_Table     v_table;
+    Vertex_Table     v_table;
     //exhibits the points, the topology and the permutation number
     Pre_Ampl_List    prea_table;
     
     void Set_End(Point*,int* &,int&);
     void Next_P(Point*,Point* &);
     void Print_P(Point*);
-    int  MatchVertex(MODEL::Single_Vertex*,ATOOLS::Flavour*,std::vector<Complex>&);
+    inline int MatchVertex(AMEGIC::Single_Vertex* v,
+			   ATOOLS::Flavour* flav,std::vector<Complex>& cpl)
+    {
+      if (v->dec>0 || flav[0]!=v->in[0]) return 0;
+      if (flav[1].Kfcode() && flav[1]!=v->in[1]) return 0;
+      if (flav[2].Kfcode() && flav[2]!=v->in[2]) return 0;
+      flav[1]=v->in[1];
+      flav[2]=v->in[2];
+      cpl.clear();
+      for (int j=0;j<v->cpl.size();++j) cpl.push_back(v->Coupling(j));
+      return 1;
+    }
     int  CheckEnd(Point*,ATOOLS::Flavour);  
     void SetProps(Point*,int,Single_Amplitude* &,int*, int, int);
     int  Kill_Off(Single_Amplitude* &);
@@ -56,7 +68,6 @@ namespace AMEGIC {
     bool CheckOrders(Point * p);
     bool CheckTChannels(Point * p);
     void Compare(Single_Amplitude* &);
-    void Unite(Point*,Point*);
     int  CompareColors(Point*,Point*);
     int  Compare5Vertex(Point*,Point*);
 
@@ -72,11 +83,13 @@ namespace AMEGIC {
     int Count4G(Point * p);
     int CountRealAmplitudes(Single_Amplitude* first);
   public:
-    Amplitude_Generator(int,ATOOLS::Flavour *,int *,MODEL::Model_Base *,Topology *,
-			int,int,int,Basic_Sfuncs *,String_Handler *,bool=true);
-    ~Amplitude_Generator(); 
+    Amplitude_Generator(int,ATOOLS::Flavour *,int *,Amegic_Model *,
+                        Topology *,std::vector<double>,size_t,size_t,
+                        Basic_Sfuncs *,String_Handler *,bool=true);
+    ~Amplitude_Generator();
     Single_Amplitude* Matching();
-    void GetOrders(int& qed,int& qcd) {qed=nEW;qcd=nQCD;}
+
+    inline const std::vector<double> &Order() const { return order; }
   };
 }
 #endif

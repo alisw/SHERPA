@@ -48,8 +48,7 @@ namespace PHASIC {
     std::string m_coupling;
 
     size_t m_nin, m_nout;
-
-    double m_htyfac, m_htyexp;
+    size_t m_l1, m_l2;
 
     ATOOLS::ClusterAmplitude_Vector m_ampls;
 
@@ -69,12 +68,10 @@ namespace PHASIC {
 
     double HTM() const;
     double HT() const;
+    double HTprime() const;
 
     ATOOLS::Vec4D PSum() const;
 
-    double HTYweighted() const;
-    bool   SetHTYweightedParameters(std::string par, std::string val);
-    
     double BeamThrust() const;
 
     double CalculateScale(const ATOOLS::Vec4D_Vector &p,const size_t mode=0);

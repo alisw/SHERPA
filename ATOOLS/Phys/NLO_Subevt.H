@@ -3,20 +3,9 @@
 
 #include "ATOOLS/Phys/Particle_List.H"
 #include "ATOOLS/Phys/Decay_Info.H"
+#include "PHASIC++/Process/Subprocess_Info.H"
 
 namespace ATOOLS {
-
-  class ME_wgtinfo {
-  public: 
-    int m_nx;
-    double m_w0, *p_wx;
-    double m_x1, m_x2, m_y1, m_y2, m_mur2;
-    ME_wgtinfo();
-    ~ME_wgtinfo();
-    ME_wgtinfo& operator*=(const double &scal);
-    void Flip();
-    void AddMEweights(int n);
-  };
 
   struct IDip_ID {
     size_t m_ijt, m_kt;
@@ -113,6 +102,7 @@ namespace ATOOLS {
     Particle_List *CreateParticleList() const;
 
     std::string IDString(const int mode=0) const;
+    std::string PSInfo() const;
 
     inline void Mult(const double &scal)
     { m_result*=scal; m_me*=scal; m_mewgt*=scal; }
@@ -137,7 +127,10 @@ namespace ATOOLS {
   std::ostream &operator<<(std::ostream &ostr,const NLO_subevt &sevt);
 
   class NLO_subevtlist: public std::vector<NLO_subevt*> { 
+  private:
+    PHASIC::nlo_type::code m_type;
   public:
+    inline NLO_subevtlist() : m_type(PHASIC::nlo_type::lo) {}
 
     void Mult(const double &scal);
     void MultME(const double &scal);
@@ -145,6 +138,8 @@ namespace ATOOLS {
 
     NLO_subevtlist& operator*=(const double scal);
 
+    inline PHASIC::nlo_type::code Type() { return m_type; }
+    inline void SetType(PHASIC::nlo_type::code type) { m_type=type; }
   };// end of class NLO_subevtlist
 
 }// end of namespace ATOOLS

@@ -1,8 +1,9 @@
 #ifndef AMEGIC_Main_Point_H
 #define AMEGIC_Main_Point_H
 
-#include "MODEL/Interaction_Models/Vertex.H"
-#include "ATOOLS/Phys/Flavour.H"
+#include "MODEL/Main/Model_Base.H"
+#include "AMEGIC++/Amplitude/Single_Vertex.H"
+#include "AMEGIC++/Amplitude/Lorentz_Function.H"
 
 namespace AMEGIC {
 
@@ -17,13 +18,11 @@ namespace AMEGIC {
     int             m;
     int             propid;
     ATOOLS::Flavour   fl;
-    ATOOLS::Flavour * extrafl;
-    int                  nextra;
     Point              * left;
     Point              * right;
     Point              * middle;
     Point              * prev;
-    MODEL::Single_Vertex * v;
+    AMEGIC::Single_Vertex * v;
     std::vector<Complex> cpl;
     MODEL::Color_Function     * Color;
     MODEL::Lorentz_Function   * Lorentz;
@@ -34,9 +33,8 @@ namespace AMEGIC {
     Point& operator=(const Point& p);
     
     ~Point() {
-      if (nextra>0) delete[] extrafl;
-      delete Color;
-      if (Lorentz) delete Lorentz;
+      if (Color) delete Color;
+      if (Lorentz) Lorentz->Delete();
     }
     void Print();
     void ResetExternalNumbers(int);
@@ -48,8 +46,7 @@ namespace AMEGIC {
     bool CountT(int & tchan,const long unsigned int & kfcode=0);
     void GeneratePropID();
     std::string GetPropID() const;
-    int FindQCDOrder(int &);
-    int FindQEDOrder(int &);
+    void FindOrder(std::vector<int> &);
   };
 
   std::ostream &operator<<(std::ostream &str,const Point &p);

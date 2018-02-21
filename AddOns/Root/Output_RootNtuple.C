@@ -25,8 +25,8 @@ MPI_Datatype MPI_rntuple_evt2;
 MPI_Datatype MPI_Vec4D;
 #endif
 
-Output_RootNtuple::Output_RootNtuple(const Output_Arguments &args):
-  Output_Base("Root")
+Output_RootNtuple::Output_RootNtuple(const Output_Arguments &args,int exact):
+  Output_Base("Root"), m_exact(exact)
 {
   args.p_reader->SetAllowUnits(true);
   m_filesize = args.p_reader->GetValue<long int>
@@ -41,8 +41,10 @@ Output_RootNtuple::Output_RootNtuple(const Output_Arguments &args):
   m_avsize=args.p_reader->GetValue<int>("ROOTNTUPLE_AVSIZE",10000);
 #ifdef USING__MPI
   int size=MPI::COMM_WORLD.Get_size();
+  if (m_exact) m_avsize=Max((size_t)1,m_avsize/size);
 #endif
   m_total=0;
+  m_csumsqr=m_csum=m_cn=0.;
   m_sum=m_s2=m_s3=m_c1=m_c2=0.;
   m_sq=m_fsq=m_sq2=m_sq3=0.;
 #ifdef USING__ROOT
@@ -50,13 +52,13 @@ Output_RootNtuple::Output_RootNtuple(const Output_Arguments &args):
   p_f=NULL;
 #ifdef USING__MPI
   rntuple_evt2 dummye[1];
-  MPI_Datatype typee[17]={MPI_DOUBLE,MPI_DOUBLE,MPI_DOUBLE,
+  MPI_Datatype typee[18]={MPI_DOUBLE,MPI_DOUBLE,MPI_DOUBLE,
 			  MPI_DOUBLE,MPI_DOUBLE,MPI_DOUBLE,
 			  MPI_DOUBLE,MPI_DOUBLE,MPI_DOUBLE,
-			  MPI_LONG,MPI_INT,MPI_INT,MPI_INT,
+			  MPI_LONG,MPI_INT,MPI_INT,MPI_INT,MPI_INT,
 			  MPI_INT,MPI_DOUBLE,MPI_INT,MPI_CHAR};
-  int blocklene[17]={1,1,1,1,1,1,1,1,1,1,1,1,1,1,18,1,2};
-  MPI_Aint basee, dispe[17];
+  int blocklene[18]={1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,18,1,2};
+  MPI_Aint basee, dispe[18];
   MPI_Get_address(&dummye[0],&basee);
   MPI_Get_address(&dummye[0].weight,dispe+0);
   MPI_Get_address(&dummye[0].wgt0,dispe+1);
@@ -68,14 +70,15 @@ Output_RootNtuple::Output_RootNtuple(const Output_Arguments &args):
   MPI_Get_address(&dummye[0].rscale,dispe+7);
   MPI_Get_address(&dummye[0].alphas,dispe+8);
   MPI_Get_address(&dummye[0].id,dispe+9);
-  MPI_Get_address(&dummye[0].nparticle,dispe+10);
-  MPI_Get_address(&dummye[0].kf1,dispe+11);
-  MPI_Get_address(&dummye[0].kf2,dispe+12);
-  MPI_Get_address(&dummye[0].nuwgt,dispe+13);
-  MPI_Get_address(dummye[0].uwgt,dispe+14);
-  MPI_Get_address(&dummye[0].oqcd,dispe+15);
-  MPI_Get_address(dummye[0].type,dispe+16);
-  for (size_t i=0;i<17;++i) dispe[i]-=basee;
+  MPI_Get_address(&dummye[0].ncount,dispe+10);
+  MPI_Get_address(&dummye[0].nparticle,dispe+11);
+  MPI_Get_address(&dummye[0].kf1,dispe+12);
+  MPI_Get_address(&dummye[0].kf2,dispe+13);
+  MPI_Get_address(&dummye[0].nuwgt,dispe+14);
+  MPI_Get_address(dummye[0].uwgt,dispe+15);
+  MPI_Get_address(&dummye[0].oqcd,dispe+16);
+  MPI_Get_address(dummye[0].type,dispe+17);
+  for (size_t i=0;i<18;++i) dispe[i]-=basee;
   MPI_Type_create_struct(17,blocklene,dispe,typee,&MPI_rntuple_evt2);
   MPI_Type_commit(&MPI_rntuple_evt2);
   Vec4D dummyv[1];
@@ -103,6 +106,7 @@ void Output_RootNtuple::Header()
   size_t max = 2147483647;
   p_t3->SetMaxTreeSize(Min(m_filesize,max));
   p_t3->Branch("id",&m_id,"id/I");
+  if (m_exact) p_t3->Branch("ncount",&m_ncount,"ncount/I");
   p_t3->Branch("nparticle",&m_nparticle,"nparticle/I");
   p_t3->Branch("px",p_px,"px[nparticle]/F");
   p_t3->Branch("py",p_py,"py[nparticle]/F");
@@ -157,10 +161,39 @@ void Output_RootNtuple::PrepareTerminate()
   // delete p_f;
   ATOOLS::exh->RemoveTerminatorObject(this);
 #endif
+  if (m_exact) {
+    double xs=m_csum/m_cn;
+    double err=sqrt((m_csumsqr/m_cn-sqr(m_csum/m_cn))/(m_cn-1.));
+    msg_Info()<<METHOD<<"(): '"<<p_f->GetName()
+	      <<"' stores "<<xs<<" pb +- ( "<<err<<" pb = "
+	      <<dabs((int(10000.0*err/xs))/100.0)<<" % )\n";
+    return;
+  }
   msg_Info()<<"ROOTNTUPLE_OUTPUT stored: "<<m_s2/m_c2<<" +/- "<<sqrt((m_sq2/m_c2-sqr(m_s2/m_c2))/(m_c2-1.))<<" pb  (reweighted 1) \n"; 
   double c3(m_idcnt);
   msg_Info()<<"                          "<<m_s3/c3<<" +/- "<<sqrt((m_sq3/c3-sqr(m_s3/c3))/(c3-1.))<<" pb  (reweighted 2) \n"; 
   msg_Info()<<"                          "<<m_sum/m_c1<<" +/- "<<sqrt((m_sq/m_c1-sqr(m_sum/m_c1))/(m_c1-1.))<<" pb  (before reweighting) \n"<<endl; 
+}
+
+void Output_RootNtuple::AddDecayProducts(Particle *part,int &np) 
+{
+  DEBUG_FUNC(*part);
+  if (part->DecayBlob()) {
+    for (size_t i(0);i<part->DecayBlob()->NOutP();++i)
+      AddDecayProducts(part->DecayBlob()->OutParticle(i),np);
+    return;
+  }
+  DEBUG_VAR("Adding "<<*part);
+  ++np;
+  int kfc=part->Flav().Kfcode(); 
+  if (part->Flav().IsAnti()) kfc=-kfc;
+  if (m_fcnt>=m_flavlist.size()) {
+    m_flavlist.resize(m_flavlist.size()+3*m_avsize);
+    m_momlist.resize(m_momlist.size()+3*m_avsize);
+  }
+  m_flavlist[m_fcnt]=kfc;
+  m_momlist[m_fcnt]=part->Momentum();
+  ++m_fcnt;
 }
 
 void Output_RootNtuple::Output(Blob_List* blobs, const double weight) 
@@ -177,41 +210,54 @@ void Output_RootNtuple::Output(Blob_List* blobs, const double weight)
   int ncount=(*signal)["Trials"]->Get<double>();
   m_evt+=ncount;
   m_c1+=ncount;
+  m_cn+=ncount;
   m_cnt3++;
   m_idcnt++;
 
   Blob *blob=signal;
   if (m_mode==1) blob=shower;
-  Blob_Data_Base* seinfo=(*signal)["ME_wgtinfo"];
-  ME_wgtinfo* wgtinfo(0);
-  if (seinfo) wgtinfo=seinfo->Get<ME_wgtinfo*>();
+  Blob_Data_Base* seinfo=(*signal)["MEWeightInfo"];
+  ME_Weight_Info* wgtinfo(NULL);
+  if (seinfo) wgtinfo=seinfo->Get<ME_Weight_Info*>();
   seinfo=(*signal)["NLO_subeventlist"];
   std::string type((*signal)["NLOQCDType"]->Get<std::string>());
   
-  if (!seinfo) {
+  if (!seinfo) { // BVI type events
     if (m_evtlist.size()<=m_cnt2)
       m_evtlist.resize(m_evtlist.size()+m_avsize);
     m_evtlist[m_cnt2].weight=(*signal)["Weight"]->Get<double>();
+    m_evtlist[m_cnt2].ncount=ncount;
     m_sum+=m_evtlist[m_cnt2].weight;
+    m_csum+=m_evtlist[m_cnt2].weight;
+    m_csumsqr+=sqr(m_evtlist[m_cnt2].weight);
     m_fsq+=sqr(m_evtlist[m_cnt2].weight);
     m_evtlist[m_cnt2].id=m_idcnt;
     m_evtlist[m_cnt2].fscale=sqrt((*signal)["Factorisation_Scale"]->Get<double>());
     m_evtlist[m_cnt2].rscale=sqrt((*signal)["Renormalization_Scale"]->Get<double>());
     m_evtlist[m_cnt2].alphas=MODEL::s_model->ScalarFunction("alpha_S",m_evtlist[m_cnt2].rscale*m_evtlist[m_cnt2].rscale);
-    m_evtlist[m_cnt2].oqcd=(*signal)["OQCD"]->Get<int>();
+    m_evtlist[m_cnt2].oqcd=(*signal)["Orders"]->Get<std::vector<double> >()[0];
     if (type=="B" || type=="") strcpy(m_evtlist[m_cnt2].type,"B");
     else if (type=="V") strcpy(m_evtlist[m_cnt2].type,"V");
     else if (type=="I") strcpy(m_evtlist[m_cnt2].type,"I");
     else THROW(fatal_error,"Error in NLO type '"+type+"'");
     if (wgtinfo) {
-      m_evtlist[m_cnt2].wgt0=wgtinfo->m_w0;
+      if      (type=="B" || type=="")  m_evtlist[m_cnt2].wgt0=wgtinfo->m_B;
+      else if (type=="V" || type=="I") m_evtlist[m_cnt2].wgt0=wgtinfo->m_VI;
       m_evtlist[m_cnt2].x1=wgtinfo->m_x1;
       m_evtlist[m_cnt2].x2=wgtinfo->m_x2;
       m_evtlist[m_cnt2].y1=wgtinfo->m_y1;
       m_evtlist[m_cnt2].y2=wgtinfo->m_y2;
-      m_evtlist[m_cnt2].nuwgt=wgtinfo->m_nx;
-      for (int i=0;i<m_evtlist[m_cnt2].nuwgt;i++) 
-	m_evtlist[m_cnt2].uwgt[i]=wgtinfo->p_wx[i];
+      size_t nren(wgtinfo->m_type&mewgttype::VI?wgtinfo->m_wren.size():0),
+             nfac(wgtinfo->m_type&mewgttype::KP?wgtinfo->m_wfac.size():0);
+      m_evtlist[m_cnt2].nuwgt=nren+nfac;
+      if (wgtinfo->m_type&mewgttype::VI) {
+        for (size_t i(0);i<nren;++i)
+          m_evtlist[m_cnt2].uwgt[i]=wgtinfo->m_wren[i];
+      }
+      if (wgtinfo->m_type&mewgttype::KP) {
+        for (size_t i(0);i<nfac;++i)
+          m_evtlist[m_cnt2].uwgt[nren+i]=wgtinfo->m_wfac[i];
+      }
     }
     for (int inp=0, i=0;i<blob->NInP();i++) {
     Particle *part=blob->InParticle(i);
@@ -224,8 +270,11 @@ void Output_RootNtuple::Output(Blob_List* blobs, const double weight)
     int np=0;
     for (int i=0;i<blob->NOutP();i++) {
       Particle *part=blob->OutParticle(i);
-      if (part->DecayBlob() &&
-	  part->DecayBlob()->Type()==btp::Signal_Process) continue;
+      if (part->DecayBlob()) {
+	if (m_mode==1 && part->DecayBlob()->Type()==btp::Signal_Process) continue;
+	AddDecayProducts(part,np);
+	continue;
+      }
       ++np;
       int kfc=part->Flav().Kfcode(); 
       if (part->Flav().IsAnti()) kfc=-kfc;
@@ -240,7 +289,7 @@ void Output_RootNtuple::Output(Blob_List* blobs, const double weight)
     m_evtlist[m_cnt2].nparticle=np;
     ++m_cnt2;
   }
-  else {
+  else { // RS-type events
     NLO_subevtlist* nlos = seinfo->Get<NLO_subevtlist*>();
     double tweight=0.;
     for (size_t j=0;j<nlos->size();j++) {
@@ -249,6 +298,7 @@ void Output_RootNtuple::Output(Blob_List* blobs, const double weight)
 	m_evtlist.resize(m_evtlist.size()+m_avsize);
       ATOOLS::Particle_List * pl=(*nlos)[j]->CreateParticleList();
       m_evtlist[m_cnt2].weight=(*nlos)[j]->m_result;
+      m_evtlist[m_cnt2].ncount=ncount;
       tweight+=m_evtlist[m_cnt2].weight;
       m_evtlist[m_cnt2].nparticle=pl->size();
       m_evtlist[m_cnt2].id=m_idcnt;
@@ -256,9 +306,10 @@ void Output_RootNtuple::Output(Blob_List* blobs, const double weight)
       m_evtlist[m_cnt2].fscale=sqrt((*nlos)[j]->m_mu2[stp::fac]);
       m_evtlist[m_cnt2].rscale=sqrt((*nlos)[j]->m_mu2[stp::ren]);
       m_evtlist[m_cnt2].alphas=MODEL::s_model->ScalarFunction("alpha_S", m_evtlist[m_cnt2].rscale*m_evtlist[m_cnt2].rscale);
-      m_evtlist[m_cnt2].oqcd=(*signal)["OQCD"]->Get<int>();
+      m_evtlist[m_cnt2].oqcd=(*signal)["Orders"]->Get<std::vector<double> >()[0];
       if (type!="RS") THROW(fatal_error,"Error in NLO type");
-      strcpy(m_evtlist[m_cnt2].type,"R"); 
+      if ((*nlos)[j]->p_real==(*nlos)[j]) strcpy(m_evtlist[m_cnt2].type,"R");
+      else                                strcpy(m_evtlist[m_cnt2].type,"S");
 
       if (wgtinfo) {
 	m_evtlist[m_cnt2].x1=wgtinfo->m_x1;
@@ -292,6 +343,8 @@ void Output_RootNtuple::Output(Blob_List* blobs, const double weight)
       delete pl;
     }
     m_sum+=tweight;
+    m_csum+=tweight;
+    m_csumsqr+=sqr(tweight);
     m_fsq+=sqr(tweight);
   }
   
@@ -302,7 +355,14 @@ void Output_RootNtuple::ChangeFile()
 {
   StoreEvt();
 #ifdef USING__ROOT
-  p_t3->AutoSave();
+  if (p_t3==NULL) return;
+  double xs=m_csum/m_cn;
+  double err=sqrt((m_csumsqr/m_cn-sqr(m_csum/m_cn))/(m_cn-1.));
+  msg_Info()<<METHOD<<"(): '"<<p_f->GetName()
+	    <<"' stores "<<xs<<" pb +- ( "<<err<<" pb = "
+	    <<dabs((int(10000.0*err/xs))/100.0)<<" % )\n";
+  m_csumsqr=m_csum=m_cn=0.0;
+  p_f=p_t3->ChangeFile(p_f);
 #endif
 }
 
@@ -344,6 +404,9 @@ void Output_RootNtuple::MPISync()
 	m_fsq+=vals[4];
 	m_sum+=vals[5];
 	m_c1+=vals[2];
+	m_csumsqr+=vals[4];
+	m_csum+=vals[5];
+	m_cn+=vals[2];
       }
     }
     else {
@@ -374,6 +437,7 @@ void Output_RootNtuple::StoreEvt()
   size_t fc=0;
   double scale2=double(m_cnt2)/double(m_evt);
   double scale3=double(m_cnt3)/double(m_evt);
+  if (m_exact) scale2=scale3=1.0;
   for (size_t i=0;i<m_cnt2;i++) {
 #ifdef USING__ROOT
     m_id  = m_evtlist[i].id;
@@ -381,6 +445,7 @@ void Output_RootNtuple::StoreEvt()
     m_wgt2= m_evtlist[i].weight*scale3;
     m_mewgt = m_evtlist[i].wgt0*scale2;
     m_mewgt2= m_evtlist[i].wgt0*scale3;
+    m_ncount= m_evtlist[i].ncount;
     m_x1 = m_evtlist[i].x1;
     m_x2 = m_evtlist[i].x2;
     m_y1 = m_evtlist[i].y1;
@@ -429,6 +494,21 @@ operator()(const Output_Arguments &args) const
 }
 
 void ATOOLS::Getter<Output_Base,Output_Arguments,Output_RootNtuple>::
+PrintInfo(std::ostream &str,const size_t width) const
+{
+  str<<"Root NTuple output";
+}
+
+DECLARE_GETTER(Output_ERootNtuple,"ERoot",
+	       Output_Base,Output_Arguments);
+
+Output_Base *ATOOLS::Getter<Output_Base,Output_Arguments,Output_ERootNtuple>::
+operator()(const Output_Arguments &args) const
+{
+  return new Output_RootNtuple(args,1);
+}
+
+void ATOOLS::Getter<Output_Base,Output_Arguments,Output_ERootNtuple>::
 PrintInfo(std::ostream &str,const size_t width) const
 {
   str<<"Root NTuple output";

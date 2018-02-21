@@ -70,7 +70,7 @@ namespace CSSHOWER {
 
 }
 
-#include "MODEL/Interaction_Models/Single_Vertex.H"
+#include "MODEL/Main/Single_Vertex.H"
 #include "ATOOLS/Math/Random.H"
 
 using namespace CSSHOWER;
@@ -180,7 +180,7 @@ double LF_VHV_FI::Z()
   return m_zmin+(m_zmax-m_zmin)*ATOOLS::ran->Get();
 }
 
-DECLARE_GETTER(LF_VVH_FF,"Triangle",SF_Lorentz,SF_Key);
+DECLARE_GETTER(LF_VVH_FF,"HVV",SF_Lorentz,SF_Key);
 
 SF_Lorentz *ATOOLS::Getter<SF_Lorentz,SF_Key,LF_VVH_FF>::
 operator()(const Parameter_Type &args) const

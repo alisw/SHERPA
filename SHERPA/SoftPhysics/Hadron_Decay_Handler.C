@@ -41,7 +41,8 @@ Hadron_Decay_Handler::Hadron_Decay_Handler(string path, string fragfile) :
     }
   }
 
-  string decaypath=dr.GetValue<string>("DECAYPATH",string("Decaydata/"));
+  string decaypath=dr.GetValue<string>("DECAYPATH",rpa->gen.Variable("SHERPA_SHARE_PATH"))+"/"
+    +dr.GetValue<string>("DECAYPATHPIECE",string("Decaydata/"));
   string decayfile=dr.GetValue<string>("DECAYFILE",string("HadronDecays.dat"));
   string decayconstfile=dr.GetValue<string>("DECAYCONSTFILE",
                                             string("HadronConstants.dat"));
@@ -57,7 +58,6 @@ Hadron_Decay_Handler::Hadron_Decay_Handler(string path, string fragfile) :
   m_spincorr=rpa->gen.SoftSC();
   m_cluster=false;
 
-  decaypath=rpa->gen.Variable("SHERPA_SHARE_PATH")+"/"+decaypath;
   My_In_File::OpenDB(decaypath);
   My_In_File::ExecDB(decaypath,"PRAGMA cache_size = 100000");
   My_In_File::ExecDB(decaypath,"BEGIN");
@@ -69,7 +69,7 @@ Hadron_Decay_Handler::Hadron_Decay_Handler(string path, string fragfile) :
   dmap->Read(decaypath, decayfile, true);
   dmap->Read(decaypath, aliasdecayfile);
   dmap->Initialise();
-  dmap->ReadFixedTables(decaypath, "FixedDecays.dat");
+  dmap->ReadFixedTables("", "FixedDecays.dat");
   p_decaymap=dmap;
   
   p_mixinghandler = new Mixing_Handler();
@@ -129,10 +129,11 @@ Hadron_Decay_Handler::FillOnshellDecay(Blob *blob, Spin_Density* sigma)
 void Hadron_Decay_Handler::CreateDecayBlob(Particle* inpart)
 {
   DEBUG_FUNC(inpart->RefFlav());
-  if(inpart->DecayBlob()) abort();
+  if(inpart->DecayBlob()) THROW(fatal_error,"Decay blob already exists.");
   if(!Decays(inpart->Flav())) return;
   if(inpart->Time()==0.0) inpart->SetTime();
   Blob* blob = p_bloblist->AddBlob(btp::Hadron_Decay);
+  blob->SetStatus(blob_status::needs_extraQED);
   blob->AddToInParticles(inpart);
   SetPosition(blob);
   blob->SetTypeSpec("Sherpa");

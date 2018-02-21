@@ -82,9 +82,10 @@ bool AMEGIC::Single_Process_Combined::CheckAlternatives(vector<Process_Base *>& 
       if (links[j]->Name()==name) {
 	p_mapproc = p_partner = (Single_Process_Combined*)links[j];
 	m_iresult = p_partner->Result()*m_sfactor;
-	m_oqcd=p_partner->OrderQCD();
-	m_oew=p_partner->OrderEW();
+	m_maxcpl=p_partner->MaxOrders();
+	m_mincpl=p_partner->MinOrders();
 	m_ntchanmin=p_partner->NTchanMin();
+	m_ntchanmax=p_partner->NTchanMax();
 	msg_Tracking()<<"Found Alternative process: "<<m_name<<" "<<name<<endl;
 
 	while (*from) {
@@ -110,13 +111,13 @@ bool AMEGIC::Single_Process_Combined::CheckAlternatives(vector<Process_Base *>& 
   return false;
 }
 
-int AMEGIC::Single_Process_Combined::InitAmplitude(Model_Base * model,Topology* top,
+int AMEGIC::Single_Process_Combined::InitAmplitude(Amegic_Model * model,Topology* top,
 					  vector<Process_Base *> & links,
 					  vector<Process_Base *> & errs)
 {
   Init();
-  model->GetCouplings(m_cpls);
-  if (!model->CheckFlavours(m_nin,m_nout,&m_flavs.front())) return 0;
+  model->p_model->GetCouplings(m_cpls);
+  if (!model->p_model->CheckFlavours(m_nin,m_nout,&m_flavs.front())) return 0;
   m_newlib   = false;
   m_libnumb  = 0;
   m_pslibname = m_libname = ToString(m_nin)+"_"+ToString(m_nout);
@@ -127,16 +128,6 @@ int AMEGIC::Single_Process_Combined::InitAmplitude(Model_Base * model,Topology* 
   p_me2 = Tree_ME2_Base::GetME2(m_pinfo);
   if (!p_me2) return 0;
   p_me2->SetCouplings(m_cpls);
-
-  if (m_gen_str>1) {
-    ATOOLS::MakeDir(rpa->gen.Variable("SHERPA_CPP_PATH")+"/Process/Amegic/"+m_ptypename);
-  }
-  string newpath=rpa->gen.Variable("SHERPA_CPP_PATH");
-  ATOOLS::MakeDir(newpath);
-  if (!FileExists(newpath+"/makelibs")) {
-    Copy(rpa->gen.Variable("SHERPA_SHARE_PATH")+"/makelibs",
-	     newpath+"/makelibs");
-  }
 
   if (CheckAlternatives(links,Name())) return 1;
 
@@ -159,12 +150,12 @@ int AMEGIC::Single_Process_Combined::InitAmplitude(Model_Base * model,Topology* 
   }
   else p_BS     = new Basic_Sfuncs(m_nin+m_nout,m_nin+m_nout,&m_flavs.front(),p_b);  
   p_BS->Setk0(s_gauge);
-  p_shand  = new String_Handler(m_gen_str,p_BS,model->GetVertex()->GetCouplings());
-  int oew(m_oew), oqcd(m_oqcd), ntchanmin(m_ntchanmin);
-  p_ampl   = new Amplitude_Handler(m_nin+m_nout,&m_flavs.front(),p_b,p_pinfo,model,top,oqcd,oew,ntchanmin,
-				   &m_cpls,p_BS,p_shand,m_print_graphs,!directload);
-  m_oew=oew;
-  m_oqcd=oqcd;
+  p_shand  = new String_Handler(m_gen_str,p_BS,model->p_model->GetCouplings());
+  bool cvp(reader.GetValue<int>("AMEGIC_CUT_MASSIVE_VECTOR_PROPAGATORS",1));
+  p_ampl   = new Amplitude_Handler(m_nin+m_nout,&m_flavs.front(),p_b,p_pinfo,
+                                   model,top,m_maxcpl,m_mincpl,
+                                   m_ntchanmin,m_ntchanmax,
+                                   &m_cpls,p_BS,p_shand,m_print_graphs,!directload,cvp);
   if (p_ampl->GetGraphNumber()==0) {
     msg_Tracking()<<"AMEGIC::Single_Process_Combined::InitAmplitude : No diagrams for "<<m_name<<"."<<endl;
     return 0;
@@ -218,35 +209,11 @@ int AMEGIC::Single_Process_Combined::InitAmplitude(Model_Base * model,Topology* 
   int result(Tests());
   switch (result) {
     case 2 : 
-    for (size_t j=0;j<links.size();j++) if (Type()==links[j]->Type()) {
-      if (FlavCompare(links[j]) && ATOOLS::IsEqual(links[j]->Result(),Result())) {
-	if (CheckMapping(links[j])&&p_ampl->CheckEFMap()) {
-	  msg_Tracking()<<"AMEGIC::Single_Process_Combined::InitAmplitude : "<<std::endl
-			<<"   Found an equivalent partner process for "<<m_name<<" : "<<links[j]->Name()<<std::endl
-			<<"   Map processes."<<std::endl;
-	  p_mapproc = p_partner = (Single_Process_Combined*)links[j];
-	  InitFlavmap(p_partner);
-	  break;
-	}
-      } 
-    }
     if (p_partner==this) links.push_back(this);
     Minimize();
     WriteAlternativeName(p_partner->Name());
     return 1;
   case 1 :
-    for (size_t j=0;j<links.size();j++) {
-      if (FlavCompare(links[j]) && ATOOLS::IsEqual(links[j]->Result(),Result())) {
-	if (CheckMapping(links[j])&&p_ampl->CheckEFMap()) {
-	  msg_Tracking()<<"AMEGIC::Single_Process_Combined::InitAmplitude : "<<std::endl
-			<<"   Found a partner for process "<<m_name<<" : "<<links[j]->Name()<<std::endl;
-	  p_mapproc = p_partner   = (Single_Process_Combined*)links[j];
-	  m_pslibname = links[j]->PSLibName();
-	  WriteAlternativeName(p_partner->Name());
-	  break;
-	}
-      } 
-    }
     if (Result()==0.) return -3;
     if (p_partner==this) links.push_back(this);
 
@@ -462,11 +429,13 @@ int AMEGIC::Single_Process_Combined::Tests()
 	if (p_hel->On(i)) {
 	  for (size_t j=i+1;j<p_hel->MaxHel();j++) {
 	    if (p_hel->On(j)) {
+#ifdef FuckUp_Helicity_Mapping
 	      if (ATOOLS::IsEqual(M_doub[i],M_doub[j])) {
 		p_hel->SwitchOff(j);
 		p_hel->SetPartner(i,j);
 		p_hel->IncMultiplicity(i);
 	      }
+#endif
 	    }
 	  }
 	}
@@ -523,11 +492,13 @@ int AMEGIC::Single_Process_Combined::TestLib()
       if (p_hel->On(i)) {
 	for (size_t j=i+1;j<p_hel->MaxHel();j++) {
 	  if (p_hel->On(j)) {
+#ifdef FuckUp_Helicity_Mapping
 	    if (ATOOLS::IsEqual(M_doub[i],M_doub[j])) {
 	      p_hel->SwitchOff(j);
 	      p_hel->SetPartner(i,j);
 	      p_hel->IncMultiplicity(i);
 	    }
+#endif
 	  }
 	}
       }
@@ -535,7 +506,7 @@ int AMEGIC::Single_Process_Combined::TestLib()
   }
   delete[] M_doub;
   m_iresult = M2 * sqr(m_pol.Massless_Norm(m_nin+m_nout,&m_flavs.front(),p_BS));
-  if (m_iresult>0.) return 1;
+  if (m_iresult>0. || m_iresult<0.) return 1;
   return 0;
 }
 
@@ -631,20 +602,12 @@ void AMEGIC::Single_Process_Combined::WriteLibrary()
   p_BS->Output(newpath+m_ptypename+string("/")+m_libname);
   p_ampl->StoreAmplitudeConfiguration(newpath+m_ptypename+string("/")+m_libname);
   m_newlib=true;
+  if (!FileExists(rpa->gen.Variable("SHERPA_CPP_PATH")+"/makelibs"))
+    Copy(rpa->gen.Variable("SHERPA_SHARE_PATH")+"/makelibs",
+	 rpa->gen.Variable("SHERPA_CPP_PATH")+"/makelibs");
   msg_Info()<<"AMEGIC::Single_Process_Combined::WriteLibrary : "<<std::endl
 	    <<"   Library for "<<m_name<<" has been written, name is "<<m_libname<<std::endl;
   sync();
-}
-
-std::string  AMEGIC::Single_Process_Combined::CreateLibName()
-{
-  string name=m_ptypename;
-  name+="_"+ToString(p_ampl->GetGraphNumber());
-  name+="_"+ToString(p_shand->NumberOfCouplings());
-  name+="_"+ToString(p_shand->NumberOfZfuncs());
-  name+="_"+ToString(p_hel->MaxHel());
-  name+="_"+ToString(p_BS->MomlistSize());
-  return name;
 }
 
 void AMEGIC::Single_Process_Combined::CreateMappingFile(Single_Process_Combined* partner) {
@@ -666,7 +629,6 @@ void AMEGIC::Single_Process_Combined::CreateMappingFile(Single_Process_Combined*
   *to<<"ME: "<<m_libname<<endl
     <<"PS: "<<m_pslibname<<endl;
   p_shand->Get_Generator()->WriteCouplings(*to);
-  partner->WriteMomFlavs(*to);
   to.Close();
 }
 
@@ -771,46 +733,37 @@ void AMEGIC::Single_Process_Combined::Minimize()
   if (p_psgen)    {delete p_psgen; p_psgen=0;}
   if (p_me2)      {delete p_me2; p_me2=0;}
 
-  m_oqcd      = p_partner->OrderQCD();
-  m_oew       = p_partner->OrderEW();
+  m_maxcpl    = p_partner->MaxOrders();
+  m_mincpl    = p_partner->MinOrders();
   m_ntchanmin = p_partner->NTchanMin();
+  m_ntchanmax = p_partner->NTchanMax();
 }
 
-double AMEGIC::Single_Process_Combined::Partonic(const Vec4D_Vector &_moms,const int mode) 
+double AMEGIC::Single_Process_Combined::Partonic(const Vec4D_Vector &moms,const int mode) 
 { 
-  if (mode==1) return m_lastxs;
-  if (!Selector()->Result()) return m_lastxs = 0.0;
+  if (mode==1) return m_mewgtinfo.m_B=m_lastxs;
+  if (!Selector()->Result()) return m_mewgtinfo.m_B=m_lastxs=0.0;
   if (!(IsMapped() && LookUp())) {
-    p_partner->ScaleSetter()->CalculateScale(_moms);
+    p_partner->ScaleSetter()->CalculateScale(moms);
   }
-  Vec4D_Vector moms(_moms);
-  if (m_nin==2 && p_int->ISR() && p_int->ISR()->On()) {
-    Poincare cms(moms[0]+moms[1]);
-    for (size_t i(0);i<moms.size();++i) cms.Boost(moms[i]);
-  }
-  return DSigma(moms,m_lookup); 
+  return m_mewgtinfo.m_B=DSigma(moms,m_lookup);
 }
 
 double AMEGIC::Single_Process_Combined::DSigma(const ATOOLS::Vec4D_Vector &_moms,bool lookup)
 {
   m_lastxs = 0.;
-  if (m_nin==2) {
-    for (size_t i=0;i<m_nin+m_nout;i++) {
-      if (_moms[i][0]<m_flavs[i].Mass()) return 0.0;
-    }
-  }
-  if (m_nin==1) {
-    for (size_t i=m_nin;i<m_nin+m_nout;i++) {
-      if (_moms[i][0]<m_flavs[i].Mass()) return 0.0;
-    }
+  Vec4D_Vector mom(_moms);
+  if (m_nin==2 && p_int->ISR() && p_int->ISR()->On()) {
+    Poincare cms=Poincare(mom[0]+mom[1]);
+    for (size_t i(0);i<mom.size();++i) cms.Boost(mom[i]);
   }
   if (p_partner == this) {
-    m_lastxs = m_Norm * operator()((ATOOLS::Vec4D*)&_moms.front());
+    m_lastxs = m_Norm * operator()((ATOOLS::Vec4D*)&mom.front());
   }
   else {
     if (lookup && p_partner->m_lookup)
       m_lastxs = p_partner->LastXS()*m_sfactor;
-    else m_lastxs = m_Norm * p_partner->operator()((ATOOLS::Vec4D*)&_moms.front())*m_sfactor;
+    else m_lastxs = m_Norm * p_partner->operator()((ATOOLS::Vec4D*)&mom.front())*m_sfactor;
   }
   return m_lastxs;
 }

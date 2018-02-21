@@ -35,6 +35,7 @@ std::ostream& ATOOLS::operator<<(std::ostream& str, const Particle &part) {
   case part_status::active :  // active (final state) particle
   case part_status::decayed : // decayed particle 
   case part_status::fragmented : // or fragmented particle
+  case part_status::documentation : // documentation line
     io=str.precision(4);
     str<<std::setiosflags(std::ios::left);
     str<<"["<<part.Info()<<"] "<<part.Status()<<" "
@@ -47,17 +48,6 @@ std::ostream& ATOOLS::operator<<(std::ostream& str, const Particle &part) {
     str<<")"<<std::resetiosflags(std::ios::right);
     str<<std::resetiosflags(std::ios::scientific)<<std::resetiosflags(std::ios::left);
     break;
-  case part_status::documentation : // documentation line
-    io=str.precision(4);
-    str<<std::setiosflags(std::ios::left);
-    str<<"============================================================"<<std::endl
-       <<"  "<<std::setw(3)<<part.Info()<<"  "<<std::setw(3)<<part.Status()<<std::setw(1)<<" "
-       <<std::setw(22)<<part.Flav()<<std::setw(1)<<" "
-       <<std::setw(10)<<part.Number()<<std::endl
-       <<"============================================================"
-       <<std::resetiosflags(std::ios::scientific)<<std::resetiosflags(std::ios::left);
-    str.precision(io);
-    return str;		  
   default : // user defined or reserved
     return str<<"--- unrecognized status:"<<part.Status()<<" ---"<<std::endl;
   }
@@ -97,7 +87,7 @@ Particle::Particle():
   m_fl(Flavour(kf_none)), m_momentum(Vec4D(0,0,0,0)), 
   p_flow(new Flow(this)),
   p_startblob(NULL),p_endblob(NULL), p_originalpart(this),
-  m_dec_time(0.), m_finalmass(0.)
+  m_dec_time(0.), m_finalmass(0.), m_fromdec(false)
 {
   ++s_totalnumber;
 }
@@ -108,7 +98,7 @@ Particle::Particle(const Particle &in):
   m_fl(in.m_fl), m_momentum(in.m_momentum), 
   p_flow(new Flow(this)),
   p_startblob(NULL),p_endblob(NULL), p_originalpart(in.p_originalpart),
-  m_dec_time(in.m_dec_time), m_finalmass(in.m_finalmass)
+  m_dec_time(in.m_dec_time), m_finalmass(in.m_finalmass), m_fromdec(in.m_fromdec)
 {
   ++s_totalnumber;
   p_flow->SetCode(1,in.GetFlow(1));
@@ -127,6 +117,7 @@ Particle& Particle::operator=(const Particle &in)
     m_momentum  = in.m_momentum;
     m_dec_time  = in.m_dec_time;
     m_finalmass = in.m_finalmass;
+    m_fromdec = in.m_fromdec;
     p_startblob = NULL;
     p_endblob   = NULL;
     p_flow->SetCode(1,in.GetFlow(1));
@@ -142,7 +133,7 @@ Particle::Particle(int number, Flavour fl, Vec4D p, char a) :
   m_fl(fl), m_momentum(p),
   p_flow(new Flow(this)),
   p_startblob(NULL),p_endblob(NULL), p_originalpart(this),
-  m_dec_time(0.), m_finalmass(fl.Mass())
+  m_dec_time(0.), m_finalmass(fl.Mass()), m_fromdec(false)
 {
   ++s_totalnumber;
 }
@@ -158,6 +149,7 @@ void Particle::Copy(Particle * in)  {
   m_momentum  = in->m_momentum;
   m_dec_time  = in->m_dec_time;
   m_finalmass = in->m_finalmass;
+  m_fromdec =in->m_fromdec;
   p_startblob = in->p_startblob;
   p_endblob   = in->p_endblob;
   p_originalpart = in->p_originalpart,

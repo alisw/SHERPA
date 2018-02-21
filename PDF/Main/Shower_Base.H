@@ -6,6 +6,8 @@
 
 #include <string>
 
+namespace SHERPA { class Variation_Weights; }
+
 namespace ATOOLS {
 
   class Cluster_Amplitude;
@@ -29,6 +31,8 @@ namespace PDF {
     std::string m_name;
     double      m_weight;
     int         m_on;
+
+    SHERPA::Variation_Weights * p_variationweights;
 
   public:
 
@@ -61,16 +65,21 @@ namespace PDF {
 
     inline void SetOn(const int on) { m_on=on; }
 
+    inline void SetVariationWeights(SHERPA::Variation_Weights * varwgts)
+    { p_variationweights = varwgts; }
+
   };// end of class Shower_Base
 
   struct Shower_Key {
     MODEL::Model_Base *p_model;
     ISR_Handler *p_isr;
     ATOOLS::Data_Reader *p_read;
+    int m_type;
     inline Shower_Key(MODEL::Model_Base *const model,
 		      ISR_Handler *const isr,
-		      ATOOLS::Data_Reader *const read):
-      p_model(model), p_isr(isr), p_read(read) {}
+		      ATOOLS::Data_Reader *const read,
+		      const int type):
+      p_model(model), p_isr(isr), p_read(read), m_type(type) {}
   };//end of struct Shower_Key
 
   typedef ATOOLS::Getter_Function

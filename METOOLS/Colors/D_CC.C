@@ -1,5 +1,6 @@
 #include "METOOLS/Explicit/Lorentz_Calculator.H"
 
+#include "MODEL/Main/Single_Vertex.H"
 #include "METOOLS/Explicit/Vertex.H"
 
 namespace METOOLS {
@@ -9,15 +10,21 @@ namespace METOOLS {
 
     const CObject *p_a, *p_b;
 
-    int m_type;
+    int m_gab, m_type, m_n[2];
 
   public:
 
-    inline D_Calculator(const Vertex_Key &key): 
-      Color_Calculator(key) 
+    inline D_Calculator(const Vertex_Key &key,int gab): 
+      Color_Calculator(key), m_gab(gab)
     {
-      m_type=key.p_a->Flav().Strong()-
-	key.p_b->Flav().Strong();
+      int n[2]={key.p_mv->Color[key.m_n].ParticleArg(0),
+		key.p_mv->Color[key.m_n].ParticleArg(1)};
+      for (size_t i(0);i<key.p_mv->id.size();++i)
+	for (int j(0);j<2;++j)
+	  if (key.p_mv->id[i]==n[j]-1) m_n[j]=i;
+      if (m_n[0]==key.p_mv->id.size()-1)
+	std::swap<int>(m_n[0],m_n[1]);
+      m_type=m_n[1]==key.p_mv->id.size()-1;
     }
 
     std::string Label() const
@@ -25,12 +32,13 @@ namespace METOOLS {
       return "D";
     }
 
-    bool Evaluate(const CObject *a,const CObject *b)
+    bool Evaluate(const CObject_Vector &j)
     {
-      p_a=a;
-      p_b=b;
+      p_a=j[m_n[0]];
       if (m_type==0) {
-	m_stat=(*a)(0)==(*b)(1) && (*a)(1)==(*b)(0);
+	p_b=j[m_n[1]];
+	m_stat=(*p_a)(0)==(*p_b)(1) && (*p_a)(1)==(*p_b)(0);
+	if (m_gab) m_stat|=((*p_a)(0)==(*p_a)(1) && (*p_b)(1)==(*p_b)(0));
 	return m_stat;
       }
       m_stat=true;
@@ -39,28 +47,26 @@ namespace METOOLS {
 
     void AddJ(CObject *const j)
     {
-      switch (m_type) {
-      case -1:
-	(*j)(0)=(*p_b)(0);
-	(*j)(1)=(*p_b)(1);
-	break;
-      case 1:
+      if (m_type) {
 	(*j)(0)=(*p_a)(0);
 	(*j)(1)=(*p_a)(1);
-	break;
-      }
-      if ((*j)(0) && (*j)(0)==(*j)(1)) {
-	CObject *c(j->Copy()), *d(NULL);
-	c->Divide(-3.0);
-	int cr((*(m_type==1?p_a:p_b))(0));
-	for (size_t i(s_cimin);i<=s_cimax;++i) {
-	  if ((int)i==cr) continue;
-	  (*c)(0)=(*c)(1)=i;
-	  if (i<s_cimax-(cr==(int)s_cimax)) d=c->Copy();
-	  p_v->AddJ(c);
-	  c=d;
+	if ((*j)(0)==(*j)(1)) {
+	  CObject *c(j->Copy()), *d(NULL);
+	  c->Divide(-3.0);
+	  int cr((*p_a)(0));
+	  for (size_t i(s_cimin);i<=s_cimax;++i) {
+	    if ((int)i==cr) continue;
+	    (*c)(0)=(*c)(1)=i;
+	    if (i<s_cimax-(cr==(int)s_cimax)) d=c->Copy();
+	    p_v->AddJ(c);
+	    c=d;
+	  }
+	  j->Divide(3.0/2.0);
 	}
-	j->Divide(3.0/2.0);
+      }
+      if (m_gab && (*p_a)(0)==(*p_a)(1)) {
+	if ((*p_a)(0)==(*p_b)(1)) j->Divide(3.0/2.0);
+	else j->Divide(-3.0);
       }
       p_v->AddJ(j);
     }
@@ -81,7 +87,7 @@ Color_Calculator *ATOOLS::Getter
 <Color_Calculator,Vertex_Key,D_Calculator>::
 operator()(const Vertex_Key &key) const
 {
-  return new D_Calculator(key);
+  return new D_Calculator(key,0);
 }
 
 void ATOOLS::Getter<Color_Calculator,Vertex_Key,D_Calculator>::
@@ -97,7 +103,7 @@ Color_Calculator *ATOOLS::Getter
 <Color_Calculator,Vertex_Key,G_Calculator>::
 operator()(const Vertex_Key &key) const
 {
-  return new D_Calculator(key);
+  return new D_Calculator(key,1);
 }
 
 void ATOOLS::Getter<Color_Calculator,Vertex_Key,G_Calculator>::

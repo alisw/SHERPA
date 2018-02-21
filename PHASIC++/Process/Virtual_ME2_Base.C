@@ -15,7 +15,8 @@ Virtual_ME2_Base::Virtual_ME2_Base(const Process_Info& pi,
   m_pinfo(pi), m_flavs(flavs),
   m_res(0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
   m_mur2(1.0), m_mode(0), m_drmode(0), m_colmode(0),
-  m_born(0.0)
+  m_born(0.0), m_norm(1.0), p_aqcd(NULL), p_aqed(NULL),
+  m_fixedIRscale(false), m_IRscale(0.), m_UVscale(0.)
 {
 }
 
@@ -44,12 +45,12 @@ void Virtual_ME2_Base::SetCouplings(const MODEL::Coupling_Map& cpls)
 
 double Virtual_ME2_Base::AlphaQCD() const
 {
-  return p_aqcd ? p_aqcd->Default()*p_aqcd->Factor() : s_model->ScalarFunction("alpha_S");
+  return p_aqcd ? p_aqcd->Default()*p_aqcd->Factor() : s_model->ScalarConstant("alpha_S");
 }
 
 double Virtual_ME2_Base::AlphaQED() const
 {
-  return p_aqed ? p_aqed->Default()*p_aqed->Factor() : s_model->ScalarFunction("alpha_QED");
+  return p_aqed ? p_aqed->Default()*p_aqed->Factor() : s_model->ScalarConstant("alpha_QED");
 }
 
 typedef ATOOLS::Getter_Function<Virtual_ME2_Base, PHASIC::Process_Info>

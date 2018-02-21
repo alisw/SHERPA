@@ -13,14 +13,11 @@ nobase_dist_examples_DATA         =	\
                 BFactory/BDecay/Run.dat \
                 BFactory/Belle_QCDBackground/Run.dat \
                 BFactory/Belle_Signal/Run.dat \
-		Models/SM_ZPrime/Interaction_Model_SM_Zprime.C \
-		Models/SM_ZPrime/SM_Zprime.C \
-		Models/SM_ZPrime/Run.dat \
-		Models/SM_ZPrime/Makefile \
 		FixedOrder_NLO/NTuples/Run.B-like.dat \
 		FixedOrder_NLO/NTuples/Reweight.B-like.dat \
 		FixedOrder_NLO/NTuples/Run.R-like.dat \
 		FixedOrder_NLO/NTuples/Reweight.R-like.dat \
+		Jets_at_HadronColliders/LHC_Jets_MCatNLO/Run.dat \
 		V_plus_Jets/LHC_WJets/Run.dat \
 		V_plus_Jets/LHC_WJets/My_JetCriterion.C \
 		V_plus_Jets/LHC_WJets/SConstruct \
@@ -31,14 +28,22 @@ nobase_dist_examples_DATA         =	\
 		V_plus_Bs/LHC_Wbb/Run.dat \
 		V_plus_Bs/LHC_Wbb/Analysis.dat \
 		V_plus_Bs/LHC_Zbb/Run.dat \
-		Jets_at_HadronColliders/LHC_Jets_MCatNLO/Run.dat \
+		VV_plus_Jets/LHC_2l2nuJets/Run.dat \
+		VV_plus_Jets/LHC_2l2nuJets_GluonInitiated/Run.dat \
+		VV_plus_Jets/LHC_4lJets/Run.dat \
+		VV_plus_Jets/LHC_4lJets_GluonInitiated/Run.dat \
+		VV_plus_Jets/LHC_WqqZnunuJets/Run.dat \
+		VV_plus_Jets/LHC_2l2nu2jJets_SameSign/Run.dat \
 		Jets_at_HadronColliders/LHC_Jets_MEPS/Run.dat \
 		Jets_at_LeptonColliders/LEP_Jets/Run.dat \
 		Jets_at_LeptonColliders/LEP_Jets/Run.NLO.dat \
 		Jets_in_DIS/HERA/Run.dat \
+		H_in_AssociatedProduction/LHC_WHJets/Run.dat \
+                H_in_AssociatedProduction/LHC_ZHJets/Run.dat \
+                H_in_AssociatedProduction/LHC_Hll_MCatNLO/Run.dat \
 		H_in_GluonFusion/LHC_HInterference/Run.dat \
 		H_in_GluonFusion/LHC_HJets/Run.dat \
-		H_in_GluonFusion/LHC_HJets/Results/Decays/h0 \
+		H_in_GluonFusion/LHC_HJets_Finite_MTop/Run.dat \
 		H_in_TTBar/LHC_TTH_MCatNLO/lib.f \
 		H_in_TTBar/LHC_TTH_MCatNLO/intlib.f \
 		H_in_TTBar/LHC_TTH_MCatNLO/libqq.f \
@@ -57,6 +62,18 @@ nobase_dist_examples_DATA         =	\
 		H_in_TTBar/LHC_TTH_MCatNLO/TTH_Interface.C \
 		H_in_TTBar/LHC_TTH_MCatNLO/SConstruct \
 		H_in_TTBar/LHC_TTH_MCatNLO/Run.dat \
+		Soft_QCD/Run.Xsecs.dat \
+		Soft_QCD/LHC_MinBias/Run.7TeV.dat \
 		Tops_plus_Jets/LHC_Tops/Run.dat \
-		Tops_plus_V/LHC_TTW/Run.dat
-
+		Tops_plus_V/LHC_TTW/Run.dat \
+		UFO_MSSM/MSSM/__init__.py \
+		UFO_MSSM/MSSM/build_restrict.py \
+		UFO_MSSM/MSSM/coupling_orders.py \
+		UFO_MSSM/MSSM/couplings.py \
+		UFO_MSSM/MSSM/function_library.py \
+		UFO_MSSM/MSSM/lorentz.py \
+		UFO_MSSM/MSSM/object_library.py \
+		UFO_MSSM/MSSM/parameters.py \
+		UFO_MSSM/MSSM/particles.py \
+		UFO_MSSM/MSSM/vertices.py \
+		UFO_MSSM/MSSM/write_param_card.py

@@ -12,6 +12,8 @@ of the main features of these examples.
 * Jets::
 * HJets::
 * TopsJets::
+* VVJets::
+* MSSM/UFO::
 * DIS::
 * FONLO::
 * SoftQCD::
@@ -53,11 +55,15 @@ of the main features of these examples.
 @menu
 * LHC_HInt::
 * LHC_HJets::
+* LHC_HJets_FiniteMt::
+* LHC_VHJets::
 * LHC_HTTBar::
 @end menu
 
 @include LHC_HInt.texi
 @include LHC_HJets.texi
+@include LHC_HJets_FiniteMt.texi
+@include LHC_VHJets.texi
 @include LHC_TTH.texi
 
 
@@ -72,6 +78,24 @@ of the main features of these examples.
 @include LHC_TTBar.texi
 @include LHC_TTW.texi
 
+@node VVJets
+@section Vector boson pairs + jets production
+
+@menu
+* Dilepton missing energy and jets production::
+* Dilepton missing energy and jets production (gluon initiated)::
+* Four lepton and jets production::
+* Four lepton and jets production (gluon initiated)::
+* WZ production with jets production::
+* Same sign dilepton missing energy and jets production::
+@end menu
+
+@include LHC_VVJets.texi
+
+@node MSSM/UFO
+@section Event generation in the MSSM using UFO
+
+@include MSSM.texi
 
 @node DIS
 @section Deep-inelastic scattering
@@ -86,7 +110,7 @@ of the main features of these examples.
 @section Fixed-order next-to-leading order calculations
 
 @menu
-* NTuple production::
+* NTuple production:: Production of Root NTuples with Sherpa
 @end menu
 
 @include NLO_NTuples.texi
@@ -127,8 +151,8 @@ of the main features of these examples.
 @section Using the Python interface
 
 @menu
-* Events::
-* MPIEvents::
+* Events:: Generating events
+* MPIEvents:: Generating events with MPI
 @end menu
 
 @include Events.texi

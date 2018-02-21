@@ -40,10 +40,10 @@ Term *Tag_Setter::ReplaceTags(Term *term) const
     term->Set(sqr(p_setter->HT()));
     return term;
   case 6:
-    term->Set(p_setter->PSum());
+    term->Set(sqr(p_setter->HTprime()));
     return term;
   case 7:
-    term->Set(sqr(p_setter->HTYweighted()));
+    term->Set(p_setter->PSum());
     return term;
   case 8:
     term->Set(sqr(p_setter->BeamThrust()));
@@ -58,39 +58,46 @@ void Tag_Setter::AssignId(Term *term)
   else if (term->Tag()=="MU_R2") term->SetId(2);
   else if (term->Tag()=="MU_Q2") term->SetId(3);
   else if (term->Tag()=="H_TM2") term->SetId(4);
-  else if (term->Tag()=="H_T2") term->SetId(5);
-  else if (term->Tag()=="P_SUM") term->SetId(6);
-  else if (term->Tag().find("H_TY2")!=std::string::npos) {
-    term->SetId(7);
-    // understand why "-7" ???
-    std::string params=term->Tag().substr(term->Tag().find("[")+1,
-                                          term->Tag().find("]")-7);
-    while(true) {
-      std::string par(params.substr(0,params.find(",")));
-      if (par.find(":")!=std::string::npos)
-        p_setter->SetHTYweightedParameters
-                 (par.substr(0,par.find(":")),
-                  par.substr(par.find(":")+1,std::string::npos));
-      else if (par.find("=")!=std::string::npos)
-        p_setter->SetHTYweightedParameters
-                 (par.substr(0,par.find("=")),
-                  par.substr(par.find("=")+1,std::string::npos));
-      else THROW(fatal_error,"Unknown parameters.");
-      if (params.find(",")==std::string::npos) break;
-      params=params.substr(params.find(",")+1,std::string::npos);
-    }
-  }
-  else if (term->Tag()=="TAU_B2") term->SetId(8);
-  else if (term->Tag().find("MU_")==0) {
-    term->SetId(10+ToType<int>
-		(term->Tag().substr
-		 (3,term->Tag().length()-4)));
-  }
+  else if (term->Tag()=="H_T2")  term->SetId(5);
+  else if (term->Tag()=="H_Tp2") term->SetId(6);
+  else if (term->Tag()=="P_SUM") term->SetId(7);
+  else if (term->Tag()=="TAUB") term->SetId(8);
   else {
     term->SetId(100+ToType<int>
 		(term->Tag().substr
 		 (2,term->Tag().length()-3)));
   }
+}
+
+namespace PHASIC {
+
+  class H_TY2: public Function {
+  private:
+
+    Scale_Setter_Base *p_setter;
+
+  public:
+
+    inline H_TY2(Scale_Setter_Base *const setter):
+      Function("H_TY2"), p_setter(setter) {}
+
+    Term *Evaluate(const std::vector<Term*> &args) const
+    {
+      double htyfac(args[0]->Get<double>()), htyexp(args[1]->Get<double>());
+      Vec4D psum(0.,0.,0.,0.);
+      const Vec4D_Vector &p(p_setter->Momenta());
+      for (size_t i(p_setter->NIn());i<p.size();++i) psum+=p[i];
+      double yboost((psum/(double)(p.size()-p_setter->NIn())).Y());
+      double hty(0.0);
+      for (size_t i(p_setter->NIn());i<p.size();++i) 
+	hty+=p[i].PPerp()*exp(htyfac*pow(abs(p[i].Y()-yboost),htyexp));
+      Term *res(Term::New(hty));
+      p_interpreter->AddTerm(res);
+      return res;
+    }
+
+  };// end of class H_TY2
+
 }
 
 void Tag_Setter::SetTags(Algebra_Interpreter *const calc)
@@ -100,8 +107,9 @@ void Tag_Setter::SetTags(Algebra_Interpreter *const calc)
   calc->AddTag("MU_Q2","1.0");
   calc->AddTag("H_TM2","1.0");
   calc->AddTag("H_T2","1.0");
+  calc->AddTag("H_Tp2","1.0");
   calc->AddTag("P_SUM","(1.0,0.0,0.0,0.0)");
-  calc->AddTag("H_TY2","1.0");
+  calc->AddFunction(new H_TY2(p_setter));
   calc->AddTag("TAU_B2","1.0");
   for (size_t i=0;i<p_setter->Scales().size();++i) 
     calc->AddTag("MU_"+ToString(i)+"2","1.0");

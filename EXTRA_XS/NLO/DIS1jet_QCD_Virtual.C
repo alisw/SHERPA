@@ -30,7 +30,7 @@ using namespace EXTRAXS;
 
 void DIS1jet_QCD_Virtual::Calc(const Vec4D_Vector& mom) {
   m_res.IR()=-3.*m_fac;
-  m_res.IR()=-2.*m_fac;
+  m_res.IR2()=-2.*m_fac;
   m_res.Finite()=(-8.)*m_fac;
 }
 
@@ -40,12 +40,14 @@ Virtual_ME2_Base *ATOOLS::Getter
 <Virtual_ME2_Base,Process_Info,DIS1jet_QCD_Virtual>::
 operator()(const Process_Info &pi) const
 {
+  if (pi.m_loopgenerator!="Internal") return NULL;
   if (pi.m_fi.m_nloewtype!=nlo_type::lo) return NULL;
   if (pi.m_fi.m_nloqcdtype==nlo_type::loop) {
     Flavour_Vector fl=pi.ExtractFlavours();
     if (fl.size()!=4) return NULL;
     if (fl[0].IsLepton() && fl[1].IsQuark() && fl[2]==fl[0]  && fl[3]==fl[1]) {
-      if ((pi.m_oqcd==1 || pi.m_oqcd==99) && (pi.m_oew==2 || pi.m_oew==99)) {
+      if (pi.m_maxcpl[0]==1 && pi.m_maxcpl[1]==2 &&
+	  pi.m_mincpl[0]==1 && pi.m_mincpl[1]==2) {
         return new DIS1jet_QCD_Virtual(pi, fl);
       }
     }

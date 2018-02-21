@@ -62,16 +62,36 @@ see @ref{Command line}.
 @node EVENT_GENERATION_MODE
 @subsection EVENT_GENERATION_MODE
 @cindex EVENT_GENERATION_MODE
+@cindex OVERWEIGHT_THRESHOLD
 This parameter specifies the event generation mode.
 It can also be set on the command line
 using option @option{-w}, see @ref{Command line}.
-The three possible options are @option{Weighted} (shortcut
-@option{W}), @option{Unweighted} (shortcut @option{U}) and
-@option{PartiallyUnweighted} (shortcut @option{P}). For partially
-unweighted events, the weight is allowed to exceed a given maximum, 
-which is lower than the true maximum weight. In such cases the
-event weight will exceed the otherwise constant value.
+The three possible options are:
 
+@table @option
+@item Weighted
+(shortcut @option{W}) Weighted events.
+@item Unweighted
+(shortcut @option{U})
+Events with constant weight, which have been unweighted
+against the maximum determined during phase space integration.
+In case of rare events with @code{w > max} the parton level event
+is repeated @code{floor(w/max)} times and the remainder is unweighted.
+While this leads to unity weights for all events it can be misleading since
+the statistical impact of a high-weight event is not accounted for. In the
+extreme case this can lead to a high-weight event looking like a significant
+bump in distributions (in particular after the effects of the parton shower).
+@item PartiallyUnweighted
+(shortcut @option{P})
+Identical to @option{Unweighted} events, but if the weight exceeds the maximum
+determined during the phase space integration, the event will carry a weight
+of @code{w/max} to correct for that. This is the recommended option to
+generate unweighted events and the default setting in Sherpa.
+@end table
+
+For @option{Unweighted} and @option{PartiallyUnweighted} events the user may
+set @option{OVERWEIGHT_THRESHOLD=<maxweight>} to cap the maximal over-weight
+@code{w/max} taken into account.
 
 @node SCALES
 @subsection SCALES
@@ -84,7 +104,7 @@ factorization scale and potential additional scales.
 * Custom scale implementation::
 * Predefined scale tags::
 * Scale schemes for NLO calculations::
-* Scale variations::
+* Explicit scale variations::
 * METS scale setting with multiparton core processes::
 @end menu
 
@@ -255,7 +275,7 @@ on equal footing with the tags of @ref{Predefined scale tags} to define
 the final scale.
 
 @code{METS} is the default scale scheme in Sherpa, since it is employed
-for truncated shower merging, see @ref{Merging ME and PS}, both at 
+for truncated shower merging, see @ref{Multijet merged event generation with Sherpa}, both at 
 leading and next-to-leading order. Thus, Sherpa's default is
 @verbatim
 SCALES METS{MU_F2}{MU_R2}{MU_Q2}
@@ -323,19 +343,19 @@ will have the electron and the positron at positions @code{p[2]} and
 @code{p[3]} and the gluons on postions @code{p[4]} and @code{p[5]}. However, 
 when finding jets first, the electrons will still be at @code{p[2]} and 
 @code{p[3]} while the harder jet will be at @code{p[4]} and the softer one 
-at @code{p[6]}.
+at @code{p[5]}.
 
 @item H_T2
 Square of the scalar sum of the transverse momenta of all final state particles.
 
-@item H_TY2[fac:<factor>,exp:<exponent>]
+@item H_TY2(<factor>,<exponent>)
 Square of the scalar sum of the transverse momenta of all final state particles 
 weighted by their rapidity distance from the final state boost vector. Thus, 
 takes the form
 @verbatim
   H_T^{(Y)} = sum_i pT_i exp [ fac |y-yboost|^exp ]
 @end verbatim
-Typical values to use would by @code{fac:0.3} and @code{exp:1}.
+Typical values to use would by @code{0.3} and @code{1}.
 
 @comment @item TAU_B2
 @comment Square of the beam thrust.
@@ -386,8 +406,8 @@ of the NLO calculation any explicit reference to a parton momentum
 will lead to an inconsistent result.
 
 
-@node Scale variations
-@subsubsection Scale variations
+@node Explicit scale variations
+@subsubsection Explicit scale variations
 
 The factorisation and renormalisation scales in the fixed-order matrix
 elements can be varied separately simply by introducing a prefactor into
