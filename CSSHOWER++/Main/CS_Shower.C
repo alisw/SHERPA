@@ -35,6 +35,12 @@ CS_Shower::CS_Shower(PDF::ISR_Handler *const _isr,
     m_maxem=maxem;
     msg_Info()<<METHOD<<"(): Set max emissions "<<m_maxem<<"\n";
   }
+  int maxdecem=_dataread->GetValue<int>("CSS_MAXDECEM",-1);
+  if (maxdecem<0) m_maxdecem=std::numeric_limits<size_t>::max();
+  else {
+    m_maxdecem=maxdecem;
+    msg_Info()<<METHOD<<"(): Set max decay emissions "<<m_maxdecem<<"\n";
+  }
   SF_Lorentz::SetKappa(_dataread->GetValue<double>("DIPOLE_KAPPA",2.0/3.0));
   m_kmode=_dataread->GetValue<int>("CSS_KMODE",2);
   if (m_kmode!=2) msg_Info()<<METHOD<<"(): Set kernel mode "<<m_kmode<<"\n";
@@ -50,6 +56,10 @@ CS_Shower::CS_Shower(PDF::ISR_Handler *const _isr,
   if (pdfcheck!=1) msg_Info()<<METHOD<<"(): Set PDF check mode "<<pdfcheck<<"\n";
   int csmode=_dataread->GetValue<int>("CSS_CSMODE",0);
   if (csmode!=1) msg_Info()<<METHOD<<"(): Set color setter mode "<<csmode<<"\n";
+  m_decscalefac=_dataread->GetValue<double>("CSS_DECAY_SCALE_FACTOR",1.0);
+  if (m_decscalefac!=1.0) msg_Info()<<METHOD<<"(): Set decay scale factor "<<m_decscalefac<<"\n";
+  m_use_bbw=_dataread->GetValue<int>("CSS_USE_BBW",1);
+  if (m_use_bbw!=true) msg_Info()<<METHOD<<"(): Set use bbar/b weight "<<m_use_bbw<<"\n";
   
   m_weightmode = int(_dataread->GetValue<int>("WEIGHT_MODE",1));
   
@@ -58,6 +68,7 @@ CS_Shower::CS_Shower(PDF::ISR_Handler *const _isr,
     s_kftable[kf_photon]->SetResummed();
   }
   p_shower = new Shower(_isr,_qed,_dataread,type);
+  p_shower->SetUsesBBW(m_use_bbw);
   
   p_next = new All_Singlets();
 
@@ -94,12 +105,23 @@ int CS_Shower::PerformShowers(const size_t &maxem,size_t &nem)
 	if (m_respectq2) (*it)->SetStart(Min((*it)->KtStart(),(*it)->GetPrev()->KtStart()));
 	else (*it)->SetStart((*it)->GetPrev()->KtStart());
       }
+    int decay(0);
     std::map<int,int> colmap;   
     if (ls && (ls->GetSplit()->Stat()&2)) {
-      msg_Debugging()<<"Decay. Set color connections.\n";
+      double tmax(ls->GetSplit()->Momentum().Abs2());
+      if (ls->GetSplit()->GetFlavour().Strong() && m_decscalefac>0.) {
+	if (!ls->GetLeft()->GetFlavour().Strong()) tmax=ls->GetLeft()->Momentum().Abs2();
+	if (!ls->GetRight()->GetFlavour().Strong()) tmax=ls->GetRight()->Momentum().Abs2();
+	tmax*=std::abs(m_decscalefac);
+      }
+      msg_Debugging()<<"Decay. Set color connections. q = "<<sqrt(tmax)<<"\n";
+      decay=1;
       Parton *d[2]={ls->GetLeft(),ls->GetRight()};
       for (int j=0;j<2;++j) {
-	if (d[1-j]->GetFlow(1) || d[1-j]->GetFlow(2)) continue;
+	if (d[1-j]->GetFlow(1) || d[1-j]->GetFlow(2)) {
+	  d[1-j]->SetColSpec(ls->GetSplit()->GetFlow(1)?0:1,ls->GetSplit());
+	  continue;
+	}
 	for (int i=1;i<=2;++i) {
 	  if (d[j]->GetFlow(i)==0) continue;
 	  int nc=Flow::Counter();
@@ -112,10 +134,19 @@ int CS_Shower::PerformShowers(const size_t &maxem,size_t &nem)
       }
       for (Singlet::iterator it((*sit)->begin());it!=(*sit)->end();++it)
 	if (*it!=d[0] && *it!=d[1]) (*it)->SetStart(0.0);
+	else (*it)->SetStart(Min((*it)->KtStart(),tmax));
     }
     msg_Debugging()<<**sit;
     size_t pem(nem);
-    if (!p_shower->EvolveShower(*sit,maxem,nem)) return 0;
+    if (!decay) {
+      if (!p_shower->EvolveShower(*sit,maxem,nem)) return 0;
+    }
+    else {
+      size_t decnem(0);
+      if (!p_shower->EvolveShower(*sit,m_maxdecem,decnem)) return 0;
+      msg_Debugging()<<"after decay shower step with "
+		     <<decnem<<" emission(s)\n";
+    }
     m_weight*=p_shower->Weight();
     if (colmap.size()) {
       msg_Debugging()<<"Decay. Reset color connections.\n";
@@ -171,9 +202,18 @@ bool CS_Shower::ExtractPartons(Blob_List *const blist) {
   psblob->SetStatus(blob_status::needs_beams |
 		    blob_status::needs_hadronization);
   
-  for (All_Singlets::const_iterator 
-	 sit(m_allsinglets.begin());sit!=m_allsinglets.end();++sit)
+
+  ClusterAmplitude_PVector all_amplitudes;
+  for (All_Singlets::const_iterator
+         sit(m_allsinglets.begin());sit!=m_allsinglets.end();++sit){
       (*sit)->ExtractPartons(psblob,p_ms);
+      Cluster_Amplitude * tmp = (*sit)->GetAmplitude();
+      all_amplitudes.push_back(tmp);
+  }
+
+  Cluster_Amplitude * cl_all = all_amplitudes.OneAmpl(); //->CopyAll();
+  psblob->AddData("AllAmplitudes",new Blob_Data<SP(Cluster_Amplitude)>( cl_all));
+  all_amplitudes.clear();
   return true;
 }
 
@@ -181,7 +221,7 @@ void CS_Shower::CleanUp()
 {
   m_nem=0;
   for (All_Singlets::const_iterator 
-	 sit(m_allsinglets.begin());sit!=m_allsinglets.end();++sit) {
+         sit(m_allsinglets.begin());sit!=m_allsinglets.end();++sit) {
     if (*sit) delete *sit;
   }
   m_allsinglets.clear();
@@ -475,6 +515,7 @@ Singlet *CS_Shower::TranslateAmplitude
   singlet->SetNLO(ampl->NLO()&~1);
   if (jf==NULL && (ampl->NLO()&2)) singlet->SetNLO(4);
   singlet->SetLKF(ampl->LKF());
+  singlet->SetLKFVariationWeights(ampl->LKFVariationWeights());
   for (size_t i(0);i<ampl->Legs().size();++i) {
     Cluster_Leg *cl(ampl->Leg(i));
     if (cl->Flav().IsHadron() && cl->Id()&((1<<ampl->NIn())-1)) continue;
@@ -728,11 +769,13 @@ bool CS_Shower::JetVeto(ATOOLS::Cluster_Amplitude *const ampl,
 	      mofl=Flavour(kf_gluon);
 	      if (li->Flav().IsGluon()) mofl=lj->Flav();
 	      if (lj->Flav().IsGluon()) mofl=li->Flav();
-	      int beam=li->Id()&1?0:1;
-	      if (p_shower->ISR()->PDF(beam) &&
-		  !p_shower->ISR()->PDF(beam)->Contains(mofl)) {
-		msg_Debugging()<<"Not in PDF: "<<mofl<<".\n";
-		continue;
+	      if (li->Id() & 3) {
+		int beam = li->Id() & 1 ? 0 : 1;
+		if (p_shower->ISR()->PDF(beam) &&
+		    !p_shower->ISR()->PDF(beam)->Contains(mofl)) {
+		  msg_Debugging() << "Not in PDF: " << mofl << ".\n";
+		  continue;
+		}
 	      }
 	      Vec4D_Vector p=p_cluster->Combine
 		(*ampl,i,j,k,mofl,ampl->MS(),1);

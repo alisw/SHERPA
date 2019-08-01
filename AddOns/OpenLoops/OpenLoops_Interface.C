@@ -25,7 +25,7 @@ extern "C" {
 
   void ol_getparameter_double(const char* key, double* val);
   void ol_getparameter_int(const char* key, int* val);
-  void ol_setparameter_double(const char* key, double* val);
+  void ol_setparameter_double(const char* key, double val);
   void ol_setparameter_int(const char* key, int val);
   void ol_setparameter_string(const char* key, const char* val);
 
@@ -37,6 +37,7 @@ extern "C" {
   void ol_evaluate_loop(int id, double* pp, double* m2l0, double* m2l1, double* acc);
   void ol_evaluate_tree(int id, double* pp, double* m2l0);
   void ol_evaluate_loop2(int id, double* pp, double* m2l0, double* acc);
+  void ol_evaluate_associated(int id, double* pp, int ass, double* m2l0);
 }
 
 
@@ -45,6 +46,8 @@ namespace OpenLoops {
   std::string OpenLoops_Interface::s_olprefix     = std::string("");
   bool        OpenLoops_Interface::s_ignore_model = false;
   bool        OpenLoops_Interface::s_exit_on_error= true;
+  bool        OpenLoops_Interface::s_ass_func     = false;
+  int         OpenLoops_Interface::s_ass_ew       = 0;
 
   OpenLoops_Interface::~OpenLoops_Interface()
   {
@@ -74,6 +77,11 @@ namespace OpenLoops {
     s_loader->AddPath(s_olprefix+"/lib");
     s_loader->AddPath(s_olprefix+"/proclib");
     if (!s_loader->LoadLibrary("openloops")) THROW(fatal_error, "Failed to load libopenloops.");
+
+    // check for existance of separate access to associated contribs
+    void *assfunc(s_loader->GetLibraryFunction("openloops",
+                                               "ol_evaluate_associated"));
+    if (assfunc) s_ass_func=true;
 
     ol_set_init_error_fatal(0);
 
@@ -120,10 +128,19 @@ namespace OpenLoops {
     }
     SetParameter("install_path", s_olprefix.c_str());
 
+    // this interface passes EW parameters in the alpha(mZ) scheme,
+    // irrespective of the actual EW scheme
+    SetParameter("ew_scheme", 2);
+    SetParameter("ew_renorm_scheme", 1);
+
     // set remaining OL parameters specified by user
     vector<string> parameters;
     reader.VectorFromFile(parameters,"OL_PARAMETERS");
-    for (size_t i=1; i<parameters.size(); i=i+2) SetParameter(parameters[i-1], parameters[i]);
+    for (size_t i=1; i<parameters.size(); i=i+2) {
+      if (parameters[i-1]=="add_associated_ew")
+        s_ass_ew=ToType<int>(parameters[i]);
+      SetParameter(parameters[i-1], parameters[i]);
+    }
 
     char welcomestr[GetIntParameter("welcome_length")];
     ol_welcome(welcomestr);
@@ -169,7 +186,18 @@ namespace OpenLoops {
     Flavour_Vector fsflavs(fs.GetExternal());
     for (size_t i=0; i<fsflavs.size(); ++i) procname += ToString((long int) fsflavs[i]) + " ";
 
-    return ol_register_process(procname.c_str(), amptype);
+    // exit if ass contribs requested but not present
+    if (!s_ass_func && ConvertAssociatedContributions(fs.m_asscontribs))
+      THROW(fatal_error,"Separate evaluation of associated EW contribution not "
+                        +std::string("supported in used OpenLoops version."));
+
+    // set negative of requested associated amps such that they are only
+    // initialised, but not computed by default
+    if (s_ass_ew==0) SetParameter("add_associated_ew",-ConvertAssociatedContributions(fs.m_asscontribs));
+    int procid(ol_register_process(procname.c_str(), amptype));
+    if (s_ass_ew==0) SetParameter("add_associated_ew",0);
+
+    return procid;
   }
 
   void OpenLoops_Interface::EvaluateTree(int id, const Vec4D_Vector& momenta, double& res)
@@ -217,17 +245,54 @@ namespace OpenLoops {
     ol_evaluate_loop2(id, &pp[0], &res, &acc);
   }
 
+  void OpenLoops_Interface::EvaluateAssociated(int id, const Vec4D_Vector& momenta, int ass, double& res)
+  {
+    vector<double> pp(5*momenta.size());
+    for (size_t i=0; i<momenta.size(); ++i) {
+      pp[0+i*5]=momenta[i][0];
+      pp[1+i*5]=momenta[i][1];
+      pp[2+i*5]=momenta[i][2];
+      pp[3+i*5]=momenta[i][3];
+    }
+
+    ol_evaluate_associated(id, &pp[0], ass, &res);
+  }
+
+  int OpenLoops_Interface::ConvertAssociatedContributions
+  (const PHASIC::asscontrib::type at)
+  {
+    int iat(0);
+    // only allow successive associated contribs
+    if (at&asscontrib::EW) {
+      ++iat;
+      if (at&asscontrib::LO1) {
+        ++iat;
+        if (at&asscontrib::LO2) {
+          ++iat;
+          if (at&asscontrib::LO3) {
+            ++iat;
+          }
+        }
+      }
+    }
+    msg_Debugging()<<"Convert associated contributions identifier "
+                   <<at<<" -> "<<iat<<std::endl;
+    return iat;
+  }
+
 
   double OpenLoops_Interface::GetDoubleParameter(const std::string & key) {
     double value;
     ol_getparameter_double(key.c_str(), &value);
     return value;
   }
+
   int OpenLoops_Interface::GetIntParameter(const std::string & key) {
     int value;
     ol_getparameter_int(key.c_str(), &value);
     return value;
   }
+
   template <class ValueType>
   void HandleParameterStatus(int err, const std::string & key, ValueType value) {
     if (err==0) {
@@ -244,8 +309,9 @@ namespace OpenLoops {
       else                                    msg_Error()<<errorstring<<std::endl;
     }
   }
+
   void OpenLoops_Interface::SetParameter(const std::string & key, double value) {
-    ol_setparameter_double(key.c_str(), &value);
+    ol_setparameter_double(key.c_str(), value);
     HandleParameterStatus(ol_get_error(), key, value);
   }
   void OpenLoops_Interface::SetParameter(const std::string & key, int value) {

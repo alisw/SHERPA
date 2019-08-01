@@ -9,6 +9,17 @@ namespace ATOOLS { class Data_Reader; }
 
 namespace PDF {
 
+  struct PDF_Defaults {
+    std::map<kf_code,std::string> m_deflib, m_defset;
+
+    PDF_Defaults();
+
+    inline std::string DefaultPDFLibrary(kf_code kf) { return m_deflib[kf]; }
+    inline std::string DefaultPDFSet(kf_code kf)     { return m_defset[kf]; }
+  };
+
+  extern PDF_Defaults * pdfdefs;
+
   struct PDF_Arguments {
     ATOOLS::Flavour m_bunch;
     ATOOLS::Data_Reader *p_read;
@@ -54,6 +65,8 @@ namespace PDF {
     std::string m_set;
     int m_member;
     int m_lhef_number;
+
+    int m_force_4f;
 
     double m_exponent, m_rescale;
     double m_xmin, m_xmax, m_q2min, m_q2max;
@@ -115,8 +128,8 @@ namespace PDF {
     inline void Reset()
     { GetBasicPDF()->SingleReset(); }
 
-    inline bool Contains(const ATOOLS::Flavour &a) const
-    { return m_partons.find(a)!=m_partons.end(); }
+    bool Contains(const ATOOLS::Flavour &a) const;
+
 
     inline double RescaleFactor() const { return m_rescale; }
 

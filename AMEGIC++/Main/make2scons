@@ -27,9 +27,8 @@ vars = Variables()
 vars.Add(PathVariable('libdir','lib path',os.getcwd()+'/Process/Amegic/lib',PathVariable.PathIsDirCreate))
 vars.Add('CXX','The C++ Compiler','mpic++ -Wl,--no-as-needed')
 vars.Add('CXXFLAGS','The C++ Flags',['-g -O2'.split(" "),''.split(" "),'-g0','-O2'])
-vars.Add(PathVariable('incdir','include path','/scratch/sherpa/rel-2-2-4/include/SHERPA-MC',PathVariable.PathIsDir))
-env = Environment(variables=vars,CPPPATH=['\${incdir}'])
-env['ENV']=os.environ
+vars.Add(PathVariable('incdir','include path','/scratch/sherpa/rel-2-2-7/include/SHERPA-MC',PathVariable.PathIsDir))
+env = Environment(variables=vars,CPPPATH=['\${incdir}'],ENV=os.environ)
 if env['PLATFORM']=='darwin':
    env.Append( LINKFLAGS='-Wl,-undefined -Wl,dynamic_lookup' )
 " > SConstruct;

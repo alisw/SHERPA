@@ -8,6 +8,7 @@
 #include "ATOOLS/Phys/Cluster_Leg.H"
 #include "ATOOLS/Math/Random.H"
 #include "ATOOLS/Org/My_Limits.H"
+#include "PHASIC++/Selectors/Jet_Finder.H"
 
 using namespace CSSHOWER;
 using namespace ATOOLS;
@@ -26,13 +27,7 @@ Shower::Shower(PDF::ISR_Handler * isr,const int qed,
   double fs_as_fac=ToType<double>(rpa->gen.Variable("CSS_FS_AS_FAC"));
   double is_as_fac=ToType<double>(rpa->gen.Variable("CSS_IS_AS_FAC"));
   double mth=ToType<double>(rpa->gen.Variable("CSS_MASS_THRESHOLD"));
-  const bool reweightalphas = dataread->GetValue<int>("CSS_REWEIGHT_ALPHAS",1);
-  const bool reweightpdfs = dataread->GetValue<int>("CSS_REWEIGHT_PDFS",1);
-  m_maxrewem = dataread->GetValue<int>("REWEIGHT_MAXEM",0);
-  if (m_maxrewem < 0) {
-    m_maxrewem = std::numeric_limits<int>::max();
-  }
-  m_use_bbw   = dataread->GetValue<int>("CSS_USE_BBW",1);
+  m_reweight  = dataread->GetValue<int>("CSS_REWEIGHT",0);
   m_kscheme   = dataread->GetValue<int>("CSS_KIN_SCHEME",1);
   m_noem      = dataread->GetValue<int>("CSS_NOEM",0);
   m_recdec    = dataread->GetValue<int>("CSS_RECO_DECAYS",0);
@@ -56,8 +51,8 @@ Shower::Shower(PDF::ISR_Handler * isr,const int qed,
   m_sudakov.SetScaleScheme(scs);
   m_sudakov.InitSplittingFunctions(MODEL::s_model,kfmode);
   m_sudakov.SetCoupling(MODEL::s_model,k0sqi,k0sqf,is_as_fac,fs_as_fac);
-  m_sudakov.SetReweightAlphaS(reweightalphas);
-  m_sudakov.SetReweightPDFs(reweightpdfs);
+  m_sudakov.SetReweightScaleCutoff(dataread->GetValue<double>(
+        "CSS_REWEIGHT_SCALE_CUTOFF", 5.0));
   m_kinFF.SetEvolScheme(evol);
   m_kinFI.SetEvolScheme(evol);
   m_kinIF.SetEvolScheme(evol);
@@ -84,11 +79,6 @@ double Shower::EFac(const std::string &sfk) const
 bool Shower::EvolveShower(Singlet * actual,const size_t &maxem,size_t &nem)
 {
   m_weight=1.0;
-  if (nem < m_maxrewem) {
-    m_sudakov.SetVariationWeights(p_variationweights);
-  } else {
-    m_sudakov.SetVariationWeights(NULL);
-  }
   return EvolveSinglet(actual,maxem,nem);
 }
 
@@ -318,6 +308,19 @@ int Shower::MakeKinematics
   Vec4D peo(split->Momentum()), pso(spect->Momentum());
   Vec4D pem(split->OldMomentum()), psm(spect->OldMomentum());
   Vec4D pef(split->FixSpec()), psf(spect->FixSpec());
+
+
+  // first step for the amplitude: create parton list
+  Singlet *s_test = split->GetSing();
+  Parton_List p_list;
+  for (Singlet::const_iterator it=s_test->begin();it!=s_test->end();++it){
+      Parton *parton = *it;
+      if (parton == split) continue;
+      if (parton == spect) continue;
+      p_list.push_back(parton);
+  }
+  s_test =NULL;
+
   int stype(-1), stat(-1);
   double mc2(m_kinFF.MS()->Mass2(flc)), mi2(0.0);
   if (split->GetType()==pst::FS) {
@@ -403,15 +406,60 @@ int Shower::MakeKinematics
   m_weight*=split->Weight();
   msg_Debugging()<<"sw = "<<split->Weight()
 		 <<", w = "<<m_weight<<"\n";
+  if (p_variationweights && m_reweight) {
+    p_variationweights->UpdateOrInitialiseWeights(
+        &Shower::Reweight, *this, *split, SHERPA::Variations_Type::sudakov);
+  }
   split->GetSing()->SplitParton(split,pi,pj);
+
+
+  // add missing particles to parton list
+  p_list.push_back(pi);
+  p_list.push_back(pj);
+  p_list.push_back(spect);
+
+  /*  p_list now contains all relevant partons. add first the IS partons and
+      afterwards the FS partons to the amplitude*/
+
+  Cluster_Amplitude * tmp_ampl = Cluster_Amplitude::New();
+  size_t count_is(0);
+  for(Parton_List::const_iterator it=p_list.begin(); it!=p_list.end(); ++it){
+      Parton *parton = *it;
+      if (parton->GetType()==pst::IS)  {
+          PartonToAmplitude(parton, tmp_ampl);
+          count_is++;
+      }
+    }
+
+  for(Parton_List::const_iterator it=p_list.begin(); it!=p_list.end(); ++it){
+      Parton *parton = *it;
+      if (parton->GetType()==pst::FS)  PartonToAmplitude(parton, tmp_ampl);
+    }
+
+  tmp_ampl->SetNIn(count_is);
+  CheckAmplitude(tmp_ampl);
+  p_actual->UpdateAmplitude(tmp_ampl);
+
+  msg_Debugging() << "Amplitude after Make kinematics: " << *tmp_ampl << "\n";
+  tmp_ampl=NULL;
+
   return 1;
 }
 
 bool Shower::EvolveSinglet(Singlet * act,const size_t &maxem,size_t &nem)
 {
   p_actual=act;
+
+  Cluster_Amplitude * cl_tmp = Cluster_Amplitude::New();
+  cl_tmp = SingletToAmplitude(act, cl_tmp);
+  msg_Debugging() << "Amplitude from Singlet: " << *cl_tmp<< "\n" ;
+  p_actual->UpdateAmplitude(cl_tmp);
+  cl_tmp=NULL;
+
+
   Vec4D mom;
   double kt2win;
+  if (p_actual->NLO()&(8|256)) ++nem;
   if (p_actual->NLO()&4) {
     msg_Debugging()<<"Skip MC@NLO emission\nSet p_T = "
 		   <<sqrt(p_actual->KtNext())<<"\n";
@@ -425,6 +473,8 @@ bool Shower::EvolveSinglet(Singlet * act,const size_t &maxem,size_t &nem)
     return true;
   }
   if (nem>=maxem) return true;
+  const bool reweight = p_variationweights && m_reweight;
+  m_sudakov.SetKeepReweightingInfo(reweight);
   while (true) {
     for (Singlet::const_iterator it=p_actual->begin();it!=p_actual->end();++it)
       if ((*it)->GetType()==pst::IS) SetXBj(*it);
@@ -439,6 +489,13 @@ bool Shower::EvolveSinglet(Singlet * act,const size_t &maxem,size_t &nem)
         if ((*it)->Weight()!=1.0)
           msg_Debugging()<<"Add wt for "<<(**it)<<": "<<(*it)->Weight()<<"\n";
         m_weight*=(*it)->Weight();
+        (*it)->Weights().clear();
+        if (reweight) {
+          p_variationweights->UpdateOrInitialiseWeights(
+              &Shower::Reweight, *this, **it,
+              SHERPA::Variations_Type::sudakov);
+          (*it)->SudakovReweightingInfos().clear();
+        }
       }
       return true;
     }
@@ -478,11 +535,21 @@ bool Shower::EvolveSinglet(Singlet * act,const size_t &maxem,size_t &nem)
       }
       if (p_actual->JF()) {
 	int vstat(MakeKinematics(split,m_flavA,m_flavB,m_flavC,2,fc));
-	if (vstat==0) {
+	//next line: special treatment for Qcut=Infinity, needed for fusing with massive calculation
+	if (vstat==0 || (p_actual->JF()->Ycut() > 1.0 && p_actual->NLO()&2)) {
 	  if (p_actual->NLO()&2) {
 	    msg_Debugging()<<"Skip first truncated emission, K = "
 			   <<p_actual->LKF()<<"\n";
-	    if (m_use_bbw) m_weight*=1.0/p_actual->LKF();
+	    if (m_use_bbw) {
+              m_weight*=1.0/p_actual->LKF();
+              if (p_variationweights && p_actual->LKFVariationWeights()) {
+                // only apply the *relative* variation here, as m_weight will
+                // be applied to the variation weights later, which will divide
+                // out the nominal LKF again
+                *p_variationweights *= p_actual->LKF();
+                *p_variationweights /= *p_actual->LKFVariationWeights();
+              }
+            }
 	    if (IsBad(m_weight) || m_weight==0.0) {
 	      msg_Error()<<METHOD<<"(): Bad weight '"<<m_weight
 			 <<"'. Set it to one."<<std::endl;
@@ -522,10 +589,15 @@ bool Shower::EvolveSinglet(Singlet * act,const size_t &maxem,size_t &nem)
             m_weight*=(*it)->Weight(m_last[0]->KtStart());
             (*it)->Weights().clear();
           }
+          if (reweight) {
+            p_variationweights->UpdateOrInitialiseWeights(
+                &Shower::Reweight, *this, **it,
+                SHERPA::Variations_Type::sudakov);
+            (*it)->SudakovReweightingInfos().clear();
+          }
         }
       }
       ++nem;
-      if (nem >= m_maxrewem) m_sudakov.SetVariationWeights(NULL);
       if (nem >= maxem) return true;
     }
   }
@@ -568,6 +640,117 @@ bool Shower::TrialEmission(double & kt2win,Parton * split)
   return false;
 }
 
+double Shower::Reweight(SHERPA::Variation_Parameters* varparams,
+                        SHERPA::Variation_Weights* varweights,
+                        Parton& splitter)
+{
+  const double kt2win = (m_last[0] == NULL) ? 0.0 : m_last[0]->KtStart();
+  Sudakov_Reweighting_Infos& infos = splitter.SudakovReweightingInfos();
+  double overallrewfactor = 1.0;
+
+  for (Sudakov_Reweighting_Infos::const_iterator it = infos.begin();
+      it != infos.end() && it->scale >= kt2win;
+      it++) {
+
+    const double rejwgt(1.0 - it->accwgt);
+    double rewfactor(1.0);
+    double accrewfactor(1.0);
+
+    // PDF reweighting
+    // NOTE: also the Jacobians depend on the Running_AlphaS class, but only
+    // through the number of flavours, which should not vary between AlphaS
+    // variations anyway; therefore we do not insert AlphaS for the PDF
+    // reweighting
+    const cstp::code type = it->sf->GetType();
+    if (type == cstp::II || type == cstp::FI || type == cstp::IF) {
+      // insert new PDF
+      const Flavour swappedflspec = it->sf->Lorentz()->FlSpec();
+      it->sf->Lorentz()->SetFlSpec(it->flspec);
+      PDF::PDF_Base** swappedpdf = it->sf->PDF();
+      PDF::PDF_Base* pdf[] = {varparams->p_pdf1, varparams->p_pdf2};
+      it->sf->SetPDF(pdf);
+      // calculate new J
+      const double lastJ(it->sf->Lorentz()->LastJ());
+      double newJ;
+      switch (type) {
+        case cstp::II:
+          newJ = it->sf->Lorentz()->JII(
+              it->z, it->y, it->x, varparams->m_showermuF2fac * it->scale);
+          break;
+        case cstp::IF:
+          newJ = it->sf->Lorentz()->JIF(
+              it->z, it->y, it->x, varparams->m_showermuF2fac * it->scale);
+          break;
+        case cstp::FI:
+          newJ = it->sf->Lorentz()->JFI(
+              it->y, it->x, varparams->m_showermuF2fac * it->scale);
+          break;
+        case cstp::FF:
+        case cstp::none:
+          THROW(fatal_error, "Unexpected splitting configuration");
+      }
+      // clean up
+      it->sf->SetPDF(swappedpdf);
+      it->sf->Lorentz()->SetLastJ(lastJ);
+      it->sf->Lorentz()->SetFlSpec(swappedflspec);
+      // validate and apply
+      if (newJ == 0.0) {
+        varparams->IncrementOrInitialiseWarningCounter(
+            "different PDF cut-off");
+        continue;
+      } else {
+        const double pdfrewfactor(newJ / it->lastj);
+        if (pdfrewfactor < 0.25 || pdfrewfactor > 4.0) {
+          varparams->IncrementOrInitialiseWarningCounter(
+              "large PDF reweighting factor");
+        }
+        accrewfactor *= pdfrewfactor;
+      }
+    }
+
+    // AlphaS reweighting
+    if (it->sf->Coupling()->AllowsAlternativeCouplingUsage()) {
+      // insert new AlphaS
+      const double lastcpl(it->sf->Coupling()->Last());
+      it->sf->Coupling()->SetAlternativeUnderlyingCoupling(
+          varparams->p_alphas, varparams->m_showermuR2fac);
+      // calculate new coupling
+      double newcpl(it->sf->Coupling()->Coupling(it->scale, 0));
+      // clean up
+      it->sf->Coupling()->SetAlternativeUnderlyingCoupling(NULL);
+      it->sf->Coupling()->SetLast(lastcpl);
+      // validate and apply
+      if (newcpl == 0.0) {
+        varparams->IncrementOrInitialiseWarningCounter(
+            "different coupling cut-off");
+        continue;
+      } else {
+        const double alphasrewfactor(newcpl / it->lastcpl);
+        if (alphasrewfactor < 0.5 || alphasrewfactor > 2.0) {
+          varparams->IncrementOrInitialiseWarningCounter(
+              "large AlphaS reweighting factor");
+        }
+        accrewfactor *= alphasrewfactor;
+      }
+    }
+
+    // calculate and apply overall factor
+    if (it->accepted) {
+      rewfactor = accrewfactor;
+    } else {
+      rewfactor = 1.0 + (1.0 - accrewfactor) * (1.0 - rejwgt) / rejwgt;
+    }
+    if (rewfactor < -9.0 || rewfactor > 11.0) {
+      varparams->IncrementOrInitialiseWarningCounter(
+          "vetoed large reweighting factor");
+      continue;
+    }
+    overallrewfactor *= rewfactor;
+  }
+
+  return overallrewfactor;
+}
+
 void Shower::SetMS(ATOOLS::Mass_Selector *const ms)
 {
   m_sudakov.SetMS(ms);
@@ -576,3 +759,45 @@ void Shower::SetMS(ATOOLS::Mass_Selector *const ms)
   m_kinIF.SetMS(ms);
   m_kinII.SetMS(ms);
 }
+
+ATOOLS::Cluster_Amplitude *  Shower::SingletToAmplitude(const Singlet * sing, ATOOLS::Cluster_Amplitude * ampl){
+  size_t is(0);
+  for (Singlet::const_iterator it=sing->begin();it!=sing->end();++it){
+      Parton *parton = *it;
+      if(parton->GetType()==pst::IS){
+          PartonToAmplitude(parton, ampl);
+          is++;
+      }
+  }
+  for (Singlet::const_iterator it=sing->begin();it!=sing->end();++it){
+      Parton *parton = *it;
+      if(parton->GetType()==pst::FS)   PartonToAmplitude(parton, ampl);
+  }
+  ampl->SetNIn(is);
+  CheckAmplitude(ampl);
+  return ampl;
+}
+
+
+void Shower::PartonToAmplitude(const Parton *parton, Cluster_Amplitude * ampl){
+  ampl->CreateLeg(parton->Momentum(), parton->GetFlavour(),parton->Col(),parton->Id());
+  // TODO: treat colors correctly. not needed so far
+  ATOOLS::Cluster_Leg * leg = ampl->Legs().back();
+  leg->SetFromDec(parton->FromDec());
+  if (parton->GetType()==pst::IS) leg->SetMom(-leg->Mom());
+  if(ampl->KT2()==0){
+      ampl->SetKT2(parton->KtStart());
+    }
+}
+
+void Shower::CheckAmplitude(const ATOOLS::Cluster_Amplitude *ampl){
+  ATOOLS::Vec4D check;
+  for(ClusterLeg_Vector::const_iterator it=ampl->Legs().begin(); it !=ampl->Legs().end(); ++it){
+      ATOOLS::Cluster_Leg *leg = *it;
+      check+=leg->Mom();
+  }
+  msg_Debugging() << " mom sum: " << check << "\n";
+  //problematic: hadron decays, where the decaying hadron does not show up in the amplitude since its not a parton
+
+}
+

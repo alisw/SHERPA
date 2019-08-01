@@ -21,8 +21,8 @@ PHASIC::Decay_Table * Tools::partonic_c =
 const double Tools::Vud = 0.97377;
 const double Tools::Vus = 0.2257;
 const double Tools::Vub = 4.31e-3;
-const double Tools::Vcd = 0.230;
-const double Tools::Vcs = 0.957;
+const double Tools::Vcd = 0.225;
+const double Tools::Vcs = 0.973;
 const double Tools::Vcb = 41.6e-3;
 const double Tools::Vtd = 7.4e-3;
 const double Tools::Vts = Tools::Vtd/0.208;
@@ -156,7 +156,7 @@ void Tools::ExtractBRInfo( std::string entry, double & br,
   size_t posa, posb;        // start and end of things b/w brackets
   size_t posmin;            // start of first bracket
 
-  std::string sbr, sdbr;
+  std::string sbr(""), sdbr("");
 
   // extract Delta BR
   posa = entry.find("(");
@@ -164,7 +164,7 @@ void Tools::ExtractBRInfo( std::string entry, double & br,
   posmin = posa;
   if(posa!=std::string::npos && posb!=std::string::npos)
     sdbr = entry.substr(posa+1,posb-posa-1);
-  else sdbr = "-1.0";
+  if (sdbr=="") sdbr = "-1.0";
 
   // extract Origin
   posa = entry.find("[");

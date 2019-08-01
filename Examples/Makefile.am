@@ -5,7 +5,7 @@ nobase_dist_examples_DATA         =	\
 		API/ME2-Python/test.py.in \
 		API/ME2-CPP/Run.dat \
 		API/ME2-CPP/test.cpp \
-		API/ME2-CPP/Makefile \
+		API/ME2-CPP/SConstruct \
 		API/Events/Run.dat \
 		API/Events/test.py.in \
 		API/MPIEvents/Run.dat \
@@ -65,6 +65,7 @@ nobase_dist_examples_DATA         =	\
 		Soft_QCD/Run.Xsecs.dat \
 		Soft_QCD/LHC_MinBias/Run.7TeV.dat \
 		Tops_plus_Jets/LHC_Tops/Run.dat \
+		Tops_plus_Jets/LHC_Tops/Run.EWapprox.dat \
 		Tops_plus_V/LHC_TTW/Run.dat \
 		UFO_MSSM/MSSM/__init__.py \
 		UFO_MSSM/MSSM/build_restrict.py \

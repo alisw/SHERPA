@@ -70,8 +70,8 @@ namespace SHERPARIVET {
     size_t m_nevt;
     bool   m_finished;
     bool   m_splitjetconts, m_splitSH, m_splitcoreprocs, m_splitvariations,
-           m_ignorebeams, m_usehepmcshort, m_usehepmcnamedweights,
-           m_usehepmcfullweightinfo, m_usehepmctreelike, m_printsummary,
+           m_ignorebeams, m_usehepmcshort,
+           m_printsummary,
            m_evtbyevtxs;
     size_t m_hepmcoutputprecision, m_xsoutputprecision;
 
@@ -189,21 +189,20 @@ Rivet_Interface::Rivet_Interface(const std::string &inpath,
   m_nevt(0), m_finished(false),
   m_splitjetconts(false), m_splitSH(false),
   m_splitcoreprocs(false), m_splitvariations(true),
-  m_ignoreblobs(ignoreblobs), m_usehepmcnamedweights(false),
-  m_usehepmcfullweightinfo(false), m_usehepmctreelike(false),
+  m_ignoreblobs(ignoreblobs),
   m_printsummary(true), m_evtbyevtxs(false),
   m_hepmcoutputprecision(15), m_xsoutputprecision(6)
 {
   if (m_outpath[m_outpath.size()-1]=='/')
     m_outpath=m_outpath.substr(0,m_outpath.size()-1);
 #ifdef USING__MPI
-  if (MPI::COMM_WORLD.Get_rank()==0) {
+  if (mpi->Rank()==0) {
 #endif
     if (m_outpath.rfind('/')!=std::string::npos)
       MakeDir(m_outpath.substr(0,m_outpath.rfind('/')));
 #ifdef USING__MPI
   }
-  if (MPI::COMM_WORLD.Get_size()>1) {
+  if (mpi->Size()>1) {
     m_outpath.insert(m_outpath.length(),"_"+rpa->gen.Variable("RNG_SEED"));
   }
 #endif
@@ -339,7 +338,7 @@ AnalysisHandler* Rivet_Interface::GetRivet(Rivet_Map& rm, std::string proc,
   else {
     msg_Debugging()<<"create new "<<key.first<<" "<<key.second<<std::endl;
     AnalysisHandler* rivet(new AnalysisHandler());
-#ifdef USING__RIVET__SETSOW
+#ifdef USING__RIVET__IGNOREBEAMS
     rivet->setIgnoreBeams(m_ignorebeams);
 #endif
     rivet->addAnalyses(m_analyses);
@@ -438,7 +437,7 @@ std::string Rivet_Interface::GetCoreProc(const std::string& proc)
 bool Rivet_Interface::Init()
 {
   if (m_nevt==0) {
-    Data_Reader reader(" ",";","//","=");
+    Data_Reader reader(" ",";","//");
     reader.AddWordSeparator("\t");
     reader.SetAddCommandLine(false);
     reader.SetInputPath(m_inpath);
@@ -456,12 +455,6 @@ bool Rivet_Interface::Init()
     if (m_usehepmcshort && m_tag!="RIVET") {
       THROW(fatal_error, "Internal error.");
     }
-#ifdef HEPMC_HAS_NAMED_WEIGHTS
-    m_usehepmcnamedweights=reader.GetValue<int>("USE_HEPMC_NAMED_WEIGHTS",1);
-#endif
-    m_usehepmcfullweightinfo=reader.GetValue<int>("USE_HEPMC_EXTENDED_WEIGHTS",
-                                                  0);
-    m_usehepmctreelike=reader.GetValue<int>("USE_HEPMC_TREE_LIKE",0);
     m_printsummary=reader.GetValue<int>("PRINT_SUMMARY",1);
     m_evtbyevtxs=reader.GetValue<int>("EVENTBYEVENTXS",0);
     m_ignorebeams=reader.GetValue<int>("IGNOREBEAMS", 0);
@@ -478,13 +471,24 @@ bool Rivet_Interface::Init()
       if (i==m_analyses.size()-1) m_analyses.push_back(std::string("MC_XS"));
     }
 
+    // configure HepMC interface
+    bool usehepmcnamedweights(false);
+#ifdef HEPMC_HAS_NAMED_WEIGHTS
+    usehepmcnamedweights=reader.GetValue<int>("USE_HEPMC_NAMED_WEIGHTS",1);
+#endif
+    bool usehepmcfullweightinfo(
+      reader.GetValue<int>("USE_HEPMC_EXTENDED_WEIGHTS", 0));
+    bool usehepmctreelike(
+      reader.GetValue<int>("USE_HEPMC_TREE_LIKE", 0));
+    bool includehepmcmeonlyvars(
+      reader.GetValue<int>("INCLUDE_HEPMC_ME_ONLY_VARIATIONS", 0));
     for (size_t i=0; i<m_ignoreblobs.size(); ++i) {
       m_hepmc2.Ignore(m_ignoreblobs[i]);
     }
-    // set HepMC modus operandi
-    m_hepmc2.SetHepMCNamedWeights(m_usehepmcnamedweights);
-    m_hepmc2.SetHepMCExtendedWeights(m_usehepmcfullweightinfo);
-    m_hepmc2.SetHepMCTreeLike(m_usehepmctreelike);
+    m_hepmc2.SetHepMCNamedWeights(usehepmcnamedweights);
+    m_hepmc2.SetHepMCExtendedWeights(usehepmcfullweightinfo);
+    m_hepmc2.SetHepMCTreeLike(usehepmctreelike);
+    m_hepmc2.SetHepMCIncludeMEOnlyVariations(includehepmcmeonlyvars);
   }
   return true;
 }
@@ -624,9 +628,10 @@ bool Rivet_Interface::Finish()
     }
     for (Rivet_Map::iterator it=mit->second->RivetMap().begin();
          it!=mit->second->RivetMap().end(); ++it) {
-#ifdef USING__RIVET__SETSOW
-      it->second->setSumOfWeights(mit->second->SumOfWeights());
-#endif
+      const double wgtfrac = it->second->sumOfWeights()/mit->second->SumOfWeights();
+      const double totalxs = it->second->crossSection();
+      const double thisxs  = totalxs*wgtfrac;
+      it->second->setCrossSection(thisxs);
       std::string jout=out;
       if (it->first.first!="") jout+="."+it->first.first;
       if (it->first.second!=0) jout+=".j"+ToString(it->first.second);

@@ -31,9 +31,6 @@ Variations::Variations(Data_Reader * const reader)
   // read settings that are relevant for parsing the prompted variations
   m_reweightsplittingalphasscales = reader->GetValue<int>("REWEIGHT_SPLITTING_ALPHAS_SCALES", 0);
   m_reweightsplittingpdfsscales = reader->GetValue<int>("REWEIGHT_SPLITTING_PDF_SCALES", 0);
-  if (m_reweightsplittingpdfsscales) {
-    THROW(not_implemented, "PDF scale factors in shower splittings is not implemented yet.");
-  }
 
   InitialiseParametersVector(reader);
 
@@ -130,7 +127,7 @@ void Variations::LoadLHAPDFInterfaceIfNecessary(Data_Reader * const reader)
   // check whether LHAPDF is already loaded, if not load and init interface
   if (!s_loader->LibraryIsLoaded("LHAPDFSherpa")) {
     s_loader->AddPath(std::string(LHAPDF_PATH)+"/lib");
-    s_loader->LoadLibrary("LHAPDF");
+    s_loader->LoadLibrary("LHAPDFSherpa");
     void *init(s_loader->GetLibraryFunction("LHAPDFSherpa","InitPDFLib"));
     if (init==NULL) THROW(fatal_error,"Cannot load PDF library LHAPDFSherpa");
     ((PDF_Init_Function)init)();
@@ -156,7 +153,7 @@ void Variations::InitialiseParametersVector(Data_Reader * const reader)
 
 std::vector<std::string> Variations::VariationArguments(Data_Reader * const reader)
 {
-  std::vector<std::string> varargs, pdfvarargs;
+  std::vector<std::string> varargs, pdfvarargs, assargs;
   varargs = VariationArguments(reader, "SCALE_VARIATIONS");
   // the PDF_VARIATIONS has a more specific syntax that must be transformed to
   // the more general syntax of SCALE_VARIATIONS
@@ -164,6 +161,13 @@ std::vector<std::string> Variations::VariationArguments(Data_Reader * const read
   for (size_t i(0); i < pdfvarargs.size(); ++i) {
     varargs.push_back("1.,1.," + pdfvarargs[i]);
   }
+  assargs = VariationArguments(reader, "ASSOCIATED_CONTRIBUTIONS_VARIATIONS");
+  for (size_t i(0); i < assargs.size(); ++i) {
+    varargs.push_back("1.,1.,default,ASS_" + assargs[i]);
+  }
+  if (msg_LevelIsDebugging())
+    for (size_t i(0);i<varargs.size();++i)
+      msg_Out()<<"constructed: "<<varargs[i]<<std::endl;
   return varargs;
 }
 
@@ -200,19 +204,27 @@ std::vector<std::string> Variations::VariationArgumentParameters(std::string arg
 void Variations::AddParameters(std::vector<std::string> stringparams,
     Data_Reader * const reader)
 {
+  DEBUG_FUNC(stringparams);
   // parse ME and PS scale factors
   const double muR2fac(ToType<double>(stringparams[0]));
   const double muF2fac(ToType<double>(stringparams[1]));
   const double showermuR2fac = (m_reweightsplittingalphasscales) ? muR2fac : 1.0;
+  const double showermuF2fac = (m_reweightsplittingpdfsscales) ? muF2fac : 1.0;
 
   // parse PDF member(s)
   std::vector<PDFs_And_AlphaS> pdfsandalphasvector;
+
+  // associated contribs
+  PHASIC::asscontrib::type asscontrib(PHASIC::asscontrib::none);
+
   bool ownedpdfsandalphas(false);
   if (stringparams.size() > 2) {
     // PDF variation requested
-    ownedpdfsandalphas = true;
     std::string pdfname(stringparams[2]);
-    if (pdfname.find("[all]") == std::string::npos) {
+    if (pdfname=="default") {
+      pdfsandalphasvector.push_back(PDFs_And_AlphaS());
+    }
+    else if (pdfname.find("[all]") == std::string::npos) {
       // single PDF member: "Set/i" or just "Set"
       int member(0);
       if (pdfname.find("/") != std::string::npos) {
@@ -220,10 +232,11 @@ void Variations::AddParameters(std::vector<std::string> stringparams,
         pdfname = pdfname.substr(0, pdfname.find("/"));
       }
       pdfsandalphasvector.push_back(PDFs_And_AlphaS(reader, pdfname, member));
+      ownedpdfsandalphas = true;
     } else {
       // all PDF members: "Set[all]"
       pdfname=pdfname.substr(0, pdfname.find("[all]"));
-      if (pdfname=="NNPDF30NNLO") {
+      if (pdfname==PDF::pdfdefs->DefaultPDFSet(kf_p_plus)) {
         for (size_t j(0); j < 101; ++j) {
           pdfsandalphasvector.push_back(PDFs_And_AlphaS(reader, pdfname, j));
         }
@@ -249,6 +262,12 @@ void Variations::AddParameters(std::vector<std::string> stringparams,
           + std::string(" Otherwise specify separately."));
 #endif
       }
+      ownedpdfsandalphas = true;
+    }
+    // filter associated contrib
+    if (stringparams.size() > 3) {
+      std::string assparam(stringparams[3].substr(stringparams[3].find("ASS_")));
+      asscontrib=ToType<PHASIC::asscontrib::type>(assparam);
     }
   } else {
     pdfsandalphasvector.push_back(PDFs_And_AlphaS());
@@ -258,11 +277,12 @@ void Variations::AddParameters(std::vector<std::string> stringparams,
         pdfasit != pdfsandalphasvector.end(); pdfasit++) {
     Variation_Parameters *params =
       new Variation_Parameters(muR2fac, muF2fac,
-          showermuR2fac,
-          pdfasit->m_pdfs[0],
-          pdfasit->m_pdfs[1],
-          pdfasit->p_alphas,
-          ownedpdfsandalphas);
+                               showermuR2fac, showermuF2fac,
+                               asscontrib,
+                               pdfasit->m_pdfs[0],
+                               pdfasit->m_pdfs[1],
+                               pdfasit->p_alphas,
+                               ownedpdfsandalphas);
     m_parameters_vector.push_back(params);
   }
 }
@@ -355,10 +375,14 @@ std::string Variation_Parameters::GenerateName() const
            + GenerateNamePart("PDF", p_pdf1->LHEFNumber()) + divider
            + GenerateNamePart("PDF", p_pdf2->LHEFNumber());
   }
+  // append non-trivial added associated contribs
+  if (m_asscontrib != PHASIC::asscontrib::none) {
+    name += divider + GenerateNamePart("ASS", m_asscontrib);
+  }
   // append non-trivial shower scale factors
-  if (m_showermuR2fac != 1.0) {
+  if (m_showermuR2fac != 1.0 || m_showermuF2fac != 1.0) {
     name += divider + GenerateNamePart("PSMUR", sqrt(m_showermuR2fac));
-    name += divider + GenerateNamePart("PSMUF", 1.0);
+    name += divider + GenerateNamePart("PSMUF", sqrt(m_showermuF2fac));
   }
   return name;
 }
@@ -391,20 +415,54 @@ Subevent_Weights_Vector::operator*=(const double &scalefactor)
 }
 
 
+Subevent_Weights_Vector &
+Subevent_Weights_Vector::operator*=(const Subevent_Weights_Vector &other)
+{
+  if (size() == other.size()) {
+    for (size_t i(0); i < size(); ++i) {
+      (*this)[i] *= other[i];
+    }
+  } else if (other.size() == 1) {
+    *this *= other[0];
+  }
+  return *this;
+}
+
+Subevent_Weights_Vector &
+Subevent_Weights_Vector::operator/=(const Subevent_Weights_Vector &other)
+{
+  if (size() == other.size()) {
+    for (size_t i(0); i < size(); ++i) {
+      (*this)[i] /= other[i];
+    }
+  } else if (other.size() == 1) {
+    *this /= other[0];
+  }
+  return *this;
+}
+
+Variation_Weights::Variation_Weights(Variation_Weights * vw):
+  p_variations(vw->GetVariations()),
+  m_weights(vw->m_weights),
+  m_currentparametersindex(vw->m_currentparametersindex),
+  m_reweighting(vw->m_reweighting)
+{}
+
 void Variation_Weights::Reset()
 {
   m_weights.clear();
-  m_initialised = false;
 }
 
 
 Variation_Weights & Variation_Weights::operator*=(const double &scalefactor)
 {
-  if (!m_initialised) {
+  if (!AreWeightsInitialised()) {
     THROW(fatal_error, "Can not multiply uninitialised variation weights.");
   }
-  for (std::vector<Subevent_Weights_Vector>::iterator it(m_weights.begin());
-       it != m_weights.end(); ++it) {
+  typedef std::vector<Subevent_Weights_Vector>::iterator It_type;
+  for (It_type it(m_weights[Variations_Type::main].begin());
+       it != m_weights[Variations_Type::main].end();
+       ++it) {
     *it *= scalefactor;
   }
   return *this;
@@ -413,16 +471,43 @@ Variation_Weights & Variation_Weights::operator*=(const double &scalefactor)
 
 Variation_Weights & Variation_Weights::operator*=(const Variation_Weights &other)
 {
-  if (!m_initialised) {
+  if (!AreWeightsInitialised()) {
     THROW(fatal_error, "Can not multiply uninitialised variation weights.");
   }
-  if (!other.m_initialised) {
+  if (!other.AreWeightsInitialised()) {
     return *this;
   }
   for (Variations::Parameters_Vector::size_type i(0);
        i < GetNumberOfVariations();
        ++i) {
-    this->m_weights[i] *= other.GetVariationWeightAt(i);
+    Subevent_Weights_Map::const_iterator it(
+        other.m_weights.find(Variations_Type::main));
+    if (it == other.m_weights.end())
+      THROW(fatal_error,
+            "The second variation weights does not contain the same types.");
+    this->m_weights[Variations_Type::main][i] *= it->second[i];
+  }
+  return *this;
+}
+
+
+Variation_Weights & Variation_Weights::operator/=(const Variation_Weights &other)
+{
+  if (!AreWeightsInitialised()) {
+    THROW(fatal_error, "Can not divide uninitialised variation weights.");
+  }
+  if (!other.AreWeightsInitialised()) {
+    return *this;
+  }
+  for (Variations::Parameters_Vector::size_type i(0);
+       i < GetNumberOfVariations();
+       ++i) {
+    Subevent_Weights_Map::const_iterator it(
+        other.m_weights.find(Variations_Type::main));
+    if (it == other.m_weights.end())
+      THROW(fatal_error,
+            "The second variation weights does not contain the same types.");
+    this->m_weights[Variations_Type::main][i] /= it->second[i];
   }
   return *this;
 }
@@ -434,13 +519,37 @@ std::string Variation_Weights::GetVariationNameAt(Variations::Parameters_Vector:
 }
 
 
-double Variation_Weights::GetVariationWeightAt(Variations::Parameters_Vector::size_type paramidx,
-                                               int subevtidx) const
+double Variation_Weights::GetVariationWeightAt(
+    Variations::Parameters_Vector::size_type paramidx,
+    Variations_Type::code t,
+    int subevtidx) const
 {
   if (subevtidx < 0) {
-    return std::accumulate(m_weights[paramidx].begin(), m_weights[paramidx].end(), 0.0);
-  } else { 
-    return m_weights[paramidx][subevtidx];
+    Subevent_Weights_Vector weights(GetNumberOfSubevents());
+    for (Subevent_Weights_Map::const_iterator it(m_weights.begin());
+         it != m_weights.end();
+         ++it)
+      if (t == Variations_Type::all || t == it->first)
+        weights *= it->second[paramidx];
+    return std::accumulate(weights.begin(), weights.end(), 0.0);
+  } else {
+    double weight(1.0);
+    for (Subevent_Weights_Map::const_iterator it(m_weights.begin());
+         it != m_weights.end();
+         ++it) {
+      if (t == Variations_Type::all || t == it->first) {
+        if (subevtidx > 0 && it->second[paramidx].size() == 1) {
+          if (it->first == Variations_Type::main) {
+            THROW(fatal_error,
+                  "The main variation weights do not have enough entries.");
+          }
+          weight *= it->second[paramidx][0];
+        } else {
+          weight *= it->second[paramidx][subevtidx];
+        }
+      }
+    }
+    return weight;
   }
 }
 
@@ -451,21 +560,42 @@ Variations::Parameters_Vector::size_type Variation_Weights::CurrentParametersInd
   return m_currentparametersindex;
 }
 
-
-void Variation_Weights::InitialiseWeights(const Subevent_Weights_Vector & subweights) {
-  const size_t size(p_variations->GetParametersVector()->size());
-  m_weights.clear();
-  m_weights.reserve(size);
-  for (size_t i(0); i < size; ++i) {
-    m_weights.push_back(subweights);
-  }
-  m_initialised = true;
+size_t Variation_Weights::GetNumberOfVariations() const
+{
+  Subevent_Weights_Map::const_iterator it(m_weights.find(Variations_Type::main));
+  if (it == m_weights.end())
+    return 0;
+  return it->second.size();
 }
 
+size_t Variation_Weights::GetNumberOfSubevents() const
+{
+  Subevent_Weights_Map::const_iterator it(m_weights.find(Variations_Type::main));
+  if (it == m_weights.end())
+    return 0;
+  return it->second[0].size();
+}
+
+void Variation_Weights::InitialiseWeights(const Subevent_Weights_Vector & subweights,
+                                          const Variations_Type::code t)
+{
+  const size_t size(p_variations->GetParametersVector()->size());
+  m_weights[t].clear();
+  m_weights[t].reserve(size);
+  for (size_t i(0); i < size; ++i) {
+    m_weights[t].push_back(subweights);
+  }
+}
+
+bool Variation_Weights::AreWeightsInitialised(
+    const Variations_Type::code t) const
+{
+  return (m_weights.find(t) != m_weights.end());
+}
 
 namespace SHERPA {
 
-  std::ostream& operator<<(std::ostream &s, const Variations &v)
+  std::ostream& operator<<(std::ostream& s, const Variations& v)
   {
     const Variations::Parameters_Vector * const paramsvec(v.GetParametersVector());
     s << "Named variations:" << std::endl;
@@ -476,24 +606,53 @@ namespace SHERPA {
     return s;
   }
 
-
-  std::ostream & operator<<(std::ostream & s, const Variation_Weights & weights)
+  std::ostream& operator<<(std::ostream& s, const Subevent_Weights_Vector& v)
   {
-    const Variations::Parameters_Vector * const paramsvec(weights.p_variations->GetParametersVector());
+    if (v.size() == 1) {
+      s << v[0];
+    } else {
+      s << "(";
+      for (size_t j(0); j < v.size(); ++j) {
+        if (j != 0)
+          s << ", ";
+        s << v[j];
+      }
+      s << ")";
+    }
+    return s;
+  }
+
+  std::ostream& operator<<(std::ostream& s, const Variations_Type::code &c)
+  {
+    switch (c) {
+      case Variations_Type::all:
+        return s << "All";
+      case Variations_Type::main:
+        return s << "Main";
+      case Variations_Type::sudakov:
+        return s << "Sudakov";
+    }
+  }
+
+  std::ostream& operator<<(std::ostream& s, const Variation_Weights& weights)
+  {
+    const Variations::Parameters_Vector * const paramsvec(
+        weights.p_variations->GetParametersVector());
     s << "Variation weights: {" << std::endl;
     for (Variations::Parameters_Vector::size_type i(0);
          i < paramsvec->size(); ++i) {
       s << "    " << (*paramsvec)[i]->m_name << ": ";
-      if (!weights.m_initialised) {
-        s << "not initialised";
-      } else {
-        s << weights.m_weights[i];
+      for (Subevent_Weights_Map::const_iterator it(weights.m_weights.begin());
+            it != weights.m_weights.end();
+            ++it) {
+        s << it->first << "=" << it->second[i] << " ";
       }
       s << std::endl;
     }
     s << "}" << std::endl;
     return s;
   }
+
 }
 
 

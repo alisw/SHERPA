@@ -43,12 +43,14 @@ bool Decay_Channel::FlavourSort(const Flavour &fl1,const Flavour &fl2)
   if (kf1>kf2) return true;
   if (kf1<kf2) return false;
   /*
-      anti anti -> true
+      anti anti -> false
       anti part -> false
       part anti -> true
-      anti anti -> true
+      part part -> false
       */
-  return !(fl1.IsAnti()&&!fl2.IsAnti());
+
+  if (!fl1.IsAnti() && fl2.IsAnti()) return true;
+  else return false;
 }
 
 
@@ -56,6 +58,7 @@ void Decay_Channel::AddDecayProduct(const ATOOLS::Flavour& flout,
 				    const bool & sort)
 {
   m_flavours.push_back(flout);
+  m_minmass += p_ms->Mass(flout);
   if (!sort) return;
   // sort
   Flavour flin=m_flavours[0];
@@ -70,8 +73,6 @@ void Decay_Channel::AddDecayProduct(const ATOOLS::Flavour& flout,
   for (size_t i=0; i<flouts.size(); ++i) {
     m_flavours[i+1]=flouts[i];
   }
-
-  m_minmass += p_ms->Mass(flout);
 }
 
 void Decay_Channel::AddDiagram(METOOLS::Spin_Amplitudes* amp) {
@@ -235,9 +236,9 @@ void Decay_Channel::CalculateWidth(double acc, double ref, int iter)
     }
     opt++;
 #ifdef USING__MPI
-    if (MPI::COMM_WORLD.Get_size()) {
-      mpi->MPIComm()->Allreduce(MPI_IN_PLACE,mv,3,MPI::DOUBLE,MPI::SUM);
-      mpi->MPIComm()->Allreduce(MPI_IN_PLACE,&m_max,1,MPI::DOUBLE,MPI::MAX);
+    if (mpi->Size()) {
+      mpi->Allreduce(mv,3,MPI_DOUBLE,MPI_SUM);
+      mpi->Allreduce(&m_max,1,MPI_DOUBLE,MPI_MAX);
     }
 #endif
     n+=mv[0];

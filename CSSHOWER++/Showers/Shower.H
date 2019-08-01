@@ -25,17 +25,16 @@ namespace CSSHOWER {
     Sudakov            m_sudakov;
     PDF::ISR_Handler * p_isr;
     Parton           * m_last[4];
-    int                m_kscheme, m_noem, m_use_bbw, m_recdec;
+    int                m_kscheme, m_noem, m_recdec;
+    bool               m_use_bbw;
 
     ATOOLS::Cluster_Leg *p_old[2];
 
     std::map<std::string,double,ATOOLS::String_Sort> m_efac;
 
     double m_weight;
-
+    bool m_reweight;
     SHERPA::Variation_Weights * p_variationweights;
-    //! the maximum number of rew'd emissions
-    int m_maxrewem;
 
     void   ResetScales(const double &kt2);
     void   SetSplitInfo(const ATOOLS::Vec4D &psplit,
@@ -54,6 +53,10 @@ namespace CSSHOWER {
     int MakeKinematics(Parton *const split,const ATOOLS::Flavour &fla,
 		       const ATOOLS::Flavour &flb,const ATOOLS::Flavour &flc,
 		       const int mode,const int fc);
+
+    ATOOLS::Cluster_Amplitude *  SingletToAmplitude(const Singlet * sing, ATOOLS::Cluster_Amplitude * ampl);
+    void   PartonToAmplitude(const Parton *  parton, ATOOLS::Cluster_Amplitude *);
+    void   CheckAmplitude(const ATOOLS::Cluster_Amplitude *ampl);
  public:
     Shower(PDF::ISR_Handler * isr,const int qed,
 	   ATOOLS::Data_Reader *const dataread,int type);
@@ -61,6 +64,9 @@ namespace CSSHOWER {
     bool   EvolveShower(Singlet *,const size_t &,size_t &);
     int    ReconstructDaughters(Singlet *const split,const int mode,
 				Parton *const pi=NULL,Parton *const pj=NULL);
+    double Reweight(SHERPA::Variation_Parameters*,
+                    SHERPA::Variation_Weights*,
+                    Parton& splitter);
     void SetMS(ATOOLS::Mass_Selector *const ms);
     double EFac(const std::string &sfk) const;
     inline Sudakov *GetSudakov() { return &m_sudakov; }
@@ -84,6 +90,8 @@ namespace CSSHOWER {
 
     inline void SetVariationWeights(SHERPA::Variation_Weights * varwgts)
     { p_variationweights = varwgts; }
+
+    inline void SetUsesBBW(bool on) { m_use_bbw = on; }
 
   };
 }

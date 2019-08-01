@@ -99,9 +99,7 @@ Decay_Matrix* Hadron_Decay_Handler::FillDecayTree(Blob * blob, Spin_Density* s0)
 {
   Blob* mixingblob=p_mixinghandler->PerformMixing(blob->InParticle(0));
   if (mixingblob) {
-    Blob_List::iterator bit;
-    for (bit=p_bloblist->begin();bit!=p_bloblist->end();++bit) 
-      if (*bit==blob) p_bloblist->erase(bit);
+    p_bloblist->Delete(blob);
     p_bloblist->push_back(mixingblob);
     CreateDecayBlob(mixingblob->OutParticle(0));
     return Decay_Handler_Base::FillDecayTree
@@ -191,8 +189,12 @@ RejectExclusiveChannelsFromFragmentation(Blob* fblob)
       for(int i=0;i<decayblob->NOutP();i++) {
 	if (decayblob->OutParticle(i)->GetFlow(1)==0 &&
 	    decayblob->OutParticle(i)->GetFlow(2)==0)
-	  tmp.push_back(anti?decayblob->OutParticle(i)->Flav().Bar():
-			decayblob->OutParticle(i)->Flav());
+	    {
+          Flavour flav(anti?decayblob->OutParticle(i)->Flav().Bar():
+                       decayblob->OutParticle(i)->Flav());
+          tmp.push_back(flav);
+          tmpno.push_back(flav);
+      }
       }
     }
     std::sort(tmp.begin(), tmp.end(), Decay_Channel::FlavourSort);

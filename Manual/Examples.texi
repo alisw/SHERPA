@@ -12,6 +12,7 @@ of the main features of these examples.
 * Jets::
 * HJets::
 * TopsJets::
+* SingleTopChannels::
 * VVJets::
 * MSSM/UFO::
 * DIS::
@@ -72,11 +73,19 @@ of the main features of these examples.
 
 @menu
 * Top quark pair production::
+* Top quark pair production including approximate EW corrections::
 * Tops plus W in MC@@NLO::
 @end menu
 
 @include LHC_TTBar.texi
 @include LHC_TTW.texi
+
+@node SingleTopChannels
+@section Single-top production in the s, t and tW channel
+
+In this section, examples for single-top production in three different channels
+are described.  For the channel definitions and a validation of these setups,
+see @mycite{Bothmann2017jfv}.
 
 @node VVJets
 @section Vector boson pairs + jets production
