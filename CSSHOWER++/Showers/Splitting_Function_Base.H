@@ -51,6 +51,12 @@ namespace CSSHOWER {
 
   class Splitting_Function_Base;
 
+  struct Split_Args {
+    Parton *p_split, *p_spect;
+    Split_Args(Parton *split,Parton *spect):
+      p_split(split), p_spect(spect) {}
+  };
+  
   class SF_Lorentz {
   protected:
 
@@ -65,6 +71,8 @@ namespace CSSHOWER {
     int m_beam, m_col;
 
     double m_lastJ;
+
+    Split_Args *p_split;
 
     static double s_pdfcut, s_kappa;
 
@@ -120,6 +128,8 @@ namespace CSSHOWER {
 
     inline int Col() const { return m_col; }
 
+    inline void SetSplit(Split_Args *const split) { p_split=split; }
+
     inline static void SetKappa(const double &kap) { s_kappa=kap; }
 
   };
@@ -154,13 +164,13 @@ namespace CSSHOWER {
 
     //! Subclasses can return true if they support alternative couplings to be used (e.g. for reweighting)
     virtual bool AllowsAlternativeCouplingUsage() const { return false; }
-    /*! 
+    /*!
      * Use an alternative coupling
-     * 
+     *
      * @param cpl See subclass implementation(s) for the accepted pointer type.
+     * Passing NULL ends the use of the alternative coupling.
      * @param sf An optional scale factor, see subclass implementations for the
      * concrete meaning of this argument.
-     * Passing NULL ends the use of the alternative coupling.
      */
     virtual void SetAlternativeUnderlyingCoupling(void * cpl, double sf=1.0) {}
 
@@ -267,6 +277,7 @@ namespace CSSHOWER {
     inline SF_Lorentz  *Lorentz() const  { return p_lf; }
     inline SF_Coupling *Coupling() const { return p_cf; }
 
+    PDF::PDF_Base** PDF() { return p_pdf; }
     inline void SetPDF(PDF::PDF_Base **const pdf) { p_pdf=pdf; }
 
     inline double SymFac() const { return m_symf; }

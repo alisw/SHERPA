@@ -45,6 +45,9 @@ transverse momentum cut
 rapidity cut
 @item PseudoRapidity
 pseudorapidity cut
+@item PZIN
+cut on the z-component of the momentum, acts on initial-state flavours only
+(commonly used in DIS analyses)
 @end table
 
 
@@ -81,6 +84,9 @@ rapidity separation
 azimuthal angle separation (rad)
 @item DeltaR
 R separation
+@item INEL
+inelasticity, one of the flavours must be in the initial-state (commonly used
+in DIS analyses)
 @end table
 
 
@@ -160,7 +166,8 @@ up to the specified values. This is useful e.g. in calculations with massive
 b-quarks which shall nonetheless satisfy jet criteria.
 
 The final option @option{FastjetFinder} allows to use the 
-@uref{http://www.fastjet.fr,,FastJet} plugin if enabled during configuration. 
+@uref{http://www.fastjet.fr,,FastJet} plugin if enabled during configuration(*). 
+
 It takes the following mandatory arguments:
 @code{<algorithm>} can take the values @code{kt,antikt,cambridge,siscone}, 
 @code{<n>} is the minimum number of jets to be found, @code{<ptmin>} and 
@@ -318,7 +325,7 @@ implements the Frixione isolation cone @mycite{Frixione1998jh}.
 @node Fastjet selector
 @subsection Fastjet selector
 
-If @uref{http://www.fastjet.fr,,FastJet} is enabled, the momenta and nodal 
+If @uref{http://www.fastjet.fr,,FastJet} is enabled(*), the momenta and nodal 
 values of the jets found with Fastjet can be used to calculate more elaborate 
 selector criteria. The syntax of this selector is
 
@@ -344,3 +351,8 @@ to use b-tagged jets only, based on the parton-level constituents of the jets.
 There are two options: With @code{<bmode>=1} both b and anti-b quarks are
 counted equally towards b-jets, while for @code{<bmode>=2} they are added with a
 relative sign as constituents, i.e. a jet containing b and anti-b is not tagged.
+
+(*) If FastJet has not been enabled during configuration of your Sherpa
+installation, you can still build a FastJet-based selector plugin by including
+the content of any necessary functions (e.g. from @code{Fastjet_Helpers.[HC]})
+explicitly and linking against FastJet at compile time of the plugin.

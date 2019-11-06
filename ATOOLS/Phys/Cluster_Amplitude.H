@@ -3,6 +3,8 @@
 
 #include "ATOOLS/Phys/Cluster_Leg.H"
 #include "ATOOLS/Phys/Decay_Info.H"
+#include "ATOOLS/Org/Smart_Pointer.H"
+#include "SHERPA/Tools/Variations.H"
 
 #include <vector>
 #include <map>
@@ -16,6 +18,9 @@ namespace ATOOLS {
   public:
 
     ClusterAmplitude_PVector();
+
+    Cluster_Amplitude * OneAmpl();
+
 
     ~ClusterAmplitude_PVector();
 
@@ -31,6 +36,7 @@ namespace ATOOLS {
 
     size_t m_oew, m_oqcd, m_nin, m_new, m_ncl, m_kin, m_nlo, m_flag;
     double m_mur2, m_muf2, m_muq2, m_mu2, m_kt2, m_z, m_phi, m_lkf;
+    SHERPA::Variation_Weights* p_lkfvariationweights;
     CI_Map m_cmap;
 
     void *p_jf, *p_proc, *p_procs, *p_iinfo, *p_dinfo;
@@ -40,6 +46,7 @@ namespace ATOOLS {
     static ClusterAmplitude_PVector s_ampls;
 
     friend class ClusterAmplitude_PVector;
+    friend class SP(ATOOLS::Cluster_Amplitude);
 
   protected:
 
@@ -153,6 +160,11 @@ namespace ATOOLS {
 
     inline double LKF() const { return m_lkf; }
 
+    SHERPA::Variation_Weights* LKFVariationWeights()
+    { return p_lkfvariationweights; }
+    inline void SetLKFVariationWeights(SHERPA::Variation_Weights* vw)
+    { p_lkfvariationweights = vw; }
+
     inline CI_Map       &ColorMap()       { return m_cmap; }
     inline const CI_Map &ColorMap() const { return m_cmap; }
 
@@ -177,6 +189,10 @@ namespace ATOOLS {
 
   std::ostream &operator<<
     (std::ostream &ostr,const Cluster_Amplitude &ampl);
+
+  std::ostream &operator<<
+    (std::ostream &ostr,const Cluster_Amplitude * ampl);
+
 
   typedef std::vector<Cluster_Amplitude*> ClusterAmplitude_Vector;
 

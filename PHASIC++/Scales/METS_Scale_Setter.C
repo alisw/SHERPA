@@ -284,6 +284,7 @@ void METS_Scale_Setter::PreCalc(const Vec4D_Vector &p,const size_t &mode)
 //   16 -- ignore ordering when clustering
 //  512 -- exclusive clustering
 // 4096 -- only first deterministic clustered
+// 8192 -- for R proc: do not assume 4096 by default
 
 double METS_Scale_Setter::CalculateStrict
 (const Vec4D_Vector &momenta,const size_t &mode)
@@ -297,7 +298,7 @@ double METS_Scale_Setter::CalculateStrict
   proc->Generator()->SetClusterDefinitions(cd);
   int camode(cd->AMode()?512:0);
   if (m_nproc) camode|=m_cmodebvi;
-  if (m_rproc) camode|=4096;
+  if (m_rproc && !(m_cmoders&8192)) camode|=4096;
   if (m_cmoders&1) {
     if (m_rproc) camode|=1;
     if (m_sproc&&proc->MCMode()==2) camode|=1;
@@ -714,7 +715,7 @@ double METS_Scale_Setter::SetScales
   for (size_t i(0);i<m_calcs.size();++i)
     m_scale[i]=m_calcs[i]->Calculate()->Get<double>();
   for (size_t i(m_calcs.size());i<stp::size;++i) m_scale[i]=m_scale[0];
-  if (ampl==NULL || ampl->Prev()==NULL)
+  if (ampl==NULL || ampl->Prev()==NULL || (ampl->Prev()->Prev()==0 && m_rproc ) )
     m_scale[stp::size+stp::res]=m_scale[stp::res];
   msg_Debugging()<<METHOD<<"(): Set {\n"
 		 <<"  \\mu_f = "<<sqrt(m_scale[stp::fac])<<"\n"

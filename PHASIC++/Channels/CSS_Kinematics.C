@@ -2,7 +2,6 @@
 
 #include "ATOOLS/Math/ZAlign.H"
 #include "ATOOLS/Org/Run_Parameter.H"
-#include "ATOOLS/Org/Message.H"
 #include "ATOOLS/Org/Exception.H"
 
 using namespace PHASIC;
@@ -254,10 +253,10 @@ int PHASIC::ConstructIFDipole
  const double &mkt2,const double &mb2,const Vec4D &paj,
  const Vec4D &pk,const Vec4D &pb,Kin_Args &ifp)
 {
+  const double mk2(ifp.m_mk2>=0.0?ifp.m_mk2:mkt2);
   if (ifp.m_mode==1) {
     Vec4D Q(paj-pk), Ql(Vec4D(Q[0],0.0,0.0,Q[3]));
     double Q2(Q.Abs2()), kt2(Q.PPerp2()), yt((1.0-ifp.m_z)/ifp.m_z);
-    double mk2(ifp.m_mk2>=0.0?ifp.m_mk2:mkt2);
     double sjk(-yt*(Q2-ma2)+(1.0+yt)*(mj2+mk2));
     double po(sqr(Q2-mkt2-maj2)-4.0*maj2*(mkt2+kt2));
     double ecm(Q2-sjk-ma2), pn(sqr(ecm)-4.0*ma2*(sjk+kt2));
@@ -299,7 +298,6 @@ int PHASIC::ConstructIFDipole
     Vec4D l_perp(LT(paj,pk,n_perp));
     l_perp*=1.0/sqrt(dabs(l_perp.Abs2()));
     Vec4D Q(paj-pk);
-    double mk2(ifp.m_mk2>=0.0?ifp.m_mk2:mkt2);
     double Q2(Q.Abs2()), po(sqr(Q2-maj2-mkt2)-4.0*maj2*mkt2);
     double yt(ifp.m_y/ifp.m_z), saj(yt*(Q2-mk2)+(1.0-yt)*(ma2+mj2));
     double ecm(Q2-saj-mk2), pn(sqr(ecm)-4.0*saj*mk2);

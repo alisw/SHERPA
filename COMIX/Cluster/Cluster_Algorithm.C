@@ -29,6 +29,8 @@ Cluster_Algorithm::Cluster_Algorithm(ATOOLS::Mass_Selector *const ms):
   m_corecheck=read.GetValue<int>("COMIX_CLUSTER_CORE_CHECK",0);
   m_ordered=read.GetValue<int>("COMIX_CLUSTER_ORDERED",0);
   m_nocluster=read.GetValue<int>("COMIX_NO_CLUSTER",0);
+  m_dipolecheck=read.GetValue<int>("COMIX_CLUSTER_DIPOLE_CHECK",1);
+  m_skip4096=read.GetValue<int>("COMIX_CLUSTER_RS_ORDERED",0);
 }
 
 Cluster_Algorithm::~Cluster_Algorithm()
@@ -198,7 +200,7 @@ void Cluster_Algorithm::CalculateMeasures
 	if (find(ccurs.begin(),ccurs.end(),in[j]->J(0))==ccurs.end()) continue;
 	if (find(ccurs.begin(),ccurs.end(),in[j]->J(1))==ccurs.end()) continue;
 	size_t idi(in[j]->J(0)->CId()), idj(in[j]->J(1)->CId());
-	if (p_xs!=p_proc && step==2) {
+    if (p_xs!=p_proc && step==2 && m_dipolecheck) {
 	  NLO_subevt *sub(p_proc->Get<Single_Dipole_Term>()->Sub());
 	  if (!(m_id[idi]==(1<<sub->m_i) && m_id[idj]==(1<<sub->m_j)) &&
 	      !(m_id[idj]==(1<<sub->m_i) && m_id[idi]==(1<<sub->m_j))) continue;
@@ -214,7 +216,7 @@ void Cluster_Algorithm::CalculateMeasures
 	for (size_t k(0);k<p_ampl->Legs().size();++k) {
 	  size_t idk(p_ampl->Leg(k)->Id());
 	  if (idk==m_id[idi] || idk==m_id[idj]) continue;
-	  if (p_xs!=p_proc && step==2) {
+      if (p_xs!=p_proc && step==2 && m_dipolecheck) {
 	    NLO_subevt *sub(p_proc->Get<Single_Dipole_Term>()->Sub());
 	    if (idk!=(1<<sub->m_k)) continue;
 	  }
@@ -253,7 +255,7 @@ void Cluster_Algorithm::CalculateMeasures
 	if (in[j]->Order()[1]>p_ampl->OrderEW() ||
 	    in[j]->Order()[0]>p_ampl->OrderQCD()) continue;
 	size_t idi(fcur->CId()), idj(ccurs[i]->CId());
-	if (p_xs!=p_proc && step==2) {
+    if (p_xs!=p_proc && step==2 && m_dipolecheck) {
 	  NLO_subevt *sub(p_proc->Get<Single_Dipole_Term>()->Sub());
 	  if (!(m_id[idi]==(1<<sub->m_i) && m_id[idj]==(1<<sub->m_j)) &&
 	      !(m_id[idj]==(1<<sub->m_i) && m_id[idi]==(1<<sub->m_j))) continue;
@@ -268,7 +270,7 @@ void Cluster_Algorithm::CalculateMeasures
 	  for (size_t k(0);k<p_ampl->Legs().size();++k) {
 	    size_t idk(p_ampl->Leg(k)->Id());
 	    if (idk==m_id[idi] || idk==m_id[idj]) continue;
-	    if (p_xs!=p_proc && step==2) {
+        if (p_xs!=p_proc && step==2 && m_dipolecheck) {
 	      NLO_subevt *sub(p_proc->Get<Single_Dipole_Term>()->Sub());
 	      if (idk!=(1<<sub->m_k)) continue;
 	    }
@@ -578,6 +580,7 @@ bool Cluster_Algorithm::Cluster
  const Vec4D_Vector &ip,const size_t &mode)
 {
   m_wmode=mode;
+  if (m_wmode&4096 && m_skip4096) m_wmode-=4096;
   m_cols.clear();
   Vec4D_Vector p(ip);
   if (xs) {
@@ -593,7 +596,7 @@ bool Cluster_Algorithm::Cluster
   }
   if (p_bg==NULL) THROW(fatal_error,"Internal error 9");
   Selector_Base *jf=p_xs->Selector()->GetSelector("Jetfinder");
-  DEBUG_FUNC("mode = "<<mode);
+  DEBUG_FUNC("mode = "<<m_wmode);
   m_nmin=Min((size_t)2,p_proc->Info().m_fi.NMinExternal());
   m_id.clear();
   p_bg->ResetZero();
@@ -737,9 +740,9 @@ bool Cluster_Algorithm::Cluster
       ++nc;
       if (order<0) SetCoreParams(ampl);
       KT2Info_Vector nkt2ord(((m_wmode&4096) && step==2)?
-			     kt2ord:UpdateKT2(kt2ord,ampl));
+			kt2ord:UpdateKT2(kt2ord,ampl));
       if (order!=0 && !((m_wmode&4096) && step==2))
-	if (!CheckOrdering(kt2ord,nkt2ord)) {
+        if (!CheckOrdering(kt2ord,nkt2ord)) {
 	  p_ampl=ampl;
 	  p_ampl->DeleteNext();
 	  continue;

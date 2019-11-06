@@ -178,7 +178,7 @@ bool COMIX::Single_Process::Initialize
     return true;
   }
 #ifdef USING__MPI
-  if (MPI::COMM_WORLD.Get_rank()==0) {
+  if (mpi->Rank()==0) {
 #endif
   mapfile=rpa->gen.Variable("SHERPA_CPP_PATH")
     +"/Process/Comix/"+Parent()->Name()+".map";
@@ -265,8 +265,8 @@ bool COMIX::Single_Process::MapProcess()
 	  for (size_t j(0);j<nfmap;++j) {
 	    long int src, dest;
 	    *map>>src>>dest;
-	    Flavour ft((kf_code)(abs(src)),src<0);
-	    Flavour fb((kf_code)(abs(dest)),dest<0);
+	    Flavour ft((kf_code)(std::abs(src)),src<0);
+	    Flavour fb((kf_code)(std::abs(dest)),dest<0);
 	    m_fmap[ft]=fb;
 	    msg_Debugging()<<"  fmap '"<<ft<<"' onto '"<<fb<<"'\n";
 	  }
@@ -300,7 +300,7 @@ bool COMIX::Single_Process::MapProcess()
       msg_Tracking()<<"Mapped '"<<m_name<<"' -> '"
 		    <<mapname<<"'."<<std::endl;
 #ifdef USING__MPI
-      if (MPI::COMM_WORLD.Get_rank()==0) {
+      if (mpi->Rank()==0) {
 #endif
       std::string mapfile(rpa->gen.Variable("SHERPA_CPP_PATH")
 			  +"/Process/Comix/"+m_name+".map");

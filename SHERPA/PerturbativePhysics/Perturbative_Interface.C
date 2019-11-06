@@ -201,14 +201,15 @@ DefineInitialConditions(ATOOLS::Blob *blob)
   if (p_me->Process()->Info().m_ckkw&1) {
     blob->AddData("Sud_Weight",new Blob_Data<double>(m_weight));
     if (p_me->EventGenerationMode()!=0) {
-      if (m_weight>=ran->Get()) {
-        if (m_weight < 1.0) {
-          *p_localkfactorvarweights *= 1.0 / m_weight;
-          m_weight = 1.0;
-        }
-      } else {
+      const double disc = ran->Get();
+      const double abswgt = std::abs(m_weight);
+      if (abswgt < disc) {
         return Return_Value::New_Event;
       }
+      m_weight /= Min(1.0, abswgt);
+      // local kfactor varweights not initialized if weight equal to one
+      if (p_localkfactorvarweights && abswgt < 1.)
+        *p_localkfactorvarweights *= 1.0 / abswgt;
     }
     Blob_Data_Base *winfo((*blob)["Weight"]);
     if (!winfo) THROW(fatal_error,"No weight information in signal blob");
@@ -329,6 +330,7 @@ int Perturbative_Interface::PerformShowers()
 
   int stat=csh->PerformShowers();
   double weight=csh->Weight();
+  m_weight*=weight;
   p_hard->AddData("Shower_Weight",new Blob_Data<double>(weight));
   p_hard->AddData("Weight",new Blob_Data<double>(meweight*weight));
   if (blob_data_base) {

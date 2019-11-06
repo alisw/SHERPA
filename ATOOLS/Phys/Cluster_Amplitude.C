@@ -4,6 +4,9 @@
 #include "ATOOLS/Org/Exception.H"
 #include "ATOOLS/Org/MyStrStream.H"
 #include "ATOOLS/Phys/Flow.H"
+#include "ATOOLS/Org/Smart_Pointer.C"
+#include "ATOOLS/Phys/Blob.H"
+
 
 using namespace ATOOLS;
 
@@ -18,6 +21,25 @@ ClusterAmplitude_PVector::~ClusterAmplitude_PVector()
     pop_back();
     delete ampl;
   }
+}
+
+Cluster_Amplitude * ClusterAmplitude_PVector::OneAmpl()
+{
+  // links all amplitudes from this amplitude vector and return the linked, single amplitude
+  if (this->size()==0) return Cluster_Amplitude::New();
+  Cluster_Amplitude * tmp = this->at(0)->CopyAll();
+  for(int i=1; i< this->size(); i++){
+      if (this->at(i)){
+          Cluster_Amplitude * next_prev = this->at(i)->CopyAll();
+          while (next_prev->Prev()) next_prev = next_prev->Prev();
+          tmp->SetNext(next_prev);
+          while (tmp->Next()) tmp = tmp->Next();
+
+        }
+    }
+
+  while (tmp->Prev()) tmp = tmp->Prev();
+  return tmp;
 }
 
 ClusterAmplitude_PVector Cluster_Amplitude::s_ampls;
@@ -56,6 +78,7 @@ Cluster_Amplitude *Cluster_Amplitude::New
   ca->m_kt2=ca->m_z=ca->m_phi=ca->m_lkf=0.0;
   ca->p_jf=ca->p_proc=ca->p_procs=ca->p_dinfo=NULL;
   ca->p_ms=NULL;
+  ca->p_lkfvariationweights=NULL;
   if (ca->p_prev!=NULL) ca->p_prev->p_next=ca;
   return ca;
 }
@@ -70,6 +93,7 @@ void Cluster_Amplitude::Delete()
   if (p_prev) p_prev->p_next=NULL;
   p_prev=p_next=NULL;
   s_ampls.push_back(this);
+  p_lkfvariationweights = NULL;
 }
 
 void Cluster_Amplitude::CreateLeg
@@ -98,6 +122,7 @@ void Cluster_Amplitude::CopyFrom
   if (mode==1) m_legs.clear();
   else for (size_t i(0);i<m_legs.size();++i)
     m_legs[i] = Cluster_Leg::New(this,*master->m_legs[i]);
+  p_lkfvariationweights = master->p_lkfvariationweights;
 }
 
 Cluster_Amplitude *Cluster_Amplitude::CopyNext() const
@@ -405,4 +430,49 @@ namespace ATOOLS {
     return ostr<<"}";
   }
 
+  std::ostream &operator<<
+    (std::ostream &ostr,const Cluster_Amplitude * ampl)
+  {
+
+    ostr<<ampl->NIn()<<" -> "<<ampl->Legs().size()-ampl->NIn()<<" {\n";
+    ostr<<"  \\mu_r = "<<sqrt(ampl->MuR2())
+        <<", \\mu_f = "<<sqrt(ampl->MuF2())
+        <<", \\mu_q = "<<sqrt(ampl->MuQ2())
+        <<", \\mu = "<<sqrt(ampl->Mu2())<<"\n";
+    ostr<<"  k_T = "<<sqrt(ampl->KT2())<<", z = "<<ampl->Z()
+        <<", phi = "<<ampl->Phi()<<", kin = "<<ampl->Kin()
+        <<", K = "<<ampl->LKF()<<"\n";
+    ostr<<"  oew = "<<ampl->OrderEW()<<", oqcd = "<<ampl->OrderQCD()
+        <<", nlo = "<<ampl->NLO()<<", new = "<<ID(ampl->IdNew())
+        <<", ncl = "<<ampl->NewCol()<<", flag = "<<ampl->Flag()<<"\n";
+    if (ampl->Decays().size()) {
+      std::string ds;
+      for (DecayInfo_Vector::const_iterator cit(ampl->Decays().begin());
+           cit!=ampl->Decays().end();++cit)
+        ds+=ToString(**cit)+" ";
+      ostr<<"  decs = { "<<ds<<"}\n";
+    }
+    if (ampl->ColorMap().size()) {
+      std::string cs;
+      for (CI_Map::const_iterator cit(ampl->ColorMap().begin());
+           cit!=ampl->ColorMap().end();++cit)
+        cs+=ToString(cit->first)+"->"+ToString(cit->second)+" ";
+      ostr<<"  cols = { "<<cs<<"}\n";
+    }
+    for (size_t i(0);i<ampl->Legs().size();++i)
+      ostr<<"  "<<ampl->Legs()[i]<<"\n";
+    return ostr<<"}";
+  }
+
+
+}
+
+
+namespace ATOOLS {
+  template class SP(ATOOLS::Cluster_Amplitude);
+
+  template <> Blob_Data<SP(ATOOLS::Cluster_Amplitude)>::~Blob_Data() {}
+  template class Blob_Data<SP(ATOOLS::Cluster_Amplitude)>;
+  template SP(ATOOLS::Cluster_Amplitude)&
+    Blob_Data_Base::Get<SP(ATOOLS::Cluster_Amplitude)>();
 }

@@ -135,6 +135,7 @@ void Matrix_Element_Handler::InitNLOMC()
 bool Matrix_Element_Handler::CalculateTotalXSecs() 
 {
   int storeresults = Data_Reader(" ",";","!","=").GetValue("GENERATE_RESULT_DIRECTORY", 1);
+  if (storeresults<0) return true;
   if (storeresults) {
     My_In_File::OpenDB(m_respath+"/");
     My_In_File::ExecDB(m_respath+"/","PRAGMA cache_size = 100000");
@@ -203,19 +204,25 @@ bool Matrix_Element_Handler::GenerateOneEvent()
     if (info==NULL) continue;
     m_evtinfo=*info;
     delete info;
-    double wf(rpa->Picobarn()/sw);
+    double enhance = p_proc->Integrator()->PSHandler()->Enhance();
+    double wf(rpa->Picobarn()/sw/enhance);
     if (m_eventmode!=0) {
-      double max=p_proc->Integrator()->Max(), disc=max*ran->Get();
-      if (dabs(m_evtinfo.m_weight)<disc) continue;
-      if (dabs(m_evtinfo.m_weight)>max*m_ovwth) {
+      const double max = p_proc->Integrator()->Max();
+      const double disc = max * ran->Get();
+      const double abswgt = std::abs(m_evtinfo.m_weight);
+      if (abswgt < disc)
+        continue;
+      if (abswgt > max * m_ovwth) {
         Return_Value::IncWarning(METHOD);
-        msg_Info()<<METHOD<<"(): Point for '"<<p_proc->Name()
-                  <<"' exceeds maximum by "
-                  <<dabs(m_evtinfo.m_weight)/max-1.0<<"."<<std::endl;
-        m_evtinfo.m_weight=max*m_ovwth;
+        msg_Info() << METHOD<<"(): Point for '" << p_proc->Name()
+                   << "' exceeds maximum by "
+                   << abswgt / max - 1.0 << "." << std::endl;
+        m_weightfactor = m_ovwth;
+        wf *= max * m_ovwth / abswgt;
+      } else {
+        m_weightfactor = abswgt / max;
+        wf /= Min(1.0, m_weightfactor);
       }
-      m_weightfactor=dabs(m_evtinfo.m_weight)/max;
-      wf/=Min(1.0,m_weightfactor);
     }
     m_evtinfo.m_weight*=wf;
     if (p_proc->GetSubevtList()) {
@@ -375,7 +382,7 @@ int Matrix_Element_Handler::InitializeProcesses
   double rbtime(ATOOLS::rpa->gen.Timer().RealTime());
   double btime(ATOOLS::rpa->gen.Timer().UserTime());
 #ifdef USING__MPI
-  if (MPI::COMM_WORLD.Get_rank()==0)
+  if (mpi->Rank()==0)
 #endif
   MakeDir(rpa->gen.Variable("SHERPA_CPP_PATH")+"/Process",true);
   My_In_File::OpenDB(rpa->gen.Variable("SHERPA_CPP_PATH")+"/Process/Sherpa/");
@@ -476,7 +483,7 @@ void Matrix_Element_Handler::BuildProcesses()
 	if (cur[0]=="No_Decay")
 	  for (size_t i(1);i<cur.size();++i) {
 	    long int kfc(ToType<long int>(cur[i]));
-	    pi.m_nodecs.push_back(Flavour(abs(kfc),kfc<0));
+	    pi.m_nodecs.push_back(Flavour(std::abs(kfc),kfc<0));
 	  }
 	if (cur[0]=="Order") {
 	  std::string cb(MakeString(cur,1));
@@ -605,6 +612,10 @@ void Matrix_Element_Handler::BuildProcesses()
 	if (cur[0]=="Subdivide_Virtual") {
 	  std::string cb(MakeString(cur,1));
 	  ExtractMPvalues(cb,pbi.m_vnlosubv,nf);
+	}
+	if (cur[0]=="Associated_Contributions") {
+	  std::string cb(MakeString(cur,1));
+	  ExtractMPvalues(cb,pbi.m_vasscontribs,nf);
 	}
 	if (cur[0]=="ME_Generator") {
 	  std::string cb(MakeString(cur,1));
@@ -820,6 +831,8 @@ void Matrix_Element_Handler::BuildSingleProcessList
 	  if (cpi.m_nlomode==0) pi.m_nlomode=cpi.m_nlomode=m_globalnlomode;
 	}
 	if (GetMPvalue(pbi.m_vnlosubv,nfs,pnid,ds)) cpi.m_fi.m_sv=ds;
+	if (GetMPvalue(pbi.m_vasscontribs,nfs,pnid,ds))
+	  cpi.m_fi.m_asscontribs=ToType<asscontrib::type>(ds);
 	if (GetMPvalue(pbi.m_vmegen,nfs,pnid,ds)) cpi.m_megenerator=ds;
 	if (GetMPvalue(pbi.m_vrsmegen,nfs,pnid,ds)) cpi.m_rsmegenerator=ds;
 	else cpi.m_rsmegenerator=cpi.m_megenerator;
