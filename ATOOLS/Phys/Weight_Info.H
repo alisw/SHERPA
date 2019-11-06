@@ -29,15 +29,15 @@ namespace ATOOLS {
   }
 
   struct Weight_Info {
-    double m_weight, m_dxs, m_ntrial;
+    double m_weight, m_dxs, m_enh, m_ntrial;
     PDF_Info m_pdf;
-    Weight_Info(const double &weight=0.0,
-                const double &dxs=0.0,const double &ntrial=0.0,
+    Weight_Info(const double &weight=0.0,const double &dxs=0.0,
+                const double &enh=1.0,const double &ntrial=0.0,
                 const int &fl1=0, const int &fl2=0,
                 const double &x1=0.,const double &x2=0.,
                 const double &xf1=0.0,const double &xf2=0.0,
                 const double &muf12=0.0,const double &muf22=0.0):
-      m_weight(weight), m_dxs(dxs), m_ntrial(ntrial),
+      m_weight(weight), m_dxs(dxs), m_enh(enh), m_ntrial(ntrial),
       m_pdf(PDF_Info(fl1,fl2,x1,x2,muf12,muf22,xf1,xf2)) {}
     Weight_Info &operator*=(const double &c)
     { m_weight*=c; m_dxs*=c; return *this; }
@@ -46,7 +46,8 @@ namespace ATOOLS {
   inline std::ostream & operator<<(std::ostream & s,
                                    const ATOOLS::Weight_Info & wi)
   {
-    return s<<" w = "<<wi.m_weight<<", dxs = "<<wi.m_dxs<<std::endl;
+    return s<<" w = "<<wi.m_weight<<", dxs = "<<wi.m_dxs
+            <<", enh = "<<wi.m_enh<<std::endl;
   }
 
   struct mewgttype {
@@ -172,7 +173,7 @@ namespace ATOOLS {
   public:
     mewgttype::code m_type;
     double m_B, m_VI, m_KP, m_K;
-    std::vector<double> m_wren,m_wfac;
+    std::vector<double> m_wren,m_wfac,m_wass;
     double m_x1, m_x2, m_y1, m_y2, m_mur2, m_muf2;
     int m_fl1, m_fl2;
     size_t m_oqcd, m_oew;
@@ -182,7 +183,7 @@ namespace ATOOLS {
     ME_Weight_Info():
       m_type(mewgttype::none),
       m_B(0.0), m_VI(0.0), m_KP(0.0), m_K(0.0),
-      m_wren(2,0.0), m_wfac(16,0.0),
+      m_wren(2,0.0), m_wfac(16,0.0), m_wass(4,0.0),
       m_x1(1.0), m_x2(1.0), m_y1(1.0), m_y2(1.0),
       m_mur2(0.0), m_muf2(0.0), m_fl1(0), m_fl2(0),
       m_oqcd(0), m_oew(0), m_clusseqinfo() {}

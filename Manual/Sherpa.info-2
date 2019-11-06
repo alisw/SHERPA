@@ -1,13 +1,209 @@
-This is Sherpa.info, produced by makeinfo version 6.4 from Sherpa.texi.
+This is Sherpa.info, produced by makeinfo version 6.6 from Sherpa.texi.
 
 Permission is granted to copy, distribute and/or modify this document
 under the terms of the GNU General Public License.
 
+
+File: Sherpa.info,  Node: LHC_HTTBar,  Prev: LHC_VHJets,  Up: HJets
+
+9.3.5 Associated t anti-t H production at the LHC
+-------------------------------------------------
+
+This set-up illustrates the interface to an external loop matrix element
+generator as well as the possibility of specifying hard decays for
+particles emerging from the hard interaction.  The process generated is
+the production of a Higgs boson in association with a top quark pair
+from two light partons in the initial state.  Each top quark decays into
+an (anti-)bottom quark and a W boson.  The W bosons in turn decay to
+either quarks or leptons.
+
+     (run){
+       # generator parameters
+       EVENTS 0; LGEN:=TTH;
+       ME_SIGNAL_GENERATOR Amegic LGEN;
+       HARD_DECAYS On; HARD_MASS_SMEARING 0;
+       STABLE[6] 0; STABLE[24] 0;
+       WIDTH[25] 0; WIDTH[6] 0; 
+     
+       # physics parameters
+       SCALES VAR{sqr(175+125/2)};
+       PDF_LIBRARY LHAPDFSherpa;
+       PDF_SET MSTW2008nlo90cl;
+       USE_PDF_ALPHAS 1;
+     
+       # collider parameters
+       BEAM_1 2212; BEAM_ENERGY_1 7000;
+       BEAM_2 2212; BEAM_ENERGY_2 7000;  
+     }(run);
+     
+     (processes){
+       Process 93 93 -> 25 6 -6;
+       NLO_QCD_Mode MC@NLO;
+       Loop_Generator LGEN;
+       Order (*,1);
+       End process;
+     }(processes);
+
+Things to notice:
+   * The matrix elements are interfaced from [Rei01] in *note
+     References:: [Rei01a] in *note References:: The shared library
+     necessary for running this setup is built using scons.
+   * The top quarks are stable in the hard matrix elements.  They are
+     decayed using the internal decay module, indicated by the settings
+     'HARD_DECAYS 1' and 'STABLE[6] 0; STABLE[24] 0'.
+   * LHAPDF is used (see *note ISR Parameters::) with the
+     parametrization of the strong coupling taken from LHAPDF itself as
+     indicated by 'USE_PDF_ALPHAS 1' (see *note SM::).
 
 
-File: Sherpa.info,  Node: Tops plus W in MC@NLO,  Prev: Top quark pair production,  Up: TopsJets
+File: Sherpa.info,  Node: TopsJets,  Next: SingleTopChannels,  Prev: HJets,  Up: Examples
 
-9.4.2 Production of a top quark pair in association with a W-boson
+9.4 Top quark (pair) + jets production
+======================================
+
+* Menu:
+
+* Top quark pair production::
+* Top quark pair production including approximate EW corrections::
+* Tops plus W in MC@NLO::
+
+
+File: Sherpa.info,  Node: Top quark pair production,  Next: Top quark pair production including approximate EW corrections,  Up: TopsJets
+
+9.4.1 Top quark pair production
+-------------------------------
+
+     (run){
+       % general setting
+       EVENTS 1M; ERROR 0.99;
+     
+       % scales, tags for scale variations
+       FSF:=1.; RSF:=1.; QSF:=1.;
+       SCALES METS{FSF*MU_F2}{RSF*MU_R2}{QSF*MU_Q2};
+       SCALE_VARIATIONS 0.25,0.25 0.25,1. 1.,0.25 1.,1. 1.,4. 4.,1. 4.,4.;
+       CORE_SCALE QCD;
+       METS_BBAR_MODE 5;
+     
+       % tags for process setup
+       NJET:=3; LJET:=2,3; QCUT:=20.;
+     
+       % me generator settings
+       ME_SIGNAL_GENERATOR Comix Amegic LOOPGEN;
+       EVENT_GENERATION_MODE Weighted;
+       LOOPGEN:=OpenLoops;
+     
+       % collider setup
+       BEAM_1 2212; BEAM_ENERGY_1 13500.;
+       BEAM_2 2212; BEAM_ENERGY_2 13500.;
+     
+       % decays
+       HARD_DECAYS On;
+       HDH_STATUS[24,2,-1]=0
+       HDH_STATUS[24,4,-3]=0
+       HDH_STATUS[-24,-2,1]=0
+       HDH_STATUS[-24,-4,3]=0
+       STABLE[24] 0; STABLE[6] 0; WIDTH[6] 0;
+     
+       NLO_SMEAR_THRESHOLD 1;
+       NLO_SMEAR_POWER 2;
+     }(run)
+     
+     (processes){
+       Process : 93 93 ->  6 -6 93{NJET};
+       Order (*,0); CKKW sqr(QCUT/E_CMS);
+       NLO_QCD_Mode MC@NLO {LJET};
+       ME_Generator Amegic {LJET};
+       RS_ME_Generator Comix {LJET};
+       Loop_Generator LOOPGEN {LJET};
+       Max_N_Quarks 6 {5,6,7,8};
+       Integration_Error 0.05 {5,6,7,8};
+       Scales LOOSE_METS{FSF*MU_F2}{RSF*MU_R2}{QSF*MU_Q2} {5,6,7,8};
+       End process
+     }(processes)
+
+Things to notice:
+   * We use OpenLoops to compute the virtual corrections [Cas11] in
+     *note References::
+   * We match matrix elements and parton showers using the MC@NLO
+     technique for massive particles, as described in [Hoe13] in *note
+     References::
+   * A non-default METS core scale setter is used, cf.  *note METS scale
+     setting with multiparton core processes::
+   * We enable top decays through the internal decay module using
+     'HARD_DECAYS 1'
+   * We calculate on-the-fly a 7-point scale variation, cf.  *note Scale
+     and PDF variations::.
+
+
+File: Sherpa.info,  Node: Top quark pair production including approximate EW corrections,  Next: Tops plus W in MC@NLO,  Prev: Top quark pair production,  Up: TopsJets
+
+9.4.2 Top quark pair production including approximate EW corrections
+--------------------------------------------------------------------
+
+     (run){
+       % general setting
+       EVENTS 1M; ERROR 0.99;
+     
+       % scales, tags for scale variations
+       FSF:=1.; RSF:=1.; QSF:=1.;
+       SCALES METS{FSF*MU_F2}{RSF*MU_R2}{QSF*MU_Q2};
+       SCALE_VARIATIONS 0.25,0.25 0.25,1. 1.,0.25 1.,1. 1.,4. 4.,1. 4.,4.;
+       ASSOCIATED_CONTRIBUTIONS_VARIATIONS EW EW|LO1 EW|LO1|LO2 EW|LO1|LO2|LO3;
+       CORE_SCALE QCD;
+       METS_BBAR_MODE 5;
+     
+       % tags for process setup
+       NJET:=3; LJET:=2,3; QCUT:=20.;
+     
+       % me generator settings
+       ME_SIGNAL_GENERATOR Comix Amegic LOOPGEN;
+       EVENT_GENERATION_MODE Weighted;
+       OL_PARAMETERS preset 2 ew_renorm_scheme 1;
+       LOOPGEN:=OpenLoops;
+     
+       % collider setup
+       BEAM_1 2212; BEAM_ENERGY_1 13500.;
+       BEAM_2 2212; BEAM_ENERGY_2 13500.;
+     
+       % decays
+       HARD_DECAYS On;
+       HDH_STATUS[24,2,-1]=0
+       HDH_STATUS[24,4,-3]=0
+       HDH_STATUS[-24,-2,1]=0
+       HDH_STATUS[-24,-4,3]=0
+       STABLE[24] 0; STABLE[6] 0; WIDTH[6] 0;
+     
+       NLO_SMEAR_THRESHOLD 1;
+       NLO_SMEAR_POWER 2;
+     }(run)
+     
+     (processes){
+       Process : 93 93 ->  6 -6 93{NJET};
+       Order (*,0); CKKW sqr(QCUT/E_CMS);
+       NLO_QCD_Mode MC@NLO {LJET};
+       ME_Generator Amegic {LJET};
+       RS_ME_Generator Comix {LJET};
+       Loop_Generator LOOPGEN {LJET};
+       Associated_Contributions EW|LO1|LO2|LO3 {2};
+       Associated_Contributions EW|LO1|LO2|LO3 {3};
+       Max_N_Quarks 6 {5,6,7,8};
+       Integration_Error 0.05 {5,6,7,8};
+       Scales LOOSE_METS{FSF*MU_F2}{RSF*MU_R2}{QSF*MU_Q2} {5,6,7,8};
+       End process
+     }(processes)
+
+Things to notice:
+   * In addition to the setup in *note Top quark pair production:: we
+     add approximate EW corrections, cf.  [Gut18] in *note References::
+   * Please note: this setup currently only works with a beta version of
+     the upcoming OpenLoops release.
+   * The approximate EW corrections are added as additional variations
+     on the event weight.
+
+
+File: Sherpa.info,  Node: Tops plus W in MC@NLO,  Prev: Top quark pair production including approximate EW corrections,  Up: TopsJets
+
+9.4.3 Production of a top quark pair in association with a W-boson
 ------------------------------------------------------------------
 
      (run){
@@ -61,9 +257,287 @@ Things to notice:
      'HDH_NO_DECAY={24,2,-1}|{24,4,-3}|{24,16,-15}'
 
 
-File: Sherpa.info,  Node: VVJets,  Next: MSSM/UFO,  Prev: TopsJets,  Up: Examples
+File: Sherpa.info,  Node: SingleTopChannels,  Next: VVJets,  Prev: TopsJets,  Up: Examples
 
-9.5 Vector boson pairs + jets production
+9.5 Single-top production in the s, t and tW channel
+====================================================
+
+In this section, examples for single-top production in three different
+channels are described.  For the channel definitions and a validation of
+these setups, see [Both17] in *note References::
+
+* Menu:
+
+* t-channel single-top production::
+* t-channel single-top production with N_f=4::
+* s-channel single-top production::
+* tW-channel single-top production::
+
+
+File: Sherpa.info,  Node: t-channel single-top production,  Next: t-channel single-top production with N_f=4,  Up: SingleTopChannels
+
+9.5.1 t-channel single-top production
+-------------------------------------
+
+     # SHERPA run card for t-channel single top-quark production at MC@NLO
+     # and N_f = 5
+     
+     (run){
+       # general setting
+       EVENTS 1M
+     
+       # me generator settings
+       ME_SIGNAL_GENERATOR Comix Amegic LOOPGEN
+       EVENT_GENERATION_MODE Weighted
+       LOOPGEN:=OpenLoops
+       HARD_DECAYS On
+     
+       # scales, tags for scale variations
+       # SCALES STRICT_METS:
+       #   use CKKW clustering scale for real/MC@NLO emission
+       # CORESCALE SingleTop:
+       #   use Mandelstam \hat{t} for t-channel 2->2 core process
+       SCF:=1.; FSF:=SCF; RSF:=SCF; QSF:=SCF
+       SCALES STRICT_METS{FSF*MU_F2}{RSF*MU_R2}{QSF*MU_Q2}
+       CORE_SCALE SingleTop
+     
+       # collider setup
+       BEAM_1 2212; BEAM_ENERGY_1 4000
+       BEAM_2 2212; BEAM_ENERGY_2 4000
+     
+       # disable hadronic W decays
+       HDH_STATUS[24,2,-1] 0
+       HDH_STATUS[24,4,-3] 0
+       HDH_STATUS[-24,-2,1] 0
+       HDH_STATUS[-24,-4,3] 0
+     
+       # choose EW Gmu input scheme
+       EW_SCHEME 3
+     
+       # required for using top-quark in ME
+       WIDTH[6]  0.
+     }(run)
+     
+     (processes){
+       Process 93 93 -> 6 93
+       NLO_QCD_Mode MC@NLO
+       Order (*,2)
+       ME_Generator Amegic
+       RS_ME_Generator Comix
+       Loop_Generator LOOPGEN
+       Min_N_TChannels 1  # require t-channel W
+       End process
+     }(processes)
+
+Things to notice:
+   * We use OpenLoops to compute the virtual corrections [Cas11] in
+     *note References::
+   * We match matrix elements and parton showers using the MC@NLO
+     technique for massive particles, as described in [Hoe13] in *note
+     References::
+   * A non-default METS core scale setter is used, cf.  *note METS scale
+     setting with multiparton core processes::
+   * We enable top and W decays through the internal decay module using
+     'HARD_DECAYS On'.  The W is restricted to its leptonic decay
+     channels.
+   * By setting 'Min_N_TChannels 1', only t-channel diagrams are used
+     for the calculation
+
+
+File: Sherpa.info,  Node: t-channel single-top production with N_f=4,  Next: s-channel single-top production,  Prev: t-channel single-top production,  Up: SingleTopChannels
+
+9.5.2 t-channel single-top production with N_f=4
+------------------------------------------------
+
+     # SHERPA run card for t-channel single top-quark production at MC@NLO
+     # and N_f = 4
+     
+     (run){
+       # general setting
+       EVENTS 1M
+     
+       # me generator settings
+       ME_SIGNAL_GENERATOR Comix Amegic LOOPGEN
+       EVENT_GENERATION_MODE Weighted
+       LOOPGEN:=OpenLoops
+       HARD_DECAYS On
+     
+       # scales, tags for scale variations
+       #   muR = transverse momentum of the bottom
+       #   muF = muQ = transverse momentum of the top
+       SCF:=1.; FSF:=SCF; RSF:=SCF; QSF:=SCF
+       rscl2:=MPerp2(p[3])
+       fscl2:=MPerp2(p[2])
+       SCALES VAR{FSF*fscl2}{RSF*rscl2}{QSF*fscl2}
+     
+       # collider setup
+       BEAM_1 2212; BEAM_ENERGY_1 4000
+       BEAM_2 2212; BEAM_ENERGY_2 4000
+     
+       # disable hadronic W decays
+       HDH_STATUS[24,2,-1] 0
+       HDH_STATUS[24,4,-3] 0
+       HDH_STATUS[-24,-2,1] 0
+       HDH_STATUS[-24,-4,3] 0
+     
+       # choose EW Gmu input scheme
+       EW_SCHEME 3
+     
+       # required for using top-quark in ME
+       WIDTH[6]  0.
+     
+       # configure for N_f = 4
+       PDF_LIBRARY LHAPDFSherpa
+       PDF_SET NNPDF30_nlo_as_0118_nf_4
+       USE_PDF_ALPHAS 1
+       MASS[5] 4.18  # as in NNPDF30_nlo_as_0118_nf_4
+       MASSIVE[5] 1
+     }(run)
+     
+     (processes){
+       Process 93 93 -> 6 -5 93
+       NLO_QCD_Mode MC@NLO
+       Order (*,2)
+       ME_Generator Amegic
+       RS_ME_Generator Comix
+       Loop_Generator LOOPGEN
+       Min_N_TChannels 1  # require t-channel W
+       End process
+     }(processes)
+
+Things to notice:
+   * We use an Nf4 PDF and use its definition of the bottom mass
+   * See *note t-channel single-top production:: for more comments
+
+
+File: Sherpa.info,  Node: s-channel single-top production,  Next: tW-channel single-top production,  Prev: t-channel single-top production with N_f=4,  Up: SingleTopChannels
+
+9.5.3 s-channel single-top production
+-------------------------------------
+
+     # SHERPA run card for s-channel single top-quark production at MC@NLO
+     # and N_f = 5
+     
+     (run){
+       # general setting
+       EVENTS 1M
+     
+       # me generator settings
+       ME_SIGNAL_GENERATOR Comix Amegic LOOPGEN
+       EVENT_GENERATION_MODE Weighted
+       LOOPGEN:=OpenLoops
+       HARD_DECAYS On
+     
+       # scales, tags for scale variations
+       # SCALES STRICT_METS:
+       #   use CKKW clustering scale for real/MC@NLO emission
+       # CORESCALE SingleTop:
+       #   use Mandelstam \hat{s} for s-channel 2->2 core process
+       SCF:=1.; FSF:=SCF; RSF:=SCF; QSF:=SCF
+       SCALES STRICT_METS{FSF*MU_F2}{RSF*MU_R2}{QSF*MU_Q2}
+       CORE_SCALE SingleTop
+     
+       # collider setup
+       BEAM_1 2212; BEAM_ENERGY_1 4000
+       BEAM_2 2212; BEAM_ENERGY_2 4000
+     
+       # disable hadronic W decays
+       HDH_STATUS[24,2,-1] 0
+       HDH_STATUS[24,4,-3] 0
+       HDH_STATUS[-24,-2,1] 0
+       HDH_STATUS[-24,-4,3] 0
+     
+       # choose EW Gmu input scheme
+       EW_SCHEME 3
+     
+       # required for using top-quark in ME
+       WIDTH[6]  0.
+     
+       # there is no bottom in the initial-state in s-channel production
+       PARTICLE_CONTAINER 900 lj 1 -1 2 -2 3 -3 4 -4 21
+     }(run)
+     
+     (processes){
+       Process 900 900 -> 6 93
+       NLO_QCD_Mode MC@NLO
+       Order (*,2)
+       ME_Generator Amegic
+       RS_ME_Generator Comix
+       Loop_Generator LOOPGEN
+       Max_N_TChannels 0  # require s-channel W
+       End process
+     }(processes)
+
+Things to notice:
+   * By excluding the bottom quark from the initial-state at Born level
+     using 'PARTICLE_CONTAINER', and by setting 'Max_N_TChannels 0',
+     only s-channel diagrams are used for the calculation
+   * See *note t-channel single-top production:: for more comments
+
+
+File: Sherpa.info,  Node: tW-channel single-top production,  Prev: s-channel single-top production,  Up: SingleTopChannels
+
+9.5.4 tW-channel single-top production
+--------------------------------------
+
+     # SHERPA run card for tW-channel single top-quark production at MC@NLO
+     # and N_f = 5
+     
+     (run){
+       # general setting
+       EVENTS 1M
+     
+       # me generator settings
+       ME_SIGNAL_GENERATOR Comix Amegic LOOPGEN
+       EVENT_GENERATION_MODE Weighted
+       LOOPGEN:=OpenLoops
+       HARD_DECAYS On
+     
+       # scales, tags for scale variations
+       #   mu = transverse momentum of the top
+       SCF:=1.; FSF:=SCF; RSF:=SCF; QSF:=SCF;
+       scl2:=MPerp2(p[3]);
+       SCALES VAR{FSF*scl2}{RSF*scl2}{QSF*scl2};
+     
+       # collider setup
+       BEAM_1 2212; BEAM_ENERGY_1 4000
+       BEAM_2 2212; BEAM_ENERGY_2 4000
+     
+       # disable hadronic W decays
+       HDH_STATUS[24,2,-1] 0
+       HDH_STATUS[24,4,-3] 0
+       HDH_STATUS[-24,-2,1] 0
+       HDH_STATUS[-24,-4,3] 0
+     
+       # choose EW Gmu input scheme
+       EW_SCHEME 3
+     
+       # required for using top-quark/W-boson in ME
+       WIDTH[6]   0.
+       WIDTH[24]  0.
+     }(run)
+     
+     (processes){
+       Process 93 93 -> 6 -24
+       No_Decay -6  # remove ttbar diagrams
+       NLO_QCD_Mode MC@NLO
+       Order (*,1)
+       ME_Generator Amegic
+       RS_ME_Generator Comix
+       Loop_Generator LOOPGEN
+       End process
+     }(processes)
+
+Things to notice:
+   * By setting 'No_Decay -6', the doubly-resonant TTbar diagrams are
+     removed.  Only the singly-resonant diagrams remain as required by
+     the definition of the channel.
+   * See *note t-channel single-top production:: for more comments
+
+
+File: Sherpa.info,  Node: VVJets,  Next: MSSM/UFO,  Prev: SingleTopChannels,  Up: Examples
+
+9.6 Vector boson pairs + jets production
 ========================================
 
 * Menu:
@@ -78,7 +552,7 @@ File: Sherpa.info,  Node: VVJets,  Next: MSSM/UFO,  Prev: TopsJets,  Up: Example
 
 File: Sherpa.info,  Node: Dilepton missing energy and jets production,  Next: Dilepton missing energy and jets production (gluon initiated),  Up: VVJets
 
-9.5.1 Dilepton, missing energy and jets production
+9.6.1 Dilepton, missing energy and jets production
 --------------------------------------------------
 
      (run){
@@ -132,7 +606,7 @@ Things to notice:
 
 File: Sherpa.info,  Node: Dilepton missing energy and jets production (gluon initiated),  Next: Four lepton and jets production,  Prev: Dilepton missing energy and jets production,  Up: VVJets
 
-9.5.2 Dilepton, missing energy and jets production (gluon initiated)
+9.6.2 Dilepton, missing energy and jets production (gluon initiated)
 --------------------------------------------------------------------
 
      (run){
@@ -188,7 +662,7 @@ Things to notice:
 
 File: Sherpa.info,  Node: Four lepton and jets production,  Next: Four lepton and jets production (gluon initiated),  Prev: Dilepton missing energy and jets production (gluon initiated),  Up: VVJets
 
-9.5.3 Four lepton and jets production
+9.6.3 Four lepton and jets production
 -------------------------------------
 
      (run){
@@ -237,7 +711,7 @@ Things to notice:
 
 File: Sherpa.info,  Node: Four lepton and jets production (gluon initiated),  Next: WZ production with jets production,  Prev: Four lepton and jets production,  Up: VVJets
 
-9.5.4 Four lepton and jets production (gluon initiated)
+9.6.4 Four lepton and jets production (gluon initiated)
 -------------------------------------------------------
 
      (run){
@@ -293,7 +767,7 @@ Things to notice:
 
 File: Sherpa.info,  Node: WZ production with jets production,  Next: Same sign dilepton missing energy and jets production,  Prev: Four lepton and jets production (gluon initiated),  Up: VVJets
 
-9.5.5 WZ production with jets production
+9.6.5 WZ production with jets production
 ----------------------------------------
 
      (run){
@@ -355,7 +829,7 @@ Things to notice:
 
 File: Sherpa.info,  Node: Same sign dilepton missing energy and jets production,  Prev: WZ production with jets production,  Up: VVJets
 
-9.5.6 Same sign dilepton, missing energy and jets production
+9.6.6 Same sign dilepton, missing energy and jets production
 ------------------------------------------------------------
 
      (run){
@@ -459,7 +933,7 @@ Things to notice:
 
 File: Sherpa.info,  Node: MSSM/UFO,  Next: DIS,  Prev: VVJets,  Up: Examples
 
-9.6 Event generation in the MSSM using UFO
+9.7 Event generation in the MSSM using UFO
 ==========================================
 
 This is an example for event generation in the MSSM using Sherpa's UFO
@@ -477,7 +951,7 @@ run card as a template to generate events.
 
 File: Sherpa.info,  Node: DIS,  Next: FONLO,  Prev: MSSM/UFO,  Up: Examples
 
-9.7 Deep-inelastic scattering
+9.8 Deep-inelastic scattering
 =============================
 
 * Menu:
@@ -487,7 +961,7 @@ File: Sherpa.info,  Node: DIS,  Next: FONLO,  Prev: MSSM/UFO,  Up: Examples
 
 File: Sherpa.info,  Node: HERA,  Up: DIS
 
-9.7.1 DIS at HERA
+9.8.1 DIS at HERA
 -----------------
 
 This is an example of a setup for hadronic final states in
@@ -545,7 +1019,7 @@ Things to notice:
 
 File: Sherpa.info,  Node: FONLO,  Next: SoftQCD,  Prev: DIS,  Up: Examples
 
-9.8 Fixed-order next-to-leading order calculations
+9.9 Fixed-order next-to-leading order calculations
 ==================================================
 
 * Menu:
@@ -555,7 +1029,7 @@ File: Sherpa.info,  Node: FONLO,  Next: SoftQCD,  Prev: DIS,  Up: Examples
 
 File: Sherpa.info,  Node: NTuple production,  Up: FONLO
 
-9.8.1 Production of NTuples
+9.9.1 Production of NTuples
 ---------------------------
 
 Root NTuples are a convenient way to store the result of cumbersome
@@ -647,7 +1121,7 @@ Things to notice:
    * The option 'USE_HEPMC_SHORT 1' is used in the Rivet analysis
      section as the events produced by Sherpa are not at particle level.
 
-9.8.1.1 NTuple production
+9.9.1.1 NTuple production
 .........................
 
 Start Sherpa using the command line
@@ -674,7 +1148,7 @@ The two analyses of events with Born-like and real-emission-like
 kinematics need to be merged, which can be achieved using scripts like
 'aidaadd'.  The result can then be plotted and displayed.
 
-9.8.1.2 Usage of NTuples in Sherpa
+9.9.1.2 Usage of NTuples in Sherpa
 ..................................
 
 Next we will compute the NLO uncertainty band using Sherpa.  To this
@@ -694,8 +1168,8 @@ The two contributions can again be combined using 'aidaadd'.
 
 File: Sherpa.info,  Node: SoftQCD,  Next: BFactories,  Prev: FONLO,  Up: Examples
 
-9.9 Soft QCD: Minimum Bias and Cross Sections
-=============================================
+9.10 Soft QCD: Minimum Bias and Cross Sections
+==============================================
 
 * Menu:
 
@@ -705,8 +1179,8 @@ File: Sherpa.info,  Node: SoftQCD,  Next: BFactories,  Prev: FONLO,  Up: Example
 
 File: Sherpa.info,  Node: Calculation of inclusive cross sections,  Next: Simulation of Minimum Bias events,  Up: SoftQCD
 
-9.9.1 Calculation of inclusive cross sections
----------------------------------------------
+9.10.1 Calculation of inclusive cross sections
+----------------------------------------------
 
      (run){
        OUTPUT              = 2
@@ -747,8 +1221,8 @@ Things to notice:
 
 File: Sherpa.info,  Node: Simulation of Minimum Bias events,  Prev: Calculation of inclusive cross sections,  Up: SoftQCD
 
-9.9.2 Simulation of Minimum Bias events
----------------------------------------
+9.10.2 Simulation of Minimum Bias events
+----------------------------------------
 
      (run){
        EVENTS              = 50k
@@ -815,7 +1289,7 @@ Things to notice:
 
 File: Sherpa.info,  Node: BFactories,  Next: MEvalues,  Prev: SoftQCD,  Up: Examples
 
-9.10 Setups for event production at B-factories
+9.11 Setups for event production at B-factories
 ===============================================
 
 * Menu:
@@ -827,7 +1301,7 @@ File: Sherpa.info,  Node: BFactories,  Next: MEvalues,  Prev: SoftQCD,  Up: Exam
 
 File: Sherpa.info,  Node: QCD continuum,  Next: Signal process,  Up: BFactories
 
-9.10.1 QCD continuum
+9.11.1 QCD continuum
 --------------------
 
 Example setup for QCD continuum production at the Belle/KEK collider.
@@ -867,7 +1341,7 @@ Things to notice:
 
 File: Sherpa.info,  Node: Signal process,  Next: Single hadron decay chains,  Prev: QCD continuum,  Up: BFactories
 
-9.10.2 Signal process
+9.11.2 Signal process
 ---------------------
 
 Example setup for B-hadron pair production on the Y(4S) pole.
@@ -910,7 +1384,7 @@ Things to notice:
 
 File: Sherpa.info,  Node: Single hadron decay chains,  Prev: Signal process,  Up: BFactories
 
-9.10.3 Single hadron decay chains
+9.11.3 Single hadron decay chains
 ---------------------------------
 
 This setup is not a collider setup, but a simulation of a hadronic decay
@@ -954,7 +1428,7 @@ Things to notice:
 
 File: Sherpa.info,  Node: MEvalues,  Next: APIexamples,  Prev: BFactories,  Up: Examples
 
-9.11 Calculating matrix element values for externally given configurations
+9.12 Calculating matrix element values for externally given configurations
 ==========================================================================
 
 * Menu:
@@ -965,7 +1439,7 @@ File: Sherpa.info,  Node: MEvalues,  Next: APIexamples,  Prev: BFactories,  Up: 
 
 File: Sherpa.info,  Node: Matrix Element values through Python interface,  Next: Matrix Element values through C++ interface,  Up: MEvalues
 
-9.11.1 Computing matrix elements for idividual phase space points using the Python Interface
+9.12.1 Computing matrix elements for idividual phase space points using the Python Interface
 --------------------------------------------------------------------------------------------
 
 Sherpa's Python interface (see *note Python Interface::) can be used to
@@ -1032,7 +1506,7 @@ again in order to obtain the matrix element.
 
 File: Sherpa.info,  Node: Matrix Element values through C++ interface,  Prev: Matrix Element values through Python interface,  Up: MEvalues
 
-9.11.2 Computing matrix elements for idividual phase space points using the C++ Interface
+9.12.2 Computing matrix elements for idividual phase space points using the C++ Interface
 -----------------------------------------------------------------------------------------
 
 Matrix elements values for user defined phase space points can also be
@@ -1129,7 +1603,7 @@ through 'MOMENTA_DATA_FILE=<file>'.
 
 File: Sherpa.info,  Node: APIexamples,  Prev: MEvalues,  Up: Examples
 
-9.12 Using the Python interface
+9.13 Using the Python interface
 ===============================
 
 * Menu:
@@ -1140,7 +1614,7 @@ File: Sherpa.info,  Node: APIexamples,  Prev: MEvalues,  Up: Examples
 
 File: Sherpa.info,  Node: Events,  Next: MPIEvents,  Up: APIexamples
 
-9.12.1 Generate events using scripts
+9.13.1 Generate events using scripts
 ------------------------------------
 
 This example shows how to generate events with Sherpa using a Python
@@ -1195,7 +1669,7 @@ basis for constructing interfaces to own analysis routines.
 
 File: Sherpa.info,  Node: MPIEvents,  Prev: Events,  Up: APIexamples
 
-9.12.2 Generate events with MPI using scripts
+9.13.2 Generate events with MPI using scripts
 ---------------------------------------------
 
 This example shows how to generate events with Sherpa using a Python
@@ -1665,6 +2139,13 @@ Appendix A References
      Coupling: Boosted vs Off-Shell Production_, JHEP 1502 (2015) 038
      [hep-ph/1410.5806].
 
+     [Both17] E. Bothmann and M. Schonherr and F. Krauss, _Single
+     top-quark production with Sherpa_, [arXiv:1711.02568] .
+
+     [Gut18] C. Gutschow and J. M. Lindert and M. Schonherr, _Multi-jet
+     merged top-pair production including electroweak corrections_, Eur.
+     Phys.  J. C78 (2018) 317 [arXiv:1803.00950].
+
 
 File: Sherpa.info,  Node: Index,  Prev: References,  Up: Top
 
@@ -1714,6 +2195,7 @@ Appendix B Index
                                                               (line   6)
 * COUPLINGS:                             COUPLINGS.           (line   6)
 * COUPLING_SCHEME:                       COUPLING_SCHEME.     (line   6)
+* CSS_ALPHAS_FREEZE_MODE:                CS Shower options.   (line   6)
 * CSS_EVOLUTION_SCHEME:                  CS Shower options.   (line   6)
 * CSS_EW_MODE:                           CS Shower options.   (line   6)
 * CSS_FS_AS_FAC:                         CS Shower options.   (line   6)

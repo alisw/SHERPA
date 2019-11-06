@@ -167,6 +167,15 @@
 /* HepMC::Units available */
 #undef USING__HEPMC2__UNITS
 
+/* Using HEPMC3 */
+#undef USING__HEPMC3
+
+/* WriterRoot.h available */
+#undef USING__HEPMC3__WRITERROOT
+
+/* WriterRootTree.h available */
+#undef USING__HEPMC3__WRITERROOTTREE
+
 /* hztool found */
 #undef USING__HZTOOL
 
@@ -185,14 +194,11 @@
 /* Pythia interface enabled */
 #undef USING__PYTHIA
 
-/* using Rivet */
-#undef USING__RIVET
+/* using Rivet2 */
+#undef USING__RIVET2
 
-/* setSumOfWeights function available in Rivet */
-#undef USING__RIVET__SETSOW
-
-/* Rivet uses YODA as its histogramming backend */
-#undef USING__RIVET__YODA
+/* using Rivet3 */
+#undef USING__RIVET3
 
 /* using ROOT */
 #undef USING__ROOT

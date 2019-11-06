@@ -1,11 +1,11 @@
 
 pkglib_LTLIBRARIES    =	libPhasicSelectors.la
 
-SVNTAG = PHASIC++/Selectors
-include ../../svn.make
+GITTAG = PHASIC++/Selectors
+include ../../git.make
 
 libPhasicSelectors_la_SOURCES =	\
-				SVN_Info.C \
+				Git_Info.C \
 				Cut_Data.C \
 				Selector.C \
 				Variable_Selector.C \
@@ -16,6 +16,7 @@ libPhasicSelectors_la_SOURCES =	\
 				NJet_Finder.C \
 				Cone_Finder.C \
 				Standard_Selector.C \
+				DIS_Selector.C \
 				Decay_Selector.C \
 				Decay2_Selector.C \
 				NLO_Selector.C \

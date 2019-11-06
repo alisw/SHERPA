@@ -56,6 +56,7 @@ Particle_Info::Particle_Info
  const int icharge,const int spin,const bool on,
  const int stable,const std::string &idname,const std::string &texname):
   m_kfc(kfc), m_mass(mass), m_hmass(mass), m_yuk(-1.0), m_width(width),
+  m_dg(0.0), m_dm(0.0), m_qoverp2(1.0),
   m_icharge(icharge), m_strong(0), m_resummed(0), m_priority(0), 
   m_spin(spin), m_stable(stable), m_masssign(1), m_dummy(0), m_majorana(0), 
   m_formfactor(0), m_on(on), m_massive(1), m_hadron(1), m_isgroup(0), 
@@ -69,7 +70,8 @@ Particle_Info::Particle_Info
 Particle_Info::Particle_Info
 (const kf_code &kfc,const double &mass, const int icharge, const int spin,
  const int formfactor, const std::string &idname, const std::string &antiname):
-  m_kfc(kfc), m_mass(mass), m_hmass(mass), m_yuk(-1.0), m_width(0), 
+  m_kfc(kfc), m_mass(mass), m_hmass(mass), m_yuk(-1.0), m_width(0),
+  m_dg(0.0), m_dm(0.0), m_qoverp2(1.0),
   m_icharge(icharge), m_strong(0), m_resummed(0), m_priority(0), m_spin(0), 
   m_stable(1), m_masssign(1), m_dummy(0), m_majorana(0), 
   m_formfactor(formfactor), m_on(1), m_massive(1), m_hadron(1), m_isgroup(0), 
@@ -298,8 +300,8 @@ std::string Flavour::IDName() const
 
 bool Flavour::IsDiQuark() const 
 {
-  if(abs(Kfcode())>=1103&&abs(Kfcode())<=5505) {
-    double help=abs(Kfcode())/100.0-int(abs(Kfcode())/100.0); 
+  if(Kfcode() >= 1103 && Kfcode() <= 5505) {
+    double help = Kfcode()/100.0 - int(Kfcode()/100.0); 
     if(help<0.031) return true;
   }
   return false;
@@ -307,27 +309,27 @@ bool Flavour::IsDiQuark() const
 
 bool Flavour::IsBaryon() const 
 {
-  if (abs(Kfcode())%10000<1000) return false;
+  if (Kfcode() % 10000 < 1000) return false;
   return !IsDiQuark();
 }
 
 bool Flavour::IsB_Hadron() const 
 {
-  if (abs(Kfcode())<100)                            return 0;
-  if (Kfcode()-100*int(Kfcode()/100)<10)                 return 0;
-  if (abs((Kfcode()-100*int(Kfcode()/100))/10)==5)       return 1;
-  if (abs((Kfcode()-1000*int(Kfcode()/1000))/100)==5)    return 1;
-  if (abs((Kfcode()-10000*int(Kfcode()/10000))/1000)==5) return 1;
+  if (Kfcode() < 100)                               return 0;
+  if (Kfcode()-100*int(Kfcode()/100)<10)            return 0;
+  if ((Kfcode()-100*int(Kfcode()/100))/10==5)       return 1;
+  if ((Kfcode()-1000*int(Kfcode()/1000))/100==5)    return 1;
+  if ((Kfcode()-10000*int(Kfcode()/10000))/1000==5) return 1;
   return 0;
 }
 
 bool Flavour::IsC_Hadron() const 
 {
-  if (abs(Kfcode())<100)                            return 0;
-  if (Kfcode()-100*int(Kfcode()/100)<10)                 return 0;
-  if (abs((Kfcode()-100*int(Kfcode()/100))/10)==4)       return 1;
-  if (abs((Kfcode()-1000*int(Kfcode()/1000))/100)==4)    return 1;
-  if (abs((Kfcode()-10000*int(Kfcode()/10000))/1000)==4) return 1;
+  if (Kfcode() < 100)                               return 0;
+  if (Kfcode()-100*int(Kfcode()/100)<10)            return 0;
+  if ((Kfcode()-100*int(Kfcode()/100))/10==4)       return 1;
+  if ((Kfcode()-1000*int(Kfcode()/1000))/100==4)    return 1;
+  if ((Kfcode()-10000*int(Kfcode()/10000))/1000==4) return 1;
   return 0;
 }
 

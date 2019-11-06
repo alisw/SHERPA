@@ -1,6 +1,3 @@
-#ifndef ATOOLS_Phys_Standard_Selector_H
-#define ATOOLS_Phys_Standard_Selector_H
-
 #include "PHASIC++/Selectors/Selector.H"
 #include "ATOOLS/Org/Data_Reader.H"
 
@@ -111,8 +108,6 @@ namespace PHASIC {
   };
 }
 
-#endif
-
 #include "PHASIC++/Process/Process_Base.H"
 #include "PHASIC++/Main/Process_Integrator.H"
 #include "ATOOLS/Org/Run_Parameter.H"
@@ -186,7 +181,7 @@ bool PTNLO_Selector::JetTrigger(const Vec4D_Vector &mom,ATOOLS::NLO_subevtlist *
 
 bool PTNLO_Selector::NoJetTrigger(const Vec4D_Vector & mom)
 {
-  return 1;
+  return Trigger(mom);
 }
 
 
@@ -213,7 +208,7 @@ void PTNLO_Selector::SetRange(std::vector<Flavour> crit,double _min,
       used=1;
       if (m_fl[i].Strong()) m_strong = 1;
       MaxPTmin=_min;
-      break;
+      //break;
     }
   }
   if (!used) {
@@ -307,7 +302,7 @@ bool RapidityNLO_Selector::JetTrigger(const Vec4D_Vector &mom,ATOOLS::NLO_subevt
 
 bool RapidityNLO_Selector::NoJetTrigger(const Vec4D_Vector & mom)
 {
-  return 1;
+  return Trigger(mom);
 }
 
 
@@ -336,7 +331,7 @@ void RapidityNLO_Selector::SetRange(std::vector<Flavour> crit,double _min,
     if (crit[0].Includes(m_fl[i])) {
       used=1;
       if (m_fl[i].Strong()) m_strong = 1;
-      break;
+      //break;
     }
   }
   if (!used) {
@@ -429,7 +424,7 @@ bool PseudoRapidityNLO_Selector::JetTrigger(const Vec4D_Vector &mom,ATOOLS::NLO_
 
 bool PseudoRapidityNLO_Selector::NoJetTrigger(const Vec4D_Vector & mom)
 {
-  return 1;
+  return Trigger(mom);
 }
 
 
@@ -458,7 +453,7 @@ void PseudoRapidityNLO_Selector::SetRange(std::vector<Flavour> crit,double _min,
     if (crit[0].Includes(m_fl[i])) {
       used=1;
       if (m_fl[i].Strong()) m_strong = 1;
-      break;
+      //break;
     }
   }
   if (!used) {
@@ -552,7 +547,7 @@ bool PT2NLO_Selector::JetTrigger(const Vec4D_Vector &mom,ATOOLS::NLO_subevtlist 
 
 bool PT2NLO_Selector::NoJetTrigger(const Vec4D_Vector &mom)
 {
-  return 1;
+  return Trigger(mom);
 }
 
 
@@ -564,7 +559,7 @@ void PT2NLO_Selector::SetRange(std::vector<Flavour> crit,double _min,
 			       double _max)
 {
   if (crit.size() != 2) {
-    msg_Error()<<"Wrong number of arguments in PTNLO_Selector::SetRange : "
+    msg_Error()<<"Wrong number of arguments in PT2NLO_Selector::SetRange : "
 	       <<crit.size()<<endl;
     return;
   }
@@ -581,7 +576,7 @@ void PT2NLO_Selector::SetRange(std::vector<Flavour> crit,double _min,
 	   ((crit[0].Includes(m_fl[j])) && (crit[1].Includes(m_fl[i])) ) ) {
 	used=1;
 	MaxPTmin = _min;
-	break;
+	//break;
       }
     }
   }
@@ -683,13 +678,13 @@ bool MT2NLO_Selector::JetTrigger(const Vec4D_Vector &mom,ATOOLS::NLO_subevtlist 
     }
     return 1;
   }
-  msg_Error()<<"PTNLO_Selector::JetTrigger: IR unsave cut"<<std::endl;
+  msg_Error()<<"MT2NLO_Selector::JetTrigger: IR unsave cut"<<std::endl;
   return 0;
 }
 
 bool MT2NLO_Selector::NoJetTrigger(const Vec4D_Vector &mom)
 {
-  return 1;
+  return Trigger(mom);
 }
 
 
@@ -701,7 +696,7 @@ void MT2NLO_Selector::SetRange(std::vector<Flavour> crit,double _min,
 			       double _max)
 {
   if (crit.size() != 2) {
-    msg_Error()<<"Wrong number of arguments in PTNLO_Selector::SetRange : "
+    msg_Error()<<"Wrong number of arguments in MT2NLO_Selector::SetRange : "
 	       <<crit.size()<<endl;
     return;
   }
@@ -719,7 +714,7 @@ void MT2NLO_Selector::SetRange(std::vector<Flavour> crit,double _min,
 	used=1;
 	MaxPTmin = _min;
 	if (m_fl[i].Strong()||m_fl[j].Strong()) m_strong = 1;
-	break;
+	//break;
       }
     }
   }
@@ -978,7 +973,9 @@ bool DeltaRNLO_Selector::Trigger(const Vec4D_Vector & mom)
 	     ((flav1[k].Includes(m_fl[j])) && (flav2[k].Includes(m_fl[i])) ) ) {
 	  drij = mom[i].DR(mom[j]);
 	  if (m_sel_log->Hit( ((drij<drmin[i][j]) ||
-                               (drij>drmax[i][j])) )) return 0;
+                               (drij>drmax[i][j])) )) {
+	    return 0;
+	  }
 	}
       }
     }
@@ -1006,13 +1003,13 @@ bool DeltaRNLO_Selector::JetTrigger(const Vec4D_Vector &mom,ATOOLS::NLO_subevtli
     }
     return 1;
   }
-  msg_Error()<<"PTNLO_Selector::JetTrigger: IR unsave cut"<<std::endl;
+  msg_Error()<<"DeltaRNLO_Selector::JetTrigger: IR unsave cut"<<std::endl;
   return 0;
 }
 
 bool DeltaRNLO_Selector::NoJetTrigger(const Vec4D_Vector &mom)
 {
-  return 1;
+  return Trigger(mom);
 }
 
 
@@ -1041,7 +1038,7 @@ void DeltaRNLO_Selector::SetRange(std::vector<Flavour> crit,double _min,
 	drmin[i][j] = drmin[j][i] = _min;
 	drmax[i][j] = drmax[j][i] = _max;
 	if (m_fl[i].Strong()||m_fl[j].Strong()) m_strong = 1;
-	break;
+	//break;
       }
     }
   }

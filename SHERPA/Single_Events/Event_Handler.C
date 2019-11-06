@@ -1,20 +1,23 @@
 #include "SHERPA/Single_Events/Event_Handler.H"
+#include "SHERPA/Main/Filter.H"
 #include "ATOOLS/Org/CXXFLAGS.H"
 #include "ATOOLS/Org/Message.H"
 #include "ATOOLS/Org/Run_Parameter.H"
 #include "ATOOLS/Org/My_Limits.H"
 #include "ATOOLS/Org/MyStrStream.H"
 #include "ATOOLS/Org/My_MPI.H"
+#include "ATOOLS/Math/Random.H"
+#include "ATOOLS/Org/Data_Reader.H"
+#include "ATOOLS/Org/RUsage.H"
 #include "SHERPA/Single_Events/Signal_Processes.H"
 #ifdef USING__PYTHIA
 #include "SHERPA/LundTools/Lund_Interface.H"
 #endif
-#include <unistd.h>
-#include <cassert>
 
-#include "ATOOLS/Math/Random.H"
-#include "ATOOLS/Org/Data_Reader.H"
-#include "ATOOLS/Org/RUsage.H"
+#include <signal.h>
+#include <unistd.h>
+
+#include <cassert>
 
 
 using namespace SHERPA;
@@ -26,7 +29,7 @@ Event_Handler::Event_Handler():
   m_lastparticlecounter(0), m_lastblobcounter(0), 
   m_n(0), m_addn(0), m_sum(0.0), m_sumsqr(0.0), m_maxweight(0.0),
   m_mn(0), m_msum(0.0), m_msumsqr(0.0),
-  p_variations(NULL)
+  p_filter(NULL), p_variations(NULL)
 {
   p_phases  = new Phase_List;
   Data_Reader reader(" ",";","!","=");
@@ -141,8 +144,7 @@ void Event_Handler::InitialiseSeedBlob(ATOOLS::btp::code type,
 }
 
 bool Event_Handler::AnalyseEvent(double & weight) {
-  double trials((*p_signal)["Trials"]->Get<double>());
-  double cxs((*p_signal)["Weight"]->Get<double>());
+  double trials(1.0), cxs(1.0);
   for (Phase_Iterator pit=p_phases->begin();pit!=p_phases->end();++pit) {
     if ((*pit)->Type()==eph::Analysis) {
       switch ((*pit)->Treat(&m_blobs,weight)) {
@@ -156,6 +158,8 @@ bool Event_Handler::AnalyseEvent(double & weight) {
         Return_Value::IncError((*pit)->Name());
         return false;
       case Return_Value::New_Event :
+        trials=(*p_signal)["Trials"]->Get<double>();
+        cxs=(*p_signal)["Weight"]->Get<double>();
         m_n      -= trials;
         m_addn    = trials;
         m_sum    -= cxs;
@@ -178,16 +182,29 @@ bool Event_Handler::AnalyseEvent(double & weight) {
 int Event_Handler::IterateEventPhases(eventtype::code & mode,double & weight) {
   Phase_Iterator pit=p_phases->begin();
   int retry = 0;
-  bool hardps = true;
+  bool hardps = true, filter = p_filter!=NULL;
   do {
-    if ((*pit)->Type()==eph::Analysis) {
+    if ((*pit)->Type()==eph::Analysis || (*pit)->Type()==eph::Userhook) {
       ++pit;
       continue;
     }
-
+    if ((*pit)->Type()==eph::Hadronization && filter) {
+      msg_Debugging()<<"Filter kicks in now: "<<m_blobs.back()->Type()<<".\n";
+      if ((*p_filter)(&m_blobs)) {
+	msg_Debugging()<<METHOD<<": filters accepts event.\n";
+	filter = false;
+      }
+      else {
+	msg_Debugging()<<METHOD<<": filter rejects event.\n";
+	Return_Value::IncNewEvent("Filter");
+	if (p_signal) m_addn+=(*p_signal)["Trials"]->Get<double>();
+	Reset();
+	return 2;
+      }
+    }
     Return_Value::code rv((*pit)->Treat(&m_blobs,weight));
     if (rv!=Return_Value::Nothing)
-      msg_Tracking()<<METHOD<<"(): run '"<<(*pit)->Name()<<"' -> "
+      msg_Tracking()<<METHOD<<"(): ran '"<<(*pit)->Name()<<"' -> "
 		    <<rv<<std::endl;
     switch (rv) {
     case Return_Value::Success : 
@@ -204,11 +221,11 @@ int Event_Handler::IterateEventPhases(eventtype::code & mode,double & weight) {
     case Return_Value::Nothing :
       ++pit;
       break;
-    case Return_Value::Retry_Phase : 
+    case Return_Value::Retry_Phase :
       Return_Value::IncCall((*pit)->Name());
       Return_Value::IncRetryPhase((*pit)->Name());
       break;
-    case Return_Value::Retry_Event : 
+    case Return_Value::Retry_Event :
       if (retry <= s_retrymax) {
         retry++;
         Return_Value::IncCall((*pit)->Name());
@@ -227,7 +244,7 @@ int Event_Handler::IterateEventPhases(eventtype::code & mode,double & weight) {
 	msg_Error()<<METHOD<<"(): No success after "<<s_retrymax
 		   <<" trials. Request new event.\n";
       }
-    case Return_Value::New_Event : 
+    case Return_Value::New_Event :
       Return_Value::IncCall((*pit)->Name());
       Return_Value::IncNewEvent((*pit)->Name());
       if (p_signal) m_addn+=(*p_signal)["Trials"]->Get<double>();
@@ -241,7 +258,40 @@ int Event_Handler::IterateEventPhases(eventtype::code & mode,double & weight) {
       THROW(fatal_error,"Invalid return value");
     }
   } while (pit!=p_phases->end());
-  msg_Tracking()<<METHOD<<": Event ended normally.\n";
+  msg_Tracking()<<METHOD<<": Event phases ended normally.\n";
+
+  msg_Tracking()<<METHOD<<": Running user hooks now.\n";
+  for (size_t i=0; i<p_phases->size(); ++i) {
+    Event_Phase_Handler* phase=(*p_phases)[i];
+    if (phase->Type()!=eph::Userhook) continue;
+
+    Return_Value::code rv(phase->Treat(&m_blobs, weight));
+    if (rv!=Return_Value::Nothing)
+      msg_Tracking()<<METHOD<<"(): ran '"<<phase->Name()<<"' -> "
+		    <<rv<<std::endl;
+    switch (rv) {
+    case Return_Value::Success :
+      Return_Value::IncCall(phase->Name());
+      msg_Debugging()<<m_blobs;
+      break;
+    case Return_Value::Nothing :
+      break;
+    case Return_Value::New_Event :
+      Return_Value::IncCall(phase->Name());
+      Return_Value::IncNewEvent(phase->Name());
+      if (p_signal) m_addn+=(*p_signal)["Trials"]->Get<double>();
+      Reset();
+      return 2;
+    case Return_Value::Error :
+      Return_Value::IncCall(phase->Name());
+      Return_Value::IncError(phase->Name());
+      return 3;
+    default:
+      THROW(fatal_error,"Invalid return value");
+    }
+  }
+  msg_Tracking()<<METHOD<<": User hooks ended normally.\n";
+
   return 0;
 }
 
@@ -296,7 +346,7 @@ bool Event_Handler::GenerateStandardPerturbativeEvent(eventtype::code &mode)
   m_sumsqr += sqr(cxs);
   m_addn    = 0.0;
 
-  return AnalyseEvent(weight);
+  return AnalyseEvent(cxs);
 }
 
 bool Event_Handler::GenerateMinimumBiasEvent(eventtype::code & mode) {
@@ -399,7 +449,6 @@ bool Event_Handler::GenerateHadronDecayEvent(eventtype::code & mode) {
 }
 
 void Event_Handler::Finish() {
-  if (this==NULL) return;
   MPISync();
   msg_Info()<<"In Event_Handler::Finish : "
 	    <<"Summarizing the run may take some time.\n";
@@ -442,14 +491,14 @@ void Event_Handler::MPISync()
   m_msum=m_sum;
   m_msumsqr=m_sumsqr;
 #ifdef USING__MPI
-  int size=MPI::COMM_WORLD.Get_size();
+  int size=mpi->Size();
   if (size>1) {
     double values[3];
     values[0]=m_mn;
     values[1]=m_msum;
     values[2]=m_msumsqr;
-    mpi->MPIComm()->Allreduce(MPI_IN_PLACE,values,3,MPI::DOUBLE,MPI::SUM);
-    mpi->MPIComm()->Allreduce(MPI_IN_PLACE,&m_maxweight,1,MPI::DOUBLE,MPI::MAX);
+    mpi->Allreduce(values,3,MPI_DOUBLE,MPI_SUM);
+    mpi->Allreduce(&m_maxweight,1,MPI_DOUBLE,MPI_MAX);
     m_mn=values[0];
     m_msum=values[1];
     m_msumsqr=values[2];

@@ -8,6 +8,7 @@
 #include "ATOOLS/Org/Message.H"
 #include "ATOOLS/Phys/Blob.H"
 #include "PHASIC++/Process/Subprocess_Info.H"
+#include "SHERPA/Tools/Variations.H"
 
 
 #include <map>
@@ -33,12 +34,15 @@ namespace SHERPA {
 
   class EventInfo {
   private:
-    size_t m_usenamedweights, m_extendedweights;
     ATOOLS::Blob * p_sp;
+    bool m_usenamedweights, m_extendedweights;
+    std::vector<Variations_Type::code> m_variationtypes;
     std::vector<double> m_orders;
     double m_wgt, m_mewgt, m_wgtnorm, m_ntrials, m_pswgt, m_pwgt;
-    double m_mur2, m_muf12, m_muf22;
+    double m_mur2, m_muf12, m_muf22, m_muq2;
     double m_alphas, m_alpha;
+    bool m_userhook;
+    double m_userweight;
     PHASIC::nlo_type::code m_type;
     ATOOLS::ME_Weight_Info * p_wgtinfo;
     ATOOLS::PDF_Info * p_pdfinfo;
@@ -49,7 +53,9 @@ namespace SHERPA {
 
   public:
     EventInfo(ATOOLS::Blob * sp, const double &wgt,
-              bool namedweights, bool minimalweights);
+              bool namedweights,
+              bool extendedweights,
+              bool includemeonlyweights);
     EventInfo(const EventInfo &evtinfo);
     ~EventInfo() {}
     bool WriteTo(HepMC::GenEvent &evt, const int& idx=-1);
@@ -60,13 +66,15 @@ namespace SHERPA {
     inline void SetMuR2(const double &mur2)           { m_mur2=mur2; }
     inline void SetMuF12(const double &muf12)         { m_muf12=muf12; }
     inline void SetMuF22(const double &muf22)         { m_muf22=muf22; }
+    inline void SetMuQ2(const double &muq2)           { m_muq2=muq2; }
     void SetAlphaS();
     void SetAlpha();
   };
 
   class HepMC2_Interface {
   private :
-    bool m_usenamedweights, m_extendedweights, m_hepmctree;
+    bool m_usenamedweights, m_extendedweights, m_includemeonlyweights;
+    bool m_hepmctree;
 
     std::map<ATOOLS::Blob*,HepMC::GenVertex *> m_blob2genvertex;
     std::map<ATOOLS::Particle*,HepMC::GenParticle *> m_particle2genparticle;
@@ -74,6 +82,11 @@ namespace SHERPA {
 
     HepMC::GenEvent *p_event;
     std::vector<HepMC::GenEvent*> m_subeventlist;
+
+    bool Sherpa2ShortHepMC(const ATOOLS::Vec4D&,
+                           const ATOOLS::Flavour&,
+                           bool incoming,
+                           HepMC::GenParticle*&);
 
   public :
 
@@ -95,7 +108,7 @@ namespace SHERPA {
     bool Sherpa2ShortHepMC(ATOOLS::Blob_List *const blobs, double weight=1.0);
     bool SubEvtList2ShortHepMC(EventInfo &evtinfo);
 
-    bool AddCrossSection(HepMC::GenEvent& event,
+    void AddCrossSection(HepMC::GenEvent& event,
                          const double& xs, const double& err);
 
     // inline functions
@@ -114,6 +127,8 @@ namespace SHERPA {
     inline bool HepMCExtendedWeights()         { return m_extendedweights; }
     inline void SetHepMCTreeLike(bool x)       { m_hepmctree=x; }
     inline bool HepMCTreeLike()                { return m_hepmctree; }
+    inline void SetHepMCIncludeMEOnlyVariations(bool x)
+    { m_includemeonlyweights=x; }
 
     void DeleteGenSubEventList();
 

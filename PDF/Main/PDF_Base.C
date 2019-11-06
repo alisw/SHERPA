@@ -14,12 +14,29 @@
 using namespace PDF;
 using namespace ATOOLS;
 
+namespace PDF {
+  PDF_Defaults *pdfdefs(NULL);
+}
+
+PDF_Defaults::PDF_Defaults()
+{
+  m_deflib[kf_p_plus] = "NNPDFSherpa";
+  m_defset[kf_p_plus] = "NNPDF30NNLO";
+
+  m_deflib[kf_e] = "PDFESherpa";
+  m_defset[kf_e] = "PDFe";
+
+  m_deflib[kf_photon] = "GRVSherpa";
+  m_defset[kf_photon] = "GRV";
+}
+
 PDF_Base::PDF_Base():
   m_type("none"), m_set(""), m_member(0), m_exponent(1.),
   m_rescale(1.)
 {
   Data_Reader dr(" ",";","!","=");
   m_lhef_number = dr.GetValue<int>("LHEF_PDF_NUMBER",-1);
+  m_force_4f = dr.GetValue<int>("PDF_FORCE_4F",0);
 }
 
 PDF_Base::~PDF_Base()
@@ -120,4 +137,12 @@ void PDF_Base::ShowSyntax(const size_t i)
 	   <<"   // available PDF sets (specified by PDF_SET=<value>)\n\n";
   PDF_Getter_Function::PrintGetterInfo(msg->Out(),25);
   msg_Out()<<"\n}"<<std::endl;
+}
+
+
+bool PDF_Base::Contains(const ATOOLS::Flavour &a) const
+{
+  if (m_force_4f && (a.Kfcode()==5 || a.Kfcode()==6))
+    return false;
+  return m_partons.find(a)!=m_partons.end();
 }

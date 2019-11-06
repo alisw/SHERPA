@@ -14,6 +14,8 @@ namespace OpenLoops {
     static std::string s_olprefix;
     static bool        s_ignore_model;
     static bool        s_exit_on_error;
+    static bool        s_ass_func;
+    static int         s_ass_ew;
 
   public :
     OpenLoops_Interface() : ME_Generator_Base("OpenLoops") {}
@@ -33,6 +35,9 @@ namespace OpenLoops {
                              double& res, METOOLS::DivArrD& virt);
     static void EvaluateLoop2(int id, const ATOOLS::Vec4D_Vector& momenta,
                               double& res);
+    static void EvaluateAssociated(int id, const ATOOLS::Vec4D_Vector& momenta,
+                                   int ass, double& res);
+    static int ConvertAssociatedContributions(const PHASIC::asscontrib::type at);
 
     static void SetParameter(const std::string & key, double value);
     static void SetParameter(const std::string & key, int value);

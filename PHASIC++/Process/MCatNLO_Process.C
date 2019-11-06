@@ -81,7 +81,11 @@ void MCatNLO_Process::Init(const Process_Info &pi,
   spi.m_megenerator=spi.m_rsmegenerator;
   p_rproc=InitProcess(spi,nlo_type::lo,true);
   spi.m_megenerator=pi.m_megenerator;
-  p_bviproc=InitProcess(spi,nlo_type::born|nlo_type::loop|nlo_type::vsub,false);
+  Data_Reader read(" ",";","!","=");
+  read.SetInputPath(rpa->GetPath());
+  read.SetInputFile(rpa->gen.Variable("INTEGRATION_DATA_FILE"));
+  nlo_type::code bvicode=(nlo_type::code) read.GetValue<int>("PP_BVI_MODE",7);
+  p_bviproc=InitProcess(spi,bvicode,false);
   p_ddproc=InitProcess(spi,nlo_type::rsub,1);
   spi.m_integrator=spi.m_rsintegrator;
   spi.m_megenerator=spi.m_rsmegenerator;
@@ -96,9 +100,6 @@ void MCatNLO_Process::Init(const Process_Info &pi,
   p_rproc->SetParent(this);
   p_bproc->FillProcessMap(p_apmap);
   p_rproc->FillProcessMap(p_apmap);
-  Data_Reader read(" ",";","!","=");
-  read.SetInputPath(rpa->GetPath());
-  read.SetInputFile(rpa->gen.Variable("INTEGRATION_DATA_FILE"));
   if (!read.ReadFromFile(m_hpsmode,"PP_HPSMODE")) m_hpsmode=8;
   else msg_Info()<<METHOD<<"(): Set H event shower mode "<<m_hpsmode<<".\n";
   if (!read.ReadFromFile(m_kfacmode,"PP_KFACTOR_MODE")) m_kfacmode=0;
@@ -288,18 +289,21 @@ double MCatNLO_Process::LocalKFactor(const Cluster_Amplitude &ampl)
   double bvi(bviproc->Differential(ampl,rm));
   bviproc->SetVariationWeights(NULL);
 
-  // eventually calculate local K factor
   const double random(ran->Get());
+  // calculate LocalKFactor
+  double lkf(LocalKFactor(bvi, b, rs, r, random, &ampl));
+  // eventually calculate local K factor
   if (p_variationweights) {
     KFactorReweightingInfo info;
     info.m_rsvarweights = rsvarweights;
     info.m_bvivarweights = bvivarweights;
     info.m_bvarweights = bvarweights;
     info.m_random = random;
+    msg_Debugging()<<"Calc'ing LocalKFactor weights."<<std::endl;
     p_variationweights->UpdateOrInitialiseWeights(&MCatNLO_Process::ReweightLocalKFactor,
                                                   *this, info);
   }
-  return LocalKFactor(bvi, b, rs, r, random, &ampl);
+  return lkf;
 }
 
 double MCatNLO_Process::LocalKFactor(double bvi, double b,
@@ -336,12 +340,14 @@ double MCatNLO_Process::ReweightLocalKFactor(
     SHERPA::Variation_Weights * varweights,
     MCatNLO_Process::KFactorReweightingInfo &info)
 {
+  DEBUG_FUNC(varparams->m_name);
   size_t i(varweights->CurrentParametersIndex());
   size_t subevtcount(info.m_rsvarweights->GetNumberOfSubevents());
   return LocalKFactor(info.m_bvivarweights->GetVariationWeightAt(i),
                       info.m_bvarweights->GetVariationWeightAt(i),
                       info.m_rsvarweights->GetVariationWeightAt(i),
-                      info.m_rsvarweights->GetVariationWeightAt(i, subevtcount - 1),
+                      info.m_rsvarweights->GetVariationWeightAt(
+                        i, SHERPA::Variations_Type::all, subevtcount - 1),
                       info.m_random);
 }
 
@@ -444,6 +450,7 @@ double MCatNLO_Process::OneSEvent(const int wmode)
     if (rproc==NULL) THROW(fatal_error,"Invalid splitting");
     p_selected=p_rproc;
     p_rproc->SetSelected(rproc);
+    rproc->Integrator()->PSHandler()->SetEnhance(bproc->Integrator()->PSHandler()->Enhance());
     rproc->Integrator()->SetMax(bproc->Integrator()->Max());
     if (ampl->Leg(0)->Mom().PPlus()>ampl->Leg(1)->Mom().PPlus())
       std::swap<Cluster_Leg*>(ampl->Legs()[0],ampl->Legs()[1]);
@@ -472,7 +479,7 @@ double MCatNLO_Process::OneSEvent(const int wmode)
     ampl->SetMuF2(next->MuF2());
     ampl->SetMuR2(next->MuR2());
     ampl->SetOrderQCD(next->OrderQCD()+1);
-    ampl->Next()->SetNLO(4);
+    ampl->Next()->SetNLO(ampl->Next()->NLO()|4);
     ampl->SetJF(ampl->Next()->JF<void>());
     next->SetKin(kt2.m_kin);
     while (ampl->Next()) {
@@ -503,7 +510,7 @@ double MCatNLO_Process::OneSEvent(const int wmode)
   if (p_ampl->Leg(0)->Mom().PPlus()>p_ampl->Leg(1)->Mom().PPlus())
     std::swap<Cluster_Leg*>(p_ampl->Legs()[0],p_ampl->Legs()[1]);
   ampl=p_ampl;
-  ampl->SetNLO(4);
+  ampl->SetNLO(ampl->NLO()|4);
   bproc->Integrator()->SetMomenta(*p_ampl);
   msg_Debugging()<<"B selected "<<*p_ampl
 		 <<" ( w = "<<p_nlomc->Weight()<<" )\n";
@@ -527,15 +534,21 @@ Weight_Info *MCatNLO_Process::OneEvent(const int wmode,const int mode)
       const double Ssel(p_bviproc->Selected()->Integrator()->SelectionWeight(wmode));
       const double selwgtratio(Bsel / Ssel);
       const double wgtfac(Swgt * selwgtratio);
+      msg_Debugging()<<"wgt_{NLO CSS} = "<<Swgt<<"\n"
+                     <<"Bsel = "<<Bsel<<" ,  Ssel = "<<Ssel<<"\n"
+                     <<"=> wgtfac = "<<wgtfac<<std::endl;
       winfo->m_weight *= wgtfac;
       *(p_selected->Selected()->GetMEwgtinfo()) *= wgtfac;
       *p_variationweights *= wgtfac;
 
       // calculate and set local K factors
       const double lkf(p_bviproc->Selected()->Last() / p_bviproc->Selected()->LastB());
+      SHERPA::Variation_Weights* lkfvarweights
+        = p_bviproc->Selected()->LKFVariationWeights();
       for (Cluster_Amplitude *ampl(p_ampl);
            ampl; ampl = ampl->Next()) {
         ampl->SetLKF(lkf);
+        ampl->SetLKFVariationWeights(lkfvarweights);
       }
 
       // enforce correct NLO flag throughout cluster amplitudes
@@ -582,10 +595,12 @@ Weight_Info *MCatNLO_Process::OneEvent(const int wmode,const int mode)
   if (rpa->gen.HardSC() || (rpa->gen.SoftSC() && !Flavour(kf_tau).IsStable())) {
     DEBUG_INFO("Calcing Differential for spin correlations using "
 	       <<Selected()->Generator()->Name()<<":");
+    ME_Weight_Info original_me_wgt_info = *p_selected->Selected()->GetMEwgtinfo();
     if (Selected()->Integrator()->ColorIntegrator()!=NULL)
       while (Selected()->Differential(*p_ampl,1|2|4|128)==0.0);
     else
       Selected()->Differential(*p_ampl,1|2|4|128);
+    p_selected->Selected()->SetMEwgtinfo(original_me_wgt_info);
   }
   return winfo;
 }

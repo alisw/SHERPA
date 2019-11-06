@@ -1,0 +1,25 @@
+#!/bin/bash
+
+export tmpfile=$(mktemp)
+export dir=${1%/}
+db=${dir}.db
+rm -f ${db}
+
+
+function insertsql {
+    if ! test -d "$1"; then
+        filename=$(echo "$1" | sed 's|'${dir}'||g;s|^/||g')
+        echo "$filename"
+        sed -e "s|'|''|g" -e "$ s|$|');|1" -e "1 s|^|insert into path values('${filename}','|1" "$1" >> $tmpfile
+    fi
+}
+export -f insertsql
+
+echo "begin transaction;" >> $tmpfile
+echo "create table path(file,content);" >> $tmpfile
+echo "create index idx_path on path(file);" >> $tmpfile
+find ${dir} -exec bash -c 'insertsql "$0"' {} \;
+echo "commit;" >> $tmpfile
+cat $tmpfile | sqlite3 ${db}
+rm $tmpfile
+echo "done"

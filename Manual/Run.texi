@@ -75,13 +75,7 @@ employed. This affects mostly @ref{MPI Parameters} and
 @ref{Intrinsic Transverse Momentum} parameters. Possible values are:
 @itemize @bullet
 @item
-@code{CT10} MPI tune for the Sherpa's default PDF, CT10. This is the default tune.
-@item
-@code{CT10_UEup} Upward variation of MPI activity, variation of the CT10 tune to 
-assess MPI uncertainties.
-@item
-@code{CT10_UEdown} Downward variation of MPI activity, variation of the CT10 tune to 
-assess MPI uncertainties.
+@code{None} The current version does not include alternative tunes.
 @end itemize
 
 @node OUTPUT
@@ -141,11 +135,10 @@ option @option{-R}, see @ref{Command line}.
 @node EVENT_SEED_MODE
 @subsection EVENT_SEED_MODE
 The tag @option{EVENT_SEED_MODE} can be used to enforce the same seeds in different
-runs of the generator. When set to 1, seed files are written to disk. These files are
-gzip compressed, if Sherpa was compiled with option @option{--enable-gzip}.
-When set to 2, existing random seed files are read and the seed is set to the
-next available value in the file before each event. When set to 3, Sherpa uses
-an internal bookkeeping mechanism to advance to the next predefined seed.
+runs of the generator. When set to 1, existing random seed files are read and the seed is set to the
+next available value in the file before each event. When set to 2, seed files are written to disk.
+These files are gzip compressed, if Sherpa was compiled with option @option{--enable-gzip}.
+When set to 3, Sherpa uses an internal bookkeeping mechanism to advance to the next predefined seed.
 No seed files are written out or read in.
 
 @node ANALYSIS
@@ -334,6 +327,13 @@ outgoing particles are stored. Intermediate and decayed particles are not
 listed. The event weights stored as the same as above, and 
 @code{HEPMC_USE_NAMED_WEIGHTS} and @code{HEPMC_EXTENDED_WEIGHTS} can be used to 
 customise.
+
+@item HepMC3_GenEvent
+Generates output using HepMC3 library. The format of the output is set with  @code{HEPMC3_IO_TYPE=<0|1|2|3|4>} tag.
+The default value is 0 and corresponds to ASCII GenEvent. Other available options are 
+1: HepEvt 2: ROOT file with every event written as an object of class GenEvent. 3: ROOT file with GenEvent objects writen into TTree.
+Otherwise similar to  @code{HepMC_GenEvent}.
+
 @item Delphes_GenEvent
 Generates output in @url{http://root.cern.ch,,Root} format, which can be passed to
 @uref{http://cp3.irmp.ucl.ac.be/projects/delphes,,Delphes} for analyses.
@@ -406,11 +406,12 @@ Sherpa can compute alternative event weights for different scale and
 PDF choices on-the-fly, resulting in alternative weights for the generated 
 event. The can be evoked with the following syntax
 @verbatim
-SCALE_VARIATIONS <muR-fac-1>,<muF-fac-1>[,<PDF-1>]  <muR-fac-1>,<muF-fac-1>[,<PDF-1>] ...
+SCALE_VARIATIONS <muR-fac-1>,<muF-fac-1>[,<PDF-1>[,<associated-contrib-1>]]  <muR-fac-1>,<muF-fac-1>[,<PDF-1>[,<associated-contrib-1>]] ...
 @end verbatim
 The key word @code{SCALE_VARIATIONS} takes a space separated list of 
-variation factors for the nominal renormalisation and factorisation scale 
-and an associated PDF set. Any set present in any of the PDF library interfaces
+variation factors for the nominal renormalisation and factorisation scale, 
+an associated PDF set and associated approximate NLO EW and sub-leading order
+contributions. Any set present in any of the PDF library interfaces
 loaded through @code{PDF_LIBRARY} can be used. If no PDF set is given it 
 defaults to the nominal one. Specific PDF members can be 
 specified by appending the PDF set name with @code{/<member-id>}. The 
@@ -431,11 +432,20 @@ Thus, a complete variation using the PDF4LHC convention would read
 Please note, this syntax will create 7+53+51+101=212 additional weights
 for each event.
 
+Similarly, the associated NLO EW and sub-leading order contributions can 
+be included orthogonally to scale and PDF variations through
+@verbatim
+  ASSOCIATED_CONTRIBUTIONS_VARIATIONS EW EW|LO1 EW|LO1|LO2 EW|LO1|LO2|LO3;
+@end verbatim
+
 The additional event weights can then be written into the event output. 
 However, this is currently only supported for @code{HepMC_GenEvent} and 
 @code{HepMC_Short} with versions >2.06 and @code{HEPMC_USE_NAMED_WEIGHTS=1}. 
 The alternative event weights follow the Les Houches naming convention 
-for such variations, ie. they are named @code{MUR<fac>_MUF<fac>_PDF<id>}.
+for such variations, ie. they are named @code{MUR<fac>_MUF<fac>_PDF<id>}. 
+In case associated NLO EW and sub-leading order contributions are used, 
+this convention is extended to @code{MUR<fac>_MUF<fac>_PDF<id>_ASS<contrib>}.
+
 When using Sherpa's interface to Rivet, @ref{Rivet analyses}, separate 
 instances of Rivet, one for each alternative event weight in addition to 
 the nominal one, are instantiated leading to one set of histograms each.
@@ -449,9 +459,18 @@ number of trials, cf. @ref{Cross section determination}.
 
 The on-the-fly reweighting works for all event generation modes (weighted or
 (partially) unweighted) and all calculation types (LO, LOPS, NLO, NLOPS,
-MEPS@@LO, MEPS@@NLO and MENLOPS).  However, it does not include the reweighting
-of parton shower emissions per default, which is an experimental feature in
-Sherpa 2.2.0.
+MEPS@@LO, MEPS@@NLO and MENLOPS).
+However, the reweighting of parton shower emissions has to be enabled explicitly,
+using @code{CSS_REWEIGHT=1}.  This should work out of the box for both scale
+and PDF variations.  If numerical issues are encountered, one can try to
+increase @option{CSS_REWEIGHT_SCALE_CUTOFF} (default: 5).
+This disables shower variations for emissions at scales below the value.  An
+improved accuracy for shower variations at very low scales can be achieved by
+using @code{CSS_ALPHAS_FREEZE_MODE=1}, see @ref{CS Shower options}.
+An additional safeguard against rare spuriously large shower variation
+weights is implemented as @code{CSS_MAX_REWEIGHT_FACTOR} (default: 1e3).
+Any variation weights accumulated during an event and larger than this factor
+will be ignored and reset to 1.
 
 @node MPI parallelization
 @subsection MPI parallelization

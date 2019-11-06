@@ -12,6 +12,7 @@
 #include "SHERPA/LundTools/Lund_Interface.H"
 #include "SHERPA/Tools/Event_Reader_Base.H"
 #include "SHERPA/Tools/Variations.H"
+#include "SHERPA/Main/Filter.H"
 #include "PHASIC++/Scales/Core_Scale_Setter.H"
 #include "MODEL/Main/Model_Base.H"
 #include "MODEL/Main/Running_AlphaS.H"
@@ -58,7 +59,7 @@ Initialization_Handler::Initialization_Handler(int argc,char * argv[]) :
   p_mehandler(NULL), p_harddecays(NULL), p_beamremnants(NULL),
   p_fragmentation(NULL), p_softcollisions(NULL), p_hdhandler(NULL), 
   p_mihandler(NULL), p_softphotons(NULL), p_evtreader(NULL),
-  p_variations(NULL)
+  p_variations(NULL), p_filter(NULL)
 {
   m_path=std::string("");
   m_file=std::string("Run.dat");
@@ -110,6 +111,7 @@ void Initialization_Handler::SetFileNames()
   m_softphotonsdat   = p_dataread->GetValue<string>("SOFT_PHOTON_DATA_FILE",fname+"|(fragmentation){|}(fragmentation)");
   m_processesdat     = p_dataread->GetValue<string>("PROCESSFILE",fname+"|(processes){|}(processes)");
   m_selectordat      = p_dataread->GetValue<string>("SELECTORFILE",fname+"|(selector){|}(selector)");
+  m_filterdat        = p_dataread->GetValue<string>("FILTERFILE",fname+"|(filter){|}(filter)");
   m_analysisdat      = p_dataread->GetValue<string>("ANALYSIS_DATA_FILE",FileExists("Analysis.dat")?
 						    "Analysis.dat":fname+"|(analysis){|}(analysis)");
   std::string integrationdat = p_dataread->GetValue<string>("INTEGRATION_DATA_FILE",fname+"|(integration){|}(integration)");
@@ -147,6 +149,7 @@ Initialization_Handler::~Initialization_Handler()
   if (p_model)         { delete p_model;         p_model         = NULL; }
   if (p_dataread)      { delete p_dataread;      p_dataread      = NULL; }
   if (p_variations)    { delete p_variations;    p_variations    = NULL; }
+  if (p_filter)        { delete p_filter;        p_filter        = NULL; }
   while (m_analyses.size()>0) {
     delete m_analyses.back();
     m_analyses.pop_back();
@@ -191,9 +194,7 @@ void Initialization_Handler::CheckVersion()
     size_t min1(versioninfo[0].find(".",0)),
            min2(versioninfo[0].find(".",min1+1)),
            max1(versioninfo[1].find(".",0)),
-           max2(versioninfo[1].find(".",max1+1)),
-           cur1(currentversion.find(".",0)),
-           cur2(currentversion.find(".",max1+1));
+           max2(versioninfo[1].find(".",max1+1));
     size_t minmajvers(ToType<size_t>(versioninfo[0].substr(0,min1))),
            minminvers(ToType<size_t>(versioninfo[0].substr(min1+1,min2))),
            minbugvers(ToType<size_t>(versioninfo[0].substr(min2+1))),
@@ -284,7 +285,13 @@ void Initialization_Handler::ShowParameterSyntax()
     PHASIC::Selector_Base::ShowSyntax(helpi);
     THROW(normal_exit,"Syntax shown.");
   }
-  if (!read.ReadFromFile(helpi,"SHOW_MODEL_SYNTAX")) helpi=0;
+  helpi = read.GetValue("SHOW_FILTER_SYNTAX", 0);
+  if (helpi>0) {
+    msg->SetLevel(2);
+    Filter::ShowSyntax(helpi);
+    THROW(normal_exit,"Syntax shown.");
+  }
+  helpi = read.GetValue("SHOW_MODEL_SYNTAX", 0);
   if (helpi>0) {
     msg->SetLevel(2);
     MODEL::Model_Base::ShowSyntax(helpi);
@@ -329,10 +336,9 @@ void Initialization_Handler::PrepareTerminate()
   Copy(m_path+StripSectionTags(m_fragmentationdat),path+StripSectionTags(m_fragmentationdat));
   Copy(m_path+StripSectionTags(m_hadrondecaysdat),path+StripSectionTags(m_hadrondecaysdat));
   Copy(m_path+StripSectionTags(m_analysisdat),path+StripSectionTags(m_analysisdat));
-  Copy(m_path+StripSectionTags(m_selectordat),
-	   path+StripSectionTags(m_selectordat));
-  Copy(m_path+StripSectionTags(m_processesdat),
-	   path+StripSectionTags(m_processesdat));
+  Copy(m_path+StripSectionTags(m_selectordat),path+StripSectionTags(m_selectordat));
+  Copy(m_path+StripSectionTags(m_filterdat),path+StripSectionTags(m_filterdat));
+  Copy(m_path+StripSectionTags(m_processesdat),path+StripSectionTags(m_processesdat));
   Copy(m_path+StripSectionTags(rpa->gen.Variable("INTEGRATION_DATA_FILE")),
 	   path+StripSectionTags(rpa->gen.Variable("INTEGRATION_DATA_FILE")));
   Data_Writer writer;
@@ -408,9 +414,9 @@ bool Initialization_Handler::InitializeTheFramework(int nr)
   okay = okay && InitializeTheSoftCollisions();
   }
   okay = okay && InitializeTheShowers();
+  okay = okay && InitializeTheHardDecays();
   okay = okay && InitializeTheMatrixElements();
   okay = okay && InitializeTheBeamRemnants();
-  okay = okay && InitializeTheHardDecays();
   //  only if events:
   if (rpa->gen.NumberOfEvents()>0) {
     okay = okay && InitializeTheHadronDecays();
@@ -418,6 +424,7 @@ bool Initialization_Handler::InitializeTheFramework(int nr)
     okay = okay && InitializeTheSoftPhotons();
     okay = okay && InitializeTheIO();
     okay = okay && InitializeTheReweighting();
+    okay = okay && InitializeTheFilter();
   }
   return okay;
 }
@@ -512,16 +519,6 @@ bool Initialization_Handler::InitializeTheIO()
 bool Initialization_Handler::InitializeTheModel()
 {
   if (p_model) delete p_model;
-  //determine and set scale for coupling initialization
-  Data_Reader beamer(" ",";","!","=");
-  beamer.AddComment("#");
-  beamer.AddWordSeparator("\t");
-  beamer.SetInputFile(m_path+m_beamdat);
-  std::vector<double> _beam1, _beam2;
-  if (!beamer.VectorFromFile(_beam1,"BEAM_1")) _beam1.resize(2,0.0);
-  if (!beamer.VectorFromFile(_beam2,"BEAM_2")) _beam2.resize(2,0.0);
-  double beam1 = beamer.GetValue<double>("BEAM_ENERGY_1",_beam1[1]);
-  double beam2 = beamer.GetValue<double>("BEAM_ENERGY_2",_beam2[1]);
   Data_Reader read(" ",";","!","=");
   read.AddWordSeparator("\t");
   read.SetInputPath(m_path);
@@ -569,16 +566,16 @@ bool Initialization_Handler::InitializeThePDFs()
   for (int beam(0);beam<=1;++beam) {
     std::string deflib("None");
     if (p_beamspectra->GetBeam(beam)->Bunch().Kfcode()==kf_p_plus) {
-      deflib="NNPDFSherpa";
-      defset[beam]="NNPDF30NNLO";
+      deflib=PDF::pdfdefs->DefaultPDFLibrary(kf_p_plus);
+      defset[beam]=PDF::pdfdefs->DefaultPDFSet(kf_p_plus);
     }
     else if (p_beamspectra->GetBeam(beam)->Bunch().Kfcode()==kf_e) {
-      deflib="PDFESherpa";
-      defset[beam]="PDFe";
+      deflib=PDF::pdfdefs->DefaultPDFLibrary(kf_e);
+      defset[beam]=PDF::pdfdefs->DefaultPDFSet(kf_e);
     }
     else if (p_beamspectra->GetBeam(beam)->Bunch().IsPhoton()) {
-      deflib="GRVSherpa";
-      defset[beam]="GRV";
+      deflib=PDF::pdfdefs->DefaultPDFLibrary(kf_photon);
+      defset[beam]=PDF::pdfdefs->DefaultPDFSet(kf_photon);
     }
     std::vector<std::string> pdflibs;
     std::string mpilib, beamlib;
@@ -867,6 +864,15 @@ bool Initialization_Handler::InitializeTheReweighting()
   return true;
 }
 
+bool Initialization_Handler::InitializeTheFilter()
+{
+  if (p_filter)
+    delete p_filter;
+  p_filter = new Filter();
+  if (!p_filter->Init(m_path,m_filterdat)) { delete p_filter; p_filter = NULL; }
+  return true;
+}
+
 bool Initialization_Handler::CalculateTheHardProcesses()
 {
   if (m_mode!=eventtype::StandardPerturbative) return true;
@@ -914,18 +920,24 @@ void Initialization_Handler::SetGlobalVariables()
   int evol = sdr.GetValue<int>("CSS_EVOLUTION_SCHEME",1);
   int kfmode = sdr.GetValue<int>("CSS_KFACTOR_SCHEME",1);
   int scs = sdr.GetValue<int>("CSS_SCALE_SCHEME",0);
+  int svmode = sdr.GetValue<double>("CSS_SCALE_VARIATION_SCHEME",1);
+  int freezemode = sdr.GetValue<double>("CSS_ALPHAS_FREEZE_MODE",0);
   double k0sqf = sdr.GetValue<double>("CSS_FS_PT2MIN",1.0);
   double k0sqi = sdr.GetValue<double>("CSS_IS_PT2MIN",2.00);
   double fs_as_fac = sdr.GetValue<double>("CSS_FS_AS_FAC",1.0);
   double is_as_fac = sdr.GetValue<double>("CSS_IS_AS_FAC",0.5);
+  double as_var_fac = sdr.GetValue<double>("CSS_SCALE_FACTOR",1.);
   double mth = sdr.GetValue<double>("CSS_MASS_THRESHOLD",0.0);
   rpa->gen.SetVariable("CSS_EVOLUTION_SCHEME",ToString(evol));
   rpa->gen.SetVariable("CSS_KFACTOR_SCHEME",ToString(kfmode));
   rpa->gen.SetVariable("CSS_SCALE_SCHEME",ToString(scs));
+  rpa->gen.SetVariable("CSS_SCALE_VARIATION_SCHEME",ToString(svmode));
+  rpa->gen.SetVariable("CSS_ALPHAS_FREEZE_MODE",ToString(freezemode));
   rpa->gen.SetVariable("CSS_FS_PT2MIN",ToString(k0sqf));
   rpa->gen.SetVariable("CSS_IS_PT2MIN",ToString(k0sqi));
   rpa->gen.SetVariable("CSS_FS_AS_FAC",ToString(fs_as_fac));
   rpa->gen.SetVariable("CSS_IS_AS_FAC",ToString(is_as_fac));
+  rpa->gen.SetVariable("CSS_SCALE_FACTOR",ToString(as_var_fac));
   rpa->gen.SetVariable("CSS_MASS_THRESHOLD",ToString(mth));
 }
 
@@ -1015,6 +1027,7 @@ void Initialization_Handler::ExtractCommandLineParameters(int argc,char * argv[]
     else if (ExtractValArg(helpsv,oit,"-l","LOG_FILE"));
     else if (ExtractValArg(helpsv,oit,"-g","GENERATE_RESULT_DIRECTORY","0"));
     else if (ExtractValArg(helpsv,oit,"-V","PRINT_VERSION_INFO","1"));
+    else if (ExtractValArg(helpsv,oit,"-I","INIT_ONLY","1"));
     else if (par=="--version" || par=="-v"){
       msg_Out()<<"Sherpa version "<<SHERPA_VERSION<<"."<<SHERPA_SUBVERSION
 	       <<" ("<<SHERPA_NAME<<")"<<endl;

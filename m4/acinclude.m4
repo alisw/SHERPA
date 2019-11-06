@@ -14,6 +14,7 @@ AC_DEFUN([SHERPA_SETUP_BUILDSYSTEM],
       fi
       SEDCOMMAND="sed -i.bak -E"
       AC_DEFINE([ARCH_DARWIN], "1", [Architecture identified as Darwin MacOS])
+      LIB_SUFFIX=dylib
       AC_DEFINE([LIB_SUFFIX], ".dylib", [library suffix set to .dylib]) 
       AC_DEFINE([LD_PATH_NAME], "DYLD_LIBRARY_PATH", [ld path name set to DYLD_LIBRARY_PATH]) ;;
     *linux*:*:*)
@@ -23,6 +24,7 @@ AC_DEFUN([SHERPA_SETUP_BUILDSYSTEM],
       fi
       SEDCOMMAND="sed -i -r"
       AC_DEFINE([ARCH_LINUX], "1", [Architecture identified as Linux])
+      LIB_SUFFIX=so
       AC_DEFINE([LIB_SUFFIX], ".so", [library suffix set to .so]) 
       AC_DEFINE([LD_PATH_NAME], "LD_LIBRARY_PATH", [ld path name set to LD_LIBRARY_PATH]) ;;
     *)
@@ -37,6 +39,7 @@ AC_DEFUN([SHERPA_SETUP_BUILDSYSTEM],
       fi
       SEDCOMMAND="sed -i -r"
       AC_DEFINE([ARCH_UNIX], "1", [Architecture identified as Unix])
+      LIB_SUFFIX=so
       AC_DEFINE([LIB_SUFFIX], ".so", [library suffix set to .so]) 
       AC_DEFINE([LD_PATH_NAME], "LD_LIBRARY_PATH", [ld path name set to LD_LIBRARY_PATH]) ;;
   esac
@@ -394,13 +397,82 @@ AC_DEFUN([SHERPA_SETUP_CONFIGURE_OPTIONS],
   AC_SUBST(CONDITIONAL_HEPMC2LIBS)
   AM_CONDITIONAL(HEPMC2_SUPPORT, test "$hepmc2" = "true")
 
+ AC_ARG_ENABLE(
+    hepmc3root,
+    AC_HELP_STRING([--enable-hepmc3root], [Enable HepMC (version 3.1+) ROOT support]),
+    [ 
+    case "${enableval}" in
+        no)  AC_MSG_RESULT(HepMC3 ROOT support not enabled); hepmc3root=false ;;
+        yes) AC_MSG_RESULT(HepMC3 ROOT support enabled); hepmc3root=true ;;
+    
+          esac
+    ],
+    [ hepmc3root=true ]
+  )
+
+
+  AC_ARG_ENABLE(
+    hepmc3,
+    AC_HELP_STRING([--enable-hepmc3=/path/to/hepmc], [Enable HepMC (version 3.x) support and specify where it is installed.]),
+    [ AC_MSG_CHECKING(for HepMC3 installation directory);
+      case "${enableval}" in
+        no)  AC_MSG_RESULT(HepMC3 not enabled); hepmc3=false ;;
+        yes)  if test -d "$HEPMC3DIR"; then
+                CONDITIONAL_HEPMC3DIR="$HEPMC3DIR"
+                CONDITIONAL_HEPMC3INCS="-I$HEPMC3DIR/include"
+                CONDITIONAL_HEPMC3LIBS="-L$HEPMC3DIR/lib -R$HEPMC3DIR/lib -L$HEPMC3DIR/lib64 -R$HEPMC3DIR/lib64 -lHepMC3";
+              if test "$hepmc3root" = "true" ; then
+              CONDITIONAL_HEPMC3LIBS+=" -lHepMC3rootIO"
+              fi
+              else
+                AC_MSG_ERROR(\$HEPMC3DIR is not a valid path.);
+              fi;
+              AC_MSG_RESULT([${CONDITIONAL_HEPMC3DIR}]); hepmc3=true;;
+        *)    if test -d "${enableval}"; then
+                CONDITIONAL_HEPMC3DIR="${enableval}"
+                CONDITIONAL_HEPMC3INCS="-I${enableval}/include"
+                CONDITIONAL_HEPMC3LIBS="-L${enableval}/lib -R${enableval}/lib -L${enableval}/lib64 -R${enableval}/lib64 -lHepMC3";
+              if test "$hepmc3root" = "true" ; then
+              CONDITIONAL_HEPMC3LIBS+=" -lHepMC3rootIO"
+              fi
+              else
+                AC_MSG_ERROR(${enableval} is not a valid path.);
+              fi;
+              AC_MSG_RESULT([${CONDITIONAL_HEPMC3DIR}]); hepmc3=true;;
+      esac
+      if test -f "$CONDITIONAL_HEPMC3DIR/include/HepMC3/WriterRootTree.h"; then
+        hepmc3writerroottree=true;
+      fi;
+      if test -f "$CONDITIONAL_HEPMC3DIR/include/HepMC3/WriterRoot.h"; then
+        hepmc3writerroot=true;
+      fi;
+
+      ],
+    [ hepmc3=false ]
+  )
+    if test "$hepmc3" = "true" ; then
+    AC_DEFINE([USING__HEPMC3], "1", [Using HEPMC3])
+    fi
+  if test "$hepmc3root" = "true" ; then
+    if test "$hepmc3writerroot" = "true"; then
+      AC_DEFINE([USING__HEPMC3__WRITERROOT], "1", [WriterRoot.h available])
+    fi
+    if test "$hepmc3writerroottree" = "true"; then
+      AC_DEFINE([USING__HEPMC3__WRITERROOTTREE], "1", [WriterRootTree.h available])
+    fi
+  fi
+  AC_SUBST(CONDITIONAL_HEPMC3DIR)
+  AC_SUBST(CONDITIONAL_HEPMC3INCS)
+  AC_SUBST(CONDITIONAL_HEPMC3LIBS)
+  AM_CONDITIONAL(HEPMC3_SUPPORT, test "$hepmc3" = "true")
+
 
   AC_ARG_ENABLE(
     rivet,
     AC_HELP_STRING([--enable-rivet=/path/to/rivet], [Enable Rivet support and specify where it is installed.]),
     [ AC_MSG_CHECKING(for Rivet installation directory);
       case "${enableval}" in
-        no)  AC_MSG_RESULT(Rivet not enabled); rivet=false ;;
+        no)  AC_MSG_RESULT(Rivet not enabled); rivet2=false; rivet3=false ;;
         yes) if test -x "`which rivet-config`"; then
                CONDITIONAL_RIVETDIR=`rivet-config --prefix`;
              fi;;
@@ -411,31 +483,29 @@ AC_DEFUN([SHERPA_SETUP_CONFIGURE_OPTIONS],
       if test -x "$CONDITIONAL_RIVETDIR/bin/rivet-config"; then
         CONDITIONAL_RIVETLDADD="$($CONDITIONAL_RIVETDIR/bin/rivet-config --ldflags) $($CONDITIONAL_RIVETDIR/bin/rivet-config --ldadd)";
         CONDITIONAL_RIVETCPPFLAGS="$($CONDITIONAL_RIVETDIR/bin/rivet-config --cppflags)";
-        AC_MSG_RESULT([${CONDITIONAL_RIVETDIR}]); rivet=true;
-	"$CONDITIONAL_RIVETDIR/bin/rivet-config" --version | grep -q '^1\.' || rivetyoda=true
+        AC_MSG_RESULT([${CONDITIONAL_RIVETDIR}]);
+        rivetversion="$($CONDITIONAL_RIVETDIR/bin/rivet-config --version)"
+        AC_MSG_CHECKING(for Rivet version)
+        AX_COMPARE_VERSION([${rivetversion}],[ge],[3.0.0],[ rivet3=true; AC_MSG_RESULT(Rivet 3) ], [
+          AX_COMPARE_VERSION([${rivetversion}],[ge],[2.0.0],[ rivet2=true; AC_MSG_RESULT(Rivet 2) ], [
+            AC_MSG_ERROR(Rivet version <2.0 found, not supported.)
+          ])
+        ])
       else
         AC_MSG_ERROR(Unable to use Rivet from specified path.);
       fi;
-      rivetincludedir=$($CONDITIONAL_RIVETDIR/bin/rivet-config --includedir)
-      if grep -q -s setIgnoreBeams $rivetincludedir/Rivet/AnalysisHandler.hh; then
-        rivetsetsow=true;
-      fi
     ],
     [ rivet=false ]
   )
-  if test "$rivet" = "true" ; then
-    AC_DEFINE([USING__RIVET], "1", [using Rivet])
-  fi
-  if test "$rivetsetsow" = "true" ; then
-    AC_DEFINE([USING__RIVET__SETSOW], "1", [setSumOfWeights function available in Rivet])
-  fi
-  if test "$rivetyoda" = "true" ; then
-    AC_DEFINE([USING__RIVET__YODA], "1", [Rivet uses YODA as its histogramming backend])
-  fi
   AC_SUBST(CONDITIONAL_RIVETLDADD)
   AC_SUBST(CONDITIONAL_RIVETCPPFLAGS)
-  AM_CONDITIONAL(RIVET_SUPPORT, test "$rivet" = "true")
-  
+  if test "$rivet2" = "true" ; then
+    AC_DEFINE([USING__RIVET2], "1", [using Rivet2])
+  fi
+  if test "$rivet3" = "true" ; then
+    AC_DEFINE([USING__RIVET3], "1", [using Rivet3])
+  fi
+  AM_CONDITIONAL(RIVET_SUPPORT, test "$rivet2" = "true" -o "$rivet3" = "true")
 
   AC_ARG_ENABLE(
     fastjet,

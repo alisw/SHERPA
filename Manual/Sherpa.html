@@ -3,7 +3,7 @@
 <!-- Permission is granted to copy, distribute and/or modify this
 document under the terms of the GNU General Public License.
  -->
-<!-- Created on August 29, 2017 by texi2html 5.0
+<!-- Created on August 29, 2019 by texi2html 5.0
 texi2html was written by: 
             Lionel Cons <Lionel.Cons@cern.ch> (original author)
             Karl Berry  <karl@freefriends.org>
@@ -13,10 +13,10 @@ Maintained by: Many creative people.
 Send bugs and suggestions to <texi2html-bug@nongnu.org>
 -->
 <head>
-<title>Sherpa 2.2.4</title>
+<title>Sherpa 2.2.8</title>
 
-<meta name="description" content="Sherpa 2.2.4">
-<meta name="keywords" content="Sherpa 2.2.4">
+<meta name="description" content="Sherpa 2.2.8">
+<meta name="keywords" content="Sherpa 2.2.8">
 <meta name="resource-type" content="document">
 <meta name="distribution" content="global">
 <meta name="Generator" content="texi2html 5.0">
@@ -120,7 +120,7 @@ hr {
 
 <body lang="en" bgcolor="#FFFFFF" text="#000000" link="#0000FF" vlink="#800080" alink="#FF0000">
 
-<h1>Sherpa Manual Version 2.2.4</h1>
+<h1>Sherpa Manual Version 2.2.8</h1>
 <strong>The Sherpa Team, see <a href="http://sherpa.hepforge.org">http://sherpa.hepforge.org</a></strong><br>
 
 
@@ -128,8 +128,8 @@ hr {
 document under the terms of the GNU General Public License.
 </p><hr>
 <a name="Top"></a>
-<a name="Sherpa-2_002e2_002e4-Manual"></a>
-<h1 class="top">Sherpa 2.2.4 Manual</h1>
+<a name="Sherpa-2_002e2_002e8-Manual"></a>
+<h1 class="top">Sherpa 2.2.8 Manual</h1>
 
 
 
@@ -547,17 +547,17 @@ directory as well.
 <h2 class="section">2.1 Installation</h2>
 
 <p>Sherpa is distributed as a tarred and gzipped file named
-<code>SHERPA-MC-2.2.4.tar.gz</code>, and can be unpacked in the current
+<code>SHERPA-MC-2.2.8.tar.gz</code>, and can be unpacked in the current
 working directory with
 </p>
 <div class="example">
-<pre class="example"><code> tar -zxf SHERPA-MC-2.2.4.tar.gz</code>
+<pre class="example"><code> tar -zxf SHERPA-MC-2.2.8.tar.gz</code>
 </pre></div>
 
-<p>Alternatively, it can also be accessed via SVN through the location specified
+<p>Alternatively, it can also be accessed via Git through the location specified
 on the download page. In that case, before continuing, it is necessary to
-construct the build scripts by running <code>autoreconf -i</code> once after checking
-out the SVN working copy.
+construct the build scripts by running <code>autoreconf -i</code> once after cloning
+the Git repo.
 </p>
 <p>To guarantee successful installation, the following tools should be
 available on the system:
@@ -1684,13 +1684,7 @@ employed. This affects mostly <a href="#MPI-Parameters">Multiple interactions</a
 <a href="#Intrinsic-Transverse-Momentum">Intrinsic Transverse Momentum</a> parameters. Possible values are:
 </p><ul>
 <li>
-<code>CT10</code> MPI tune for the Sherpa&rsquo;s default PDF, CT10. This is the default tune.
-</li><li>
-<code>CT10_UEup</code> Upward variation of MPI activity, variation of the CT10 tune to 
-assess MPI uncertainties.
-</li><li>
-<code>CT10_UEdown</code> Downward variation of MPI activity, variation of the CT10 tune to 
-assess MPI uncertainties.
+<code>None</code> The current version does not include alternative tunes.
 </li></ul>
 
 <hr>
@@ -1758,11 +1752,10 @@ option &lsquo;<samp>-R</samp>&rsquo;, see <a href="#Command-line">Command line o
 <a name="EVENT_005fSEED_005fMODE-1"></a>
 <h3 class="subsection">5.1.8 EVENT_SEED_MODE</h3>
 <p>The tag &lsquo;<samp>EVENT_SEED_MODE</samp>&rsquo; can be used to enforce the same seeds in different
-runs of the generator. When set to 1, seed files are written to disk. These files are
-gzip compressed, if Sherpa was compiled with option &lsquo;<samp>--enable-gzip</samp>&rsquo;.
-When set to 2, existing random seed files are read and the seed is set to the
-next available value in the file before each event. When set to 3, Sherpa uses
-an internal bookkeeping mechanism to advance to the next predefined seed.
+runs of the generator. When set to 1, existing random seed files are read and the seed is set to the
+next available value in the file before each event. When set to 2, seed files are written to disk.
+These files are gzip compressed, if Sherpa was compiled with option &lsquo;<samp>--enable-gzip</samp>&rsquo;.
+When set to 3, Sherpa uses an internal bookkeeping mechanism to advance to the next predefined seed.
 No seed files are written out or read in.
 </p>
 <hr>
@@ -1973,7 +1966,15 @@ outgoing particles are stored. Intermediate and decayed particles are not
 listed. The event weights stored as the same as above, and 
 <code>HEPMC_USE_NAMED_WEIGHTS</code> and <code>HEPMC_EXTENDED_WEIGHTS</code> can be used to 
 customise.
-</p></dd>
+</p>
+</dd>
+<dt>&lsquo;<samp>HepMC3_GenEvent</samp>&rsquo;</dt>
+<dd><p>Generates output using HepMC3 library. The format of the output is set with  <code>HEPMC3_IO_TYPE=&lt;0|1|2|3|4&gt;</code> tag.
+The default value is 0 and corresponds to ASCII GenEvent. Other available options are 
+1: HepEvt 2: ROOT file with every event written as an object of class GenEvent. 3: ROOT file with GenEvent objects writen into TTree.
+Otherwise similar to  <code>HepMC_GenEvent</code>.
+</p>
+</dd>
 <dt>&lsquo;<samp>Delphes_GenEvent</samp>&rsquo;</dt>
 <dd><p>Generates output in <a href="http://root.cern.ch">Root</a> format, which can be passed to
 <a href="http://cp3.irmp.ucl.ac.be/projects/delphes">Delphes</a> for analyses.
@@ -2058,10 +2059,11 @@ must be given during installation to enable this feature.
 <p>Sherpa can compute alternative event weights for different scale and 
 PDF choices on-the-fly, resulting in alternative weights for the generated 
 event. The can be evoked with the following syntax
-</p><pre class="verbatim">SCALE_VARIATIONS &lt;muR-fac-1&gt;,&lt;muF-fac-1&gt;[,&lt;PDF-1&gt;]  &lt;muR-fac-1&gt;,&lt;muF-fac-1&gt;[,&lt;PDF-1&gt;] ...
+</p><pre class="verbatim">SCALE_VARIATIONS &lt;muR-fac-1&gt;,&lt;muF-fac-1&gt;[,&lt;PDF-1&gt;[,&lt;associated-contrib-1&gt;]]  &lt;muR-fac-1&gt;,&lt;muF-fac-1&gt;[,&lt;PDF-1&gt;[,&lt;associated-contrib-1&gt;]] ...
 </pre><p>The key word <code>SCALE_VARIATIONS</code> takes a space separated list of 
-variation factors for the nominal renormalisation and factorisation scale 
-and an associated PDF set. Any set present in any of the PDF library interfaces
+variation factors for the nominal renormalisation and factorisation scale, 
+an associated PDF set and associated approximate NLO EW and sub-leading order
+contributions. Any set present in any of the PDF library interfaces
 loaded through <code>PDF_LIBRARY</code> can be used. If no PDF set is given it 
 defaults to the nominal one. Specific PDF members can be 
 specified by appending the PDF set name with <code>/&lt;member-id&gt;</code>. The 
@@ -2080,12 +2082,19 @@ PDF sets to be reweighted to to <code>PDF_VARIATIONS</code>.
 </pre><p>Please note, this syntax will create 7+53+51+101=212 additional weights
 for each event.
 </p>
+<p>Similarly, the associated NLO EW and sub-leading order contributions can 
+be included orthogonally to scale and PDF variations through
+</p><pre class="verbatim">  ASSOCIATED_CONTRIBUTIONS_VARIATIONS EW EW|LO1 EW|LO1|LO2 EW|LO1|LO2|LO3;
+</pre>
 <p>The additional event weights can then be written into the event output. 
 However, this is currently only supported for <code>HepMC_GenEvent</code> and 
 <code>HepMC_Short</code> with versions &gt;2.06 and <code>HEPMC_USE_NAMED_WEIGHTS=1</code>. 
 The alternative event weights follow the Les Houches naming convention 
-for such variations, ie. they are named <code>MUR&lt;fac&gt;_MUF&lt;fac&gt;_PDF&lt;id&gt;</code>.
-When using Sherpa&rsquo;s interface to Rivet, <a href="#Rivet-analyses">Rivet analyses</a>, separate 
+for such variations, ie. they are named <code>MUR&lt;fac&gt;_MUF&lt;fac&gt;_PDF&lt;id&gt;</code>. 
+In case associated NLO EW and sub-leading order contributions are used, 
+this convention is extended to <code>MUR&lt;fac&gt;_MUF&lt;fac&gt;_PDF&lt;id&gt;_ASS&lt;contrib&gt;</code>.
+</p>
+<p>When using Sherpa&rsquo;s interface to Rivet, <a href="#Rivet-analyses">Rivet analyses</a>, separate 
 instances of Rivet, one for each alternative event weight in addition to 
 the nominal one, are instantiated leading to one set of histograms each.
 They are again named using the <code>MUR&lt;fac&gt;_MUF&lt;fac&gt;_PDF&lt;id&gt;</code> convention.
@@ -2098,9 +2107,18 @@ number of trials, cf. <a href="#Cross-section-determination">Cross section deter
 </p>
 <p>The on-the-fly reweighting works for all event generation modes (weighted or
 (partially) unweighted) and all calculation types (LO, LOPS, NLO, NLOPS,
-MEPS@LO, MEPS@NLO and MENLOPS).  However, it does not include the reweighting
-of parton shower emissions per default, which is an experimental feature in
-Sherpa 2.2.0.
+MEPS@LO, MEPS@NLO and MENLOPS).
+However, the reweighting of parton shower emissions has to be enabled explicitly,
+using <code>CSS_REWEIGHT=1</code>.  This should work out of the box for both scale
+and PDF variations.  If numerical issues are encountered, one can try to
+increase &lsquo;<samp>CSS_REWEIGHT_SCALE_CUTOFF</samp>&rsquo; (default: 5).
+This disables shower variations for emissions at scales below the value.  An
+improved accuracy for shower variations at very low scales can be achieved by
+using <code>CSS_ALPHAS_FREEZE_MODE=1</code>, see <a href="#CS-Shower-options">CS Shower options</a>.
+An additional safeguard against rare spuriously large shower variation
+weights is implemented as <code>CSS_MAX_REWEIGHT_FACTOR</code> (default: 1e3).
+Any variation weights accumulated during an event and larger than this factor
+will be ignored and reset to 1.
 </p>
 <hr>
 <a name="MPI-parallelization"></a>
@@ -2592,9 +2610,9 @@ provided by the PDF set.
 in the process, Sherpa uses the complex mass scheme to construct MEs
 in a gauge-invariant way. For full consistency with this scheme,
 by default the dependent EW parameters are also calculated from the complex
-masses (&lsquo;<samp>WIDTHSCHEME=CMS</samp>&rsquo;), yielding complex values e.g. for
+masses (&lsquo;<samp>WIDTH_SCHEME=CMS</samp>&rsquo;), yielding complex values e.g. for
 the weak mixing angle.
-To keep the parameters real one can set &lsquo;<samp>WIDTHSCHEME=Fixed</samp>&rsquo;. This may
+To keep the parameters real one can set &lsquo;<samp>WIDTH_SCHEME=Fixed</samp>&rsquo;. This may
 spoil gauge invariance though.
 </p>
 <p>With the following switches it is possible to change the properties of
@@ -3218,6 +3236,11 @@ scale setter.
 <dt>&lsquo;<samp>TTBar</samp>&rsquo;</dt>
 <dd><p>Core scale setter for processes involving top quarks. Implementation details 
 are described in Appendix C of [<a href="#Hoeche2013mua">Hoe13</a>].
+</p></dd>
+<dt>&lsquo;<samp>SingleTop</samp>&rsquo;</dt>
+<dd><p>Core scale setter for single-top production in association with one jet.
+If the W is in the t-channel (s-channel), the squared scales are set to the
+Mandelstam variables <code>t=2*p[0]*p[2]</code> (<code>t=2*p[0]*p[1]</code>).
 </p></dd>
 </dl>
 
@@ -4057,6 +4080,10 @@ the given flavour. Their respective keywords are
 <dt>&lsquo;<samp>PseudoRapidity</samp>&rsquo;</dt>
 <dd><p>pseudorapidity cut
 </p></dd>
+<dt>&lsquo;<samp>PZIN</samp>&rsquo;</dt>
+<dd><p>cut on the z-component of the momentum, acts on initial-state flavours only
+(commonly used in DIS analyses)
+</p></dd>
 </dl>
 
 
@@ -4099,6 +4126,10 @@ the given flavour. Their respective keywords are
 </p></dd>
 <dt>&lsquo;<samp>DeltaR</samp>&rsquo;</dt>
 <dd><p>R separation
+</p></dd>
+<dt>&lsquo;<samp>INEL</samp>&rsquo;</dt>
+<dd><p>inelasticity, one of the flavours must be in the initial-state (commonly used
+in DIS analyses)
 </p></dd>
 </dl>
 
@@ -4181,8 +4212,9 @@ up to the specified values. This is useful e.g. in calculations with massive
 b-quarks which shall nonetheless satisfy jet criteria.
 </p>
 <p>The final option &lsquo;<samp>FastjetFinder</samp>&rsquo; allows to use the 
-<a href="http://www.fastjet.fr">FastJet</a> plugin if enabled during configuration. 
-It takes the following mandatory arguments:
+<a href="http://www.fastjet.fr">FastJet</a> plugin if enabled during configuration(*). 
+</p>
+<p>It takes the following mandatory arguments:
 <code>&lt;algorithm&gt;</code> can take the values <code>kt,antikt,cambridge,siscone</code>, 
 <code>&lt;n&gt;</code> is the minimum number of jets to be found, <code>&lt;ptmin&gt;</code> and 
 <code>&lt;etmin&gt;</code> are the minimum transverse momentum and/or energy, 
@@ -4343,7 +4375,7 @@ Mass &lt;flavour1 code&gt; &lt;flavour2 code&gt; &lt;min value&gt; &lt;max value
 <a name="Fastjet-selector-1"></a>
 <h3 class="subsection">5.7.8 Fastjet selector</h3>
 
-<p>If <a href="http://www.fastjet.fr">FastJet</a> is enabled, the momenta and nodal 
+<p>If <a href="http://www.fastjet.fr">FastJet</a> is enabled(*), the momenta and nodal 
 values of the jets found with Fastjet can be used to calculate more elaborate 
 selector criteria. The syntax of this selector is
 </p>
@@ -4365,6 +4397,11 @@ to use b-tagged jets only, based on the parton-level constituents of the jets.
 There are two options: With <code>&lt;bmode&gt;=1</code> both b and anti-b quarks are
 counted equally towards b-jets, while for <code>&lt;bmode&gt;=2</code> they are added with a
 relative sign as constituents, i.e. a jet containing b and anti-b is not tagged.
+</p>
+<p>(*) If FastJet has not been enabled during configuration of your Sherpa
+installation, you can still build a FastJet-based selector plugin by including
+the content of any necessary functions (e.g. from <code>Fastjet_Helpers.[HC]</code>)
+explicitly and linking against FastJet at compile time of the plugin.
 </p><hr>
 <a name="Integration"></a>
 <a name="Integration-1"></a>
@@ -4884,6 +4921,7 @@ as massless.
 <a name="index-CSS_005fMASS_005fTHRESHOLD"></a>
 <a name="index-CSS_005fEVOLUTION_005fSCHEME"></a>
 <a name="index-CSS_005fSCALE_005fSCHEME"></a>
+<a name="index-CSS_005fALPHAS_005fFREEZE_005fMODE"></a>
 
 <p>Sherpa&rsquo;s default shower module is based on [<a href="#Schumann2007mg">Sch07a</a>].
 A new ordering parameter for initial state splitters was introduced 
@@ -4910,7 +4948,7 @@ double counting, this has to be disabled as explained in that section.
 </p>
 <p>The CS Shower can be forced not to emit any partons setting
 &lsquo;<samp>CSS_NOEM=1</samp>&rsquo;. Sudakov rejection weights for merged samples
-are calculated nontheless. Setting &lsquo;<samp>CSS_MAXEM=&lt;N&gt;</samp>&rsquo;, on the
+are calculated nonetheless. Setting &lsquo;<samp>CSS_MAXEM=&lt;N&gt;</samp>&rsquo;, on the
 other hand, forces the CS Shower to truncate its evolution at the
 Nth emission. This setting, however does not necessarily compute all
 Sudakov weights correctly. Both settings still enable the CS Shower
@@ -4919,13 +4957,23 @@ to be used in the METS scale setter, cf. <a href="#SCALES">SCALES</a>.
 <p>The evolution variable of the CS shower can be changed using 
 &lsquo;<samp>CSS_EVOLUTION_SCHEME</samp>&rsquo;. Two options are currently implemented,
 which correspond to transverse momentum ordering (option 0) and modified
-transverse momentum ordering (option 1). The scale at which the strong 
+transverse momentum ordering (option 1). In addition, modified versions of these
+options (option 2 and option 3) are implemented, which take parton masses into
+account where applicable. The scale at which the strong 
 coupling for gluon splitting into quarks is evaluated can be chosen
 with &lsquo;<samp>CSS_SCALE_SCHEME</samp>&rsquo;, where 0 corresponds to the ordering 
 parameter and 1 corresponds to invariant mass. Additionally, the CS shower
 allows to disable splittings at scales below the on-shell mass of heavy
 quarks. The upper limit for the corresponding heavy quark mass is set
 using &lsquo;<samp>CSS_MASS_THRESHOLD</samp>&rsquo;.
+</p>
+<p>The cut-off behaviour of the strong coupling for scales at which its value
+would formally exceed one can be set using &lsquo;<samp>CSS_ALPHAS_FREEZE_MODE</samp>&rsquo;.
+Setting it to 0 (which is the default) means that the strong coupling evaluates
+to zero at such scales (hard cut-off). Setting it to 1 lets it evaluate to one
+instead (freeze-in). A freeze-in behaviour is preferable when reweighting
+shower emissions, but it has not been used in the default Sherpa tune, and
+should therefore not be used when comparing particle-level predictions to data.
 </p><hr>
 <a name="MPI-Parameters"></a>
 <a name="Multiple-interactions"></a>
@@ -6971,21 +7019,23 @@ of the main features of these examples.
 </td></tr>
 <tr><td align="left" valign="top"><a href="#TopsJets">9.4 Top quark (pair) + jets production</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
-<tr><td align="left" valign="top"><a href="#VVJets">9.5 Vector boson pairs + jets production</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#SingleTopChannels">9.5 Single-top production in the s, t and tW channel</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
-<tr><td align="left" valign="top"><a href="#MSSM_002fUFO">9.6 Event generation in the MSSM using UFO</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#VVJets">9.6 Vector boson pairs + jets production</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
-<tr><td align="left" valign="top"><a href="#DIS">9.7 Deep-inelastic scattering</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#MSSM_002fUFO">9.7 Event generation in the MSSM using UFO</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
-<tr><td align="left" valign="top"><a href="#FONLO">9.8 Fixed-order next-to-leading order calculations</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#DIS">9.8 Deep-inelastic scattering</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
-<tr><td align="left" valign="top"><a href="#SoftQCD">9.9 Soft QCD: Minimum Bias and Cross Sections</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#FONLO">9.9 Fixed-order next-to-leading order calculations</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
-<tr><td align="left" valign="top"><a href="#BFactories">9.10 Setups for event production at B-factories</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#SoftQCD">9.10 Soft QCD: Minimum Bias and Cross Sections</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
-<tr><td align="left" valign="top"><a href="#MEvalues">9.11 Calculating matrix element values for externally given configurations</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#BFactories">9.11 Setups for event production at B-factories</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
-<tr><td align="left" valign="top"><a href="#APIexamples">9.12 Using the Python interface</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#MEvalues">9.12 Calculating matrix element values for externally given configurations</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+</td></tr>
+<tr><td align="left" valign="top"><a href="#APIexamples">9.13 Using the Python interface</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
 </table>
 
@@ -7348,7 +7398,7 @@ with Comix instead of Amegic.
 
 <hr>
 <a name="Jets"></a>
-<a name="Jet-production"></a>
+<a name="Jet-production-1"></a>
 <h2 class="section">9.2 Jet production</h2>
 
 <table class="menu" border="0" cellspacing="0">
@@ -7360,7 +7410,7 @@ with Comix instead of Amegic.
 
 <hr>
 <a name="LHC_005fJets"></a>
-<a name="Jet-production-1"></a>
+<a name="Jet-production"></a>
 <h3 class="subsection">9.2.1 Jet production</h3>
 
 <table class="menu" border="0" cellspacing="0">
@@ -8283,7 +8333,9 @@ quarks or leptons.
 <table class="menu" border="0" cellspacing="0">
 <tr><td align="left" valign="top"><a href="#Top-quark-pair-production">9.4.1 Top quark pair production</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
-<tr><td align="left" valign="top"><a href="#Tops-plus-W-in-MC_0040NLO">9.4.2 Production of a top quark pair in association with a W-boson</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#Top-quark-pair-production-including-approximate-EW-corrections">9.4.2 Top quark pair production including approximate EW corrections</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+</td></tr>
+<tr><td align="left" valign="top"><a href="#Tops-plus-W-in-MC_0040NLO">9.4.3 Production of a top quark pair in association with a W-boson</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
 </table>
 
@@ -8301,6 +8353,7 @@ quarks or leptons.
   % scales, tags for scale variations
   FSF:=1.; RSF:=1.; QSF:=1.;
   SCALES METS{FSF*MU_F2}{RSF*MU_R2}{QSF*MU_Q2};
+  SCALE_VARIATIONS 0.25,0.25 0.25,1. 1.,0.25 1.,1. 1.,4. 4.,1. 4.,4.;
   CORE_SCALE QCD;
   METS_BBAR_MODE 5;
 
@@ -8313,8 +8366,8 @@ quarks or leptons.
   LOOPGEN:=OpenLoops;
 
   % collider setup
-  BEAM_1 2212; BEAM_ENERGY_1 = 4000.;
-  BEAM_2 2212; BEAM_ENERGY_2 = 4000.;
+  BEAM_1 2212; BEAM_ENERGY_1 13500.;
+  BEAM_2 2212; BEAM_ENERGY_2 13500.;
 
   % decays
   HARD_DECAYS On;
@@ -8350,11 +8403,82 @@ quarks or leptons.
 for massive particles, as described in [<a href="#Hoeche2013mua">Hoe13</a>].
 </li><li> A non-default METS core scale setter is used, cf. <a href="#METS-scale-setting-with-multiparton-core-processes">METS scale setting with multiparton core processes</a>
 </li><li> We enable top decays through the internal decay module using &lsquo;<samp>HARD_DECAYS 1</samp>&rsquo;
+</li><li> We calculate on-the-fly a 7-point scale variation, cf. <a href="#Scale-and-PDF-variations">Scale and PDF variations</a>.
+</li></ul>
+
+
+
+<hr>
+<a name="Top-quark-pair-production-including-approximate-EW-corrections"></a>
+<a name="Top-quark-pair-production-including-approximate-EW-corrections-1"></a>
+<h3 class="subsection">9.4.2 Top quark pair production including approximate EW corrections</h3>
+
+<div class="example">
+<div class="smallformat">
+<pre class="example"><pre class="verbatim">(run){
+  % general setting
+  EVENTS 1M; ERROR 0.99;
+
+  % scales, tags for scale variations
+  FSF:=1.; RSF:=1.; QSF:=1.;
+  SCALES METS{FSF*MU_F2}{RSF*MU_R2}{QSF*MU_Q2};
+  SCALE_VARIATIONS 0.25,0.25 0.25,1. 1.,0.25 1.,1. 1.,4. 4.,1. 4.,4.;
+  ASSOCIATED_CONTRIBUTIONS_VARIATIONS EW EW|LO1 EW|LO1|LO2 EW|LO1|LO2|LO3;
+  CORE_SCALE QCD;
+  METS_BBAR_MODE 5;
+
+  % tags for process setup
+  NJET:=3; LJET:=2,3; QCUT:=20.;
+
+  % me generator settings
+  ME_SIGNAL_GENERATOR Comix Amegic LOOPGEN;
+  EVENT_GENERATION_MODE Weighted;
+  OL_PARAMETERS preset 2 ew_renorm_scheme 1;
+  LOOPGEN:=OpenLoops;
+
+  % collider setup
+  BEAM_1 2212; BEAM_ENERGY_1 13500.;
+  BEAM_2 2212; BEAM_ENERGY_2 13500.;
+
+  % decays
+  HARD_DECAYS On;
+  HDH_STATUS[24,2,-1]=0
+  HDH_STATUS[24,4,-3]=0
+  HDH_STATUS[-24,-2,1]=0
+  HDH_STATUS[-24,-4,3]=0
+  STABLE[24] 0; STABLE[6] 0; WIDTH[6] 0;
+
+  NLO_SMEAR_THRESHOLD 1;
+  NLO_SMEAR_POWER 2;
+}(run)
+
+(processes){
+  Process : 93 93 -&gt;  6 -6 93{NJET};
+  Order (*,0); CKKW sqr(QCUT/E_CMS);
+  NLO_QCD_Mode MC@NLO {LJET};
+  ME_Generator Amegic {LJET};
+  RS_ME_Generator Comix {LJET};
+  Loop_Generator LOOPGEN {LJET};
+  Associated_Contributions EW|LO1|LO2|LO3 {2};
+  Associated_Contributions EW|LO1|LO2|LO3 {3};
+  Max_N_Quarks 6 {5,6,7,8};
+  Integration_Error 0.05 {5,6,7,8};
+  Scales LOOSE_METS{FSF*MU_F2}{RSF*MU_R2}{QSF*MU_Q2} {5,6,7,8};
+  End process
+}(processes)
+</pre></pre></div>
+</div>
+
+<p>Things to notice:
+</p><ul>
+<li> In addition to the setup in <a href="#Top-quark-pair-production">Top quark pair production</a> we add approximate EW corrections, cf. [<a href="#Gutschow2018tuk">Gut18</a>].
+</li><li> Please note: this setup currently only works with a beta version of the upcoming OpenLoops release.
+</li><li> The approximate EW corrections are added as additional variations on the event weight.
 </li></ul>
 <hr>
 <a name="Tops-plus-W-in-MC_0040NLO"></a>
 <a name="Production-of-a-top-quark-pair-in-association-with-a-W_002dboson"></a>
-<h3 class="subsection">9.4.2 Production of a top quark pair in association with a W-boson</h3>
+<h3 class="subsection">9.4.3 Production of a top quark pair in association with a W-boson</h3>
 
 <div class="example">
 <div class="smallformat">
@@ -8415,29 +8539,324 @@ to zero using &lsquo;<samp>WIDTH[6]=0</samp>&rsquo; and &lsquo;<samp>WIDTH[24]=0
  
 
 <hr>
+<a name="SingleTopChannels"></a>
+<a name="Single_002dtop-production-in-the-s_002c-t-and-tW-channel"></a>
+<h2 class="section">9.5 Single-top production in the s, t and tW channel</h2>
+
+<p>In this section, examples for single-top production in three different channels
+are described.  For the channel definitions and a validation of these setups,
+see [<a href="#Bothmann2017jfv">Both17</a>].
+</p>
+<table class="menu" border="0" cellspacing="0">
+<tr><td align="left" valign="top"><a href="#t_002dchannel-single_002dtop-production">9.5.1 t-channel single-top production</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+</td></tr>
+<tr><td align="left" valign="top"><a href="#t_002dchannel-single_002dtop-production-with-N_005ff_003d4">9.5.2 t-channel single-top production with N_f=4</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+</td></tr>
+<tr><td align="left" valign="top"><a href="#s_002dchannel-single_002dtop-production">9.5.3 s-channel single-top production</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+</td></tr>
+<tr><td align="left" valign="top"><a href="#tW_002dchannel-single_002dtop-production">9.5.4 tW-channel single-top production</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+</td></tr>
+</table>
+
+<hr>
+<a name="t_002dchannel-single_002dtop-production"></a>
+<a name="t_002dchannel-single_002dtop-production-1"></a>
+<h3 class="subsection">9.5.1 t-channel single-top production</h3>
+
+<div class="example">
+<div class="smallformat">
+<pre class="example"><pre class="verbatim"># SHERPA run card for t-channel single top-quark production at MC@NLO
+# and N_f = 5
+
+(run){
+  # general setting
+  EVENTS 1M
+
+  # me generator settings
+  ME_SIGNAL_GENERATOR Comix Amegic LOOPGEN
+  EVENT_GENERATION_MODE Weighted
+  LOOPGEN:=OpenLoops
+  HARD_DECAYS On
+
+  # scales, tags for scale variations
+  # SCALES STRICT_METS:
+  #   use CKKW clustering scale for real/MC@NLO emission
+  # CORESCALE SingleTop:
+  #   use Mandelstam \hat{t} for t-channel 2-&gt;2 core process
+  SCF:=1.; FSF:=SCF; RSF:=SCF; QSF:=SCF
+  SCALES STRICT_METS{FSF*MU_F2}{RSF*MU_R2}{QSF*MU_Q2}
+  CORE_SCALE SingleTop
+
+  # collider setup
+  BEAM_1 2212; BEAM_ENERGY_1 4000
+  BEAM_2 2212; BEAM_ENERGY_2 4000
+
+  # disable hadronic W decays
+  HDH_STATUS[24,2,-1] 0
+  HDH_STATUS[24,4,-3] 0
+  HDH_STATUS[-24,-2,1] 0
+  HDH_STATUS[-24,-4,3] 0
+
+  # choose EW Gmu input scheme
+  EW_SCHEME 3
+
+  # required for using top-quark in ME
+  WIDTH[6]  0.
+}(run)
+
+(processes){
+  Process 93 93 -&gt; 6 93
+  NLO_QCD_Mode MC@NLO
+  Order (*,2)
+  ME_Generator Amegic
+  RS_ME_Generator Comix
+  Loop_Generator LOOPGEN
+  Min_N_TChannels 1  # require t-channel W
+  End process
+}(processes)
+</pre></pre></div>
+</div>
+
+<p>Things to notice:
+</p><ul>
+<li> We use OpenLoops to compute the virtual corrections [<a href="#Cascioli2011va">Cas11</a>].
+</li><li> We match matrix elements and parton showers using the MC@NLO technique 
+for massive particles, as described in [<a href="#Hoeche2013mua">Hoe13</a>].
+</li><li> A non-default METS core scale setter is used, cf. <a href="#METS-scale-setting-with-multiparton-core-processes">METS scale setting with multiparton core processes</a>
+</li><li> We enable top and W decays through the internal decay module using &lsquo;<samp>HARD_DECAYS On</samp>&rsquo;.
+The W is restricted to its leptonic decay channels.
+</li><li> By setting &lsquo;<samp>Min_N_TChannels 1</samp>&rsquo;, only t-channel diagrams are used for the calculation
+</li></ul>
+
+
+<hr>
+<a name="t_002dchannel-single_002dtop-production-with-N_005ff_003d4"></a>
+<a name="t_002dchannel-single_002dtop-production-with-N_005ff_003d4-1"></a>
+<h3 class="subsection">9.5.2 t-channel single-top production with N_f=4</h3>
+
+<div class="example">
+<div class="smallformat">
+<pre class="example"><pre class="verbatim"># SHERPA run card for t-channel single top-quark production at MC@NLO
+# and N_f = 4
+
+(run){
+  # general setting
+  EVENTS 1M
+
+  # me generator settings
+  ME_SIGNAL_GENERATOR Comix Amegic LOOPGEN
+  EVENT_GENERATION_MODE Weighted
+  LOOPGEN:=OpenLoops
+  HARD_DECAYS On
+
+  # scales, tags for scale variations
+  #   muR = transverse momentum of the bottom
+  #   muF = muQ = transverse momentum of the top
+  SCF:=1.; FSF:=SCF; RSF:=SCF; QSF:=SCF
+  rscl2:=MPerp2(p[3])
+  fscl2:=MPerp2(p[2])
+  SCALES VAR{FSF*fscl2}{RSF*rscl2}{QSF*fscl2}
+
+  # collider setup
+  BEAM_1 2212; BEAM_ENERGY_1 4000
+  BEAM_2 2212; BEAM_ENERGY_2 4000
+
+  # disable hadronic W decays
+  HDH_STATUS[24,2,-1] 0
+  HDH_STATUS[24,4,-3] 0
+  HDH_STATUS[-24,-2,1] 0
+  HDH_STATUS[-24,-4,3] 0
+
+  # choose EW Gmu input scheme
+  EW_SCHEME 3
+
+  # required for using top-quark in ME
+  WIDTH[6]  0.
+
+  # configure for N_f = 4
+  PDF_LIBRARY LHAPDFSherpa
+  PDF_SET NNPDF30_nlo_as_0118_nf_4
+  USE_PDF_ALPHAS 1
+  MASS[5] 4.18  # as in NNPDF30_nlo_as_0118_nf_4
+  MASSIVE[5] 1
+}(run)
+
+(processes){
+  Process 93 93 -&gt; 6 -5 93
+  NLO_QCD_Mode MC@NLO
+  Order (*,2)
+  ME_Generator Amegic
+  RS_ME_Generator Comix
+  Loop_Generator LOOPGEN
+  Min_N_TChannels 1  # require t-channel W
+  End process
+}(processes)
+</pre></pre></div>
+</div>
+
+<p>Things to notice:
+</p><ul>
+<li> We use an Nf4 PDF and use its definition of the bottom mass
+</li><li> See <a href="#t_002dchannel-single_002dtop-production">t-channel single-top production</a> for more comments
+</li></ul>
+<hr>
+<a name="s_002dchannel-single_002dtop-production"></a>
+<a name="s_002dchannel-single_002dtop-production-1"></a>
+<h3 class="subsection">9.5.3 s-channel single-top production</h3>
+
+<div class="example">
+<div class="smallformat">
+<pre class="example"><pre class="verbatim"># SHERPA run card for s-channel single top-quark production at MC@NLO
+# and N_f = 5
+
+(run){
+  # general setting
+  EVENTS 1M
+
+  # me generator settings
+  ME_SIGNAL_GENERATOR Comix Amegic LOOPGEN
+  EVENT_GENERATION_MODE Weighted
+  LOOPGEN:=OpenLoops
+  HARD_DECAYS On
+
+  # scales, tags for scale variations
+  # SCALES STRICT_METS:
+  #   use CKKW clustering scale for real/MC@NLO emission
+  # CORESCALE SingleTop:
+  #   use Mandelstam \hat{s} for s-channel 2-&gt;2 core process
+  SCF:=1.; FSF:=SCF; RSF:=SCF; QSF:=SCF
+  SCALES STRICT_METS{FSF*MU_F2}{RSF*MU_R2}{QSF*MU_Q2}
+  CORE_SCALE SingleTop
+
+  # collider setup
+  BEAM_1 2212; BEAM_ENERGY_1 4000
+  BEAM_2 2212; BEAM_ENERGY_2 4000
+
+  # disable hadronic W decays
+  HDH_STATUS[24,2,-1] 0
+  HDH_STATUS[24,4,-3] 0
+  HDH_STATUS[-24,-2,1] 0
+  HDH_STATUS[-24,-4,3] 0
+
+  # choose EW Gmu input scheme
+  EW_SCHEME 3
+
+  # required for using top-quark in ME
+  WIDTH[6]  0.
+
+  # there is no bottom in the initial-state in s-channel production
+  PARTICLE_CONTAINER 900 lj 1 -1 2 -2 3 -3 4 -4 21
+}(run)
+
+(processes){
+  Process 900 900 -&gt; 6 93
+  NLO_QCD_Mode MC@NLO
+  Order (*,2)
+  ME_Generator Amegic
+  RS_ME_Generator Comix
+  Loop_Generator LOOPGEN
+  Max_N_TChannels 0  # require s-channel W
+  End process
+}(processes)
+</pre></pre></div>
+</div>
+
+<p>Things to notice:
+</p><ul>
+<li> By excluding the bottom quark from the initial-state at Born level using
+&lsquo;<samp>PARTICLE_CONTAINER</samp>&rsquo;, and by setting &lsquo;<samp>Max_N_TChannels 0</samp>&rsquo;, only
+s-channel diagrams are used for the calculation
+</li><li> See <a href="#t_002dchannel-single_002dtop-production">t-channel single-top production</a> for more comments
+</li></ul>
+<hr>
+<a name="tW_002dchannel-single_002dtop-production"></a>
+<a name="tW_002dchannel-single_002dtop-production-1"></a>
+<h3 class="subsection">9.5.4 tW-channel single-top production</h3>
+
+<div class="example">
+<div class="smallformat">
+<pre class="example"><pre class="verbatim"># SHERPA run card for tW-channel single top-quark production at MC@NLO
+# and N_f = 5
+
+(run){
+  # general setting
+  EVENTS 1M
+
+  # me generator settings
+  ME_SIGNAL_GENERATOR Comix Amegic LOOPGEN
+  EVENT_GENERATION_MODE Weighted
+  LOOPGEN:=OpenLoops
+  HARD_DECAYS On
+
+  # scales, tags for scale variations
+  #   mu = transverse momentum of the top
+  SCF:=1.; FSF:=SCF; RSF:=SCF; QSF:=SCF;
+  scl2:=MPerp2(p[3]);
+  SCALES VAR{FSF*scl2}{RSF*scl2}{QSF*scl2};
+
+  # collider setup
+  BEAM_1 2212; BEAM_ENERGY_1 4000
+  BEAM_2 2212; BEAM_ENERGY_2 4000
+
+  # disable hadronic W decays
+  HDH_STATUS[24,2,-1] 0
+  HDH_STATUS[24,4,-3] 0
+  HDH_STATUS[-24,-2,1] 0
+  HDH_STATUS[-24,-4,3] 0
+
+  # choose EW Gmu input scheme
+  EW_SCHEME 3
+
+  # required for using top-quark/W-boson in ME
+  WIDTH[6]   0.
+  WIDTH[24]  0.
+}(run)
+
+(processes){
+  Process 93 93 -&gt; 6 -24
+  No_Decay -6  # remove ttbar diagrams
+  NLO_QCD_Mode MC@NLO
+  Order (*,1)
+  ME_Generator Amegic
+  RS_ME_Generator Comix
+  Loop_Generator LOOPGEN
+  End process
+}(processes)
+</pre></pre></div>
+</div>
+
+<p>Things to notice:
+</p><ul>
+<li> By setting &lsquo;<samp>No_Decay -6</samp>&rsquo;, the doubly-resonant TTbar diagrams are
+removed. Only the singly-resonant diagrams remain as required by the definition
+of the channel.
+</li><li> See <a href="#t_002dchannel-single_002dtop-production">t-channel single-top production</a> for more comments
+</li></ul>
+
+<hr>
 <a name="VVJets"></a>
 <a name="Vector-boson-pairs-_002b-jets-production"></a>
-<h2 class="section">9.5 Vector boson pairs + jets production</h2>
+<h2 class="section">9.6 Vector boson pairs + jets production</h2>
 
 <table class="menu" border="0" cellspacing="0">
-<tr><td align="left" valign="top"><a href="#Dilepton-missing-energy-and-jets-production">9.5.1 Dilepton, missing energy and jets production</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#Dilepton-missing-energy-and-jets-production">9.6.1 Dilepton, missing energy and jets production</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
-<tr><td align="left" valign="top"><a href="#Dilepton-missing-energy-and-jets-production-_0028gluon-initiated_0029">9.5.2 Dilepton, missing energy and jets production (gluon initiated)</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#Dilepton-missing-energy-and-jets-production-_0028gluon-initiated_0029">9.6.2 Dilepton, missing energy and jets production (gluon initiated)</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
-<tr><td align="left" valign="top"><a href="#Four-lepton-and-jets-production">9.5.3 Four lepton and jets production</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#Four-lepton-and-jets-production">9.6.3 Four lepton and jets production</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
-<tr><td align="left" valign="top"><a href="#Four-lepton-and-jets-production-_0028gluon-initiated_0029">9.5.4 Four lepton and jets production (gluon initiated)</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#Four-lepton-and-jets-production-_0028gluon-initiated_0029">9.6.4 Four lepton and jets production (gluon initiated)</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
-<tr><td align="left" valign="top"><a href="#WZ-production-with-jets-production">9.5.5 WZ production with jets production</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#WZ-production-with-jets-production">9.6.5 WZ production with jets production</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
-<tr><td align="left" valign="top"><a href="#Same-sign-dilepton-missing-energy-and-jets-production">9.5.6 Same sign dilepton, missing energy and jets production</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#Same-sign-dilepton-missing-energy-and-jets-production">9.6.6 Same sign dilepton, missing energy and jets production</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
 </table>
 
 <hr>
 <a name="Dilepton-missing-energy-and-jets-production"></a>
 <a name="Dilepton_002c-missing-energy-and-jets-production"></a>
-<h3 class="subsection">9.5.1 Dilepton, missing energy and jets production</h3>
+<h3 class="subsection">9.6.1 Dilepton, missing energy and jets production</h3>
 
 <div class="example">
 <div class="smallformat">
@@ -8497,7 +8916,7 @@ to zero using &lsquo;<samp>WIDTH[6]=0</samp>&rsquo; and &lsquo;<samp>WIDTH[24]=0
 <hr>
 <a name="Dilepton-missing-energy-and-jets-production-_0028gluon-initiated_0029"></a>
 <a name="Dilepton_002c-missing-energy-and-jets-production-_0028gluon-initiated_0029"></a>
-<h3 class="subsection">9.5.2 Dilepton, missing energy and jets production (gluon initiated)</h3>
+<h3 class="subsection">9.6.2 Dilepton, missing energy and jets production (gluon initiated)</h3>
 
 <div class="example">
 <div class="smallformat">
@@ -8559,7 +8978,7 @@ to zero using &lsquo;<samp>WIDTH[6]=0</samp>&rsquo; and &lsquo;<samp>WIDTH[24]=0
 <hr>
 <a name="Four-lepton-and-jets-production"></a>
 <a name="Four-lepton-and-jets-production-1"></a>
-<h3 class="subsection">9.5.3 Four lepton and jets production</h3>
+<h3 class="subsection">9.6.3 Four lepton and jets production</h3>
 
 <div class="example">
 <div class="smallformat">
@@ -8614,7 +9033,7 @@ to zero using &lsquo;<samp>WIDTH[6]=0</samp>&rsquo; and &lsquo;<samp>WIDTH[24]=0
 <hr>
 <a name="Four-lepton-and-jets-production-_0028gluon-initiated_0029"></a>
 <a name="Four-lepton-and-jets-production-_0028gluon-initiated_0029-1"></a>
-<h3 class="subsection">9.5.4 Four lepton and jets production (gluon initiated)</h3>
+<h3 class="subsection">9.6.4 Four lepton and jets production (gluon initiated)</h3>
 
 <div class="example">
 <div class="smallformat">
@@ -8676,7 +9095,7 @@ to zero using &lsquo;<samp>WIDTH[6]=0</samp>&rsquo; and &lsquo;<samp>WIDTH[24]=0
 <hr>
 <a name="WZ-production-with-jets-production"></a>
 <a name="WZ-production-with-jets-production-1"></a>
-<h3 class="subsection">9.5.5 WZ production with jets production</h3>
+<h3 class="subsection">9.6.5 WZ production with jets production</h3>
 
 <div class="example">
 <div class="smallformat">
@@ -8744,7 +9163,7 @@ to zero using &lsquo;<samp>WIDTH[6]=0</samp>&rsquo; and &lsquo;<samp>WIDTH[24]=0
 <hr>
 <a name="Same-sign-dilepton-missing-energy-and-jets-production"></a>
 <a name="Same-sign-dilepton_002c-missing-energy-and-jets-production"></a>
-<h3 class="subsection">9.5.6 Same sign dilepton, missing energy and jets production</h3>
+<h3 class="subsection">9.6.6 Same sign dilepton, missing energy and jets production</h3>
 
 <div class="example">
 <div class="smallformat">
@@ -8855,7 +9274,7 @@ to zero using &lsquo;<samp>WIDTH[6]=0</samp>&rsquo; and &lsquo;<samp>WIDTH[24]=0
 <hr>
 <a name="MSSM_002fUFO"></a>
 <a name="Event-generation-in-the-MSSM-using-UFO"></a>
-<h2 class="section">9.6 Event generation in the MSSM using UFO</h2>
+<h2 class="section">9.7 Event generation in the MSSM using UFO</h2>
 
 <p>This is an example for event generation in the MSSM using Sherpa&rsquo;s UFO
 support. In the corresponding Example directory
@@ -8873,17 +9292,17 @@ run card as a template to generate events.
 <hr>
 <a name="DIS"></a>
 <a name="Deep_002dinelastic-scattering"></a>
-<h2 class="section">9.7 Deep-inelastic scattering</h2>
+<h2 class="section">9.8 Deep-inelastic scattering</h2>
 
 <table class="menu" border="0" cellspacing="0">
-<tr><td align="left" valign="top"><a href="#HERA">9.7.1 DIS at HERA</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#HERA">9.8.1 DIS at HERA</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
 </table>
 
 <hr>
 <a name="HERA"></a>
 <a name="DIS-at-HERA"></a>
-<h3 class="subsection">9.7.1 DIS at HERA</h3>
+<h3 class="subsection">9.8.1 DIS at HERA</h3>
 
 <p>This is an example of a setup for hadronic final states in deep-inelastic 
 lepton-nucleon scattering at a centre-of-mass energy of 300 GeV.
@@ -8945,17 +9364,17 @@ the experimental requirements for idenitfying the deep-inelastic scattering proc
 <hr>
 <a name="FONLO"></a>
 <a name="Fixed_002dorder-next_002dto_002dleading-order-calculations"></a>
-<h2 class="section">9.8 Fixed-order next-to-leading order calculations</h2>
+<h2 class="section">9.9 Fixed-order next-to-leading order calculations</h2>
 
 <table class="menu" border="0" cellspacing="0">
-<tr><td align="left" valign="top"><a href="#NTuple-production">9.8.1 Production of NTuples</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top"> Production of Root NTuples with Sherpa
+<tr><td align="left" valign="top"><a href="#NTuple-production">9.9.1 Production of NTuples</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top"> Production of Root NTuples with Sherpa
 </td></tr>
 </table>
 
 <hr>
 <a name="NTuple-production"></a>
 <a name="Production-of-NTuples"></a>
-<h3 class="subsection">9.8.1 Production of NTuples</h3>
+<h3 class="subsection">9.9.1 Production of NTuples</h3>
 <p>Root NTuples are a convenient way to store the result of cumbersome 
 fixed-order calculations in order to perform multiple analyses. 
 This example shows how to generate such NTuples and reweighted them 
@@ -9053,7 +9472,7 @@ to be larger than 20 GeV. No other cuts are applied at generation level.
 
 <hr>
 <a name="NTuple-production-1"></a>
-<h4 class="subsubsection">9.8.1.1 NTuple production</h4>
+<h4 class="subsubsection">9.9.1.1 NTuple production</h4>
 <p>Start Sherpa using the command line
 </p><pre class="verbatim">  Sherpa -f Run.B-like.dat
 </pre><p>Sherpa will first create source code for its matrix-element calculations.
@@ -9079,7 +9498,7 @@ The result can then be plotted and displayed.
 </p>
 <hr>
 <a name="Usage-of-NTuples-in-Sherpa"></a>
-<h4 class="subsubsection">9.8.1.2 Usage of NTuples in Sherpa</h4>
+<h4 class="subsubsection">9.9.1.2 Usage of NTuples in Sherpa</h4>
 <p>Next we will compute the NLO uncertainty band using Sherpa.
 To this end, we make use of the Root NTuples generated in the previous steps.
 Note that the setup files for reweighting are almost identical to those for
@@ -9097,19 +9516,19 @@ generating the NTuples. We have simply replaced &lsquo;<samp>EVENT_OUTPUT</samp>
 <hr>
 <a name="SoftQCD"></a>
 <a name="Soft-QCD_003a-Minimum-Bias-and-Cross-Sections"></a>
-<h2 class="section">9.9 Soft QCD: Minimum Bias and Cross Sections</h2>
+<h2 class="section">9.10 Soft QCD: Minimum Bias and Cross Sections</h2>
 
 <table class="menu" border="0" cellspacing="0">
-<tr><td align="left" valign="top"><a href="#Calculation-of-inclusive-cross-sections">9.9.1 Calculation of inclusive cross sections</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#Calculation-of-inclusive-cross-sections">9.10.1 Calculation of inclusive cross sections</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
-<tr><td align="left" valign="top"><a href="#Simulation-of-Minimum-Bias-events">9.9.2 Simulation of Minimum Bias events</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#Simulation-of-Minimum-Bias-events">9.10.2 Simulation of Minimum Bias events</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
 </table>
 
 <hr>
 <a name="Calculation-of-inclusive-cross-sections"></a>
 <a name="Calculation-of-inclusive-cross-sections-1"></a>
-<h3 class="subsection">9.9.1 Calculation of inclusive cross sections</h3>
+<h3 class="subsection">9.10.1 Calculation of inclusive cross sections</h3>
 
 <div class="example">
 <div class="smallformat">
@@ -9154,7 +9573,7 @@ generating the NTuples. We have simply replaced &lsquo;<samp>EVENT_OUTPUT</samp>
 <hr>
 <a name="Simulation-of-Minimum-Bias-events"></a>
 <a name="Simulation-of-Minimum-Bias-events-1"></a>
-<h3 class="subsection">9.9.2 Simulation of Minimum Bias events</h3>
+<h3 class="subsection">9.10.2 Simulation of Minimum Bias events</h3>
 
 <div class="example">
 <div class="smallformat">
@@ -9228,21 +9647,21 @@ generating the NTuples. We have simply replaced &lsquo;<samp>EVENT_OUTPUT</samp>
 <hr>
 <a name="BFactories"></a>
 <a name="Setups-for-event-production-at-B_002dfactories"></a>
-<h2 class="section">9.10 Setups for event production at B-factories</h2>
+<h2 class="section">9.11 Setups for event production at B-factories</h2>
 
 <table class="menu" border="0" cellspacing="0">
-<tr><td align="left" valign="top"><a href="#QCD-continuum">9.10.1 QCD continuum</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#QCD-continuum">9.11.1 QCD continuum</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
-<tr><td align="left" valign="top"><a href="#Signal-process">9.10.2 Signal process</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#Signal-process">9.11.2 Signal process</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
-<tr><td align="left" valign="top"><a href="#Single-hadron-decay-chains">9.10.3 Single hadron decay chains</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#Single-hadron-decay-chains">9.11.3 Single hadron decay chains</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
 </table>
 
 <hr>
 <a name="QCD-continuum"></a>
 <a name="QCD-continuum-1"></a>
-<h3 class="subsection">9.10.1 QCD continuum</h3>
+<h3 class="subsection">9.11.1 QCD continuum</h3>
 
 <p>Example setup for QCD continuum production at the Belle/KEK collider.
 Please note, it does not include any hadronic resonance.
@@ -9287,7 +9706,7 @@ Please note, it does not include any hadronic resonance.
 <hr>
 <a name="Signal-process"></a>
 <a name="Signal-process-1"></a>
-<h3 class="subsection">9.10.2 Signal process</h3>
+<h3 class="subsection">9.11.2 Signal process</h3>
 
 <p>Example setup for B-hadron pair production on the Y(4S) pole.
 </p><div class="example">
@@ -9334,7 +9753,7 @@ Please note, it does not include any hadronic resonance.
 <hr>
 <a name="Single-hadron-decay-chains"></a>
 <a name="Single-hadron-decay-chains-1"></a>
-<h3 class="subsection">9.10.3 Single hadron decay chains</h3>
+<h3 class="subsection">9.11.3 Single hadron decay chains</h3>
 
 <p>This setup is not a collider setup, but a simulation of a hadronic
 decay chain.
@@ -9384,19 +9803,19 @@ decay chain.
 <hr>
 <a name="MEvalues"></a>
 <a name="Calculating-matrix-element-values-for-externally-given-configurations"></a>
-<h2 class="section">9.11 Calculating matrix element values for externally given configurations</h2>
+<h2 class="section">9.12 Calculating matrix element values for externally given configurations</h2>
 
 <table class="menu" border="0" cellspacing="0">
-<tr><td align="left" valign="top"><a href="#Matrix-Element-values-through-Python-interface">9.11.1 Computing matrix elements for idividual phase space points using the Python Interface</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#Matrix-Element-values-through-Python-interface">9.12.1 Computing matrix elements for idividual phase space points using the Python Interface</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
-<tr><td align="left" valign="top"><a href="#Matrix-Element-values-through-C_002b_002b-interface">9.11.2 Computing matrix elements for idividual phase space points using the C++ Interface</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
+<tr><td align="left" valign="top"><a href="#Matrix-Element-values-through-C_002b_002b-interface">9.12.2 Computing matrix elements for idividual phase space points using the C++ Interface</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top">
 </td></tr>
 </table>
 
 <hr>
 <a name="Matrix-Element-values-through-Python-interface"></a>
 <a name="Computing-matrix-elements-for-idividual-phase-space-points-using-the-Python-Interface"></a>
-<h3 class="subsection">9.11.1 Computing matrix elements for idividual phase space points using the Python Interface</h3>
+<h3 class="subsection">9.12.1 Computing matrix elements for idividual phase space points using the Python Interface</h3>
 <p>Sherpa&rsquo;s Python interface (see <a href="#Python-Interface">Python Interface</a>) can be used to
 compute matrix elemtents for individual phase space points.  Access to a
 designated class &ldquo;MEProcess&rdquo; is provided by interface to compute
@@ -9465,7 +9884,7 @@ except Sherpa.Exception as exc:
 <hr>
 <a name="Matrix-Element-values-through-C_002b_002b-interface"></a>
 <a name="Computing-matrix-elements-for-idividual-phase-space-points-using-the-C_002b_002b-Interface"></a>
-<h3 class="subsection">9.11.2 Computing matrix elements for idividual phase space points using the C++ Interface</h3>
+<h3 class="subsection">9.12.2 Computing matrix elements for idividual phase space points using the C++ Interface</h3>
 <a name="index-NUMBER_005fOF_005fPOINTS"></a>
 <a name="index-MOMENTA_005fDATA_005fFILE"></a>
 
@@ -9567,19 +9986,19 @@ colour-summed value is printed to screen.
 <hr>
 <a name="APIexamples"></a>
 <a name="Using-the-Python-interface"></a>
-<h2 class="section">9.12 Using the Python interface</h2>
+<h2 class="section">9.13 Using the Python interface</h2>
 
 <table class="menu" border="0" cellspacing="0">
-<tr><td align="left" valign="top"><a href="#Events">9.12.1 Generate events using scripts</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top"> Generating events
+<tr><td align="left" valign="top"><a href="#Events">9.13.1 Generate events using scripts</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top"> Generating events
 </td></tr>
-<tr><td align="left" valign="top"><a href="#MPIEvents">9.12.2 Generate events with MPI using scripts</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top"> Generating events with MPI
+<tr><td align="left" valign="top"><a href="#MPIEvents">9.13.2 Generate events with MPI using scripts</a></td><td>&nbsp;&nbsp;</td><td align="left" valign="top"> Generating events with MPI
 </td></tr>
 </table>
 
 <hr>
 <a name="Events"></a>
 <a name="Generate-events-using-scripts"></a>
-<h3 class="subsection">9.12.1 Generate events using scripts</h3>
+<h3 class="subsection">9.13.1 Generate events using scripts</h3>
 
 <p>This example shows how to generate events with Sherpa
 using a Python wrapper script. For each event the weight,
@@ -9637,7 +10056,7 @@ except Sherpa.Exception as exc:
 <hr>
 <a name="MPIEvents"></a>
 <a name="Generate-events-with-MPI-using-scripts"></a>
-<h3 class="subsection">9.12.2 Generate events with MPI using scripts</h3>
+<h3 class="subsection">9.13.2 Generate events with MPI using scripts</h3>
 
 <p>This example shows how to generate events with Sherpa
 using a Python wrapper script and MPI. For each event the weight,
@@ -10328,6 +10747,16 @@ D. M. Beazley, <em>Automated scientific software scripting with SWIG</em>, Futur
 M. Buschmann and others, <em>Mass Effects in the Higgs-Gluon Coupling: Boosted vs Off-Shell Production</em>, JHEP <b>1502</b> (2015) 038 [hep-ph/1410.5806].
 <br>
 <br>
+</li><li>
+<a name="Bothmann2017jfv"></a>[<a href="http://inspirehep.net/search?p=">Both17</a>] 
+E. Bothmann and M. Schonherr and F. Krauss, <em>Single top-quark production with Sherpa</em>, [arXiv:1711.02568] <b></b>   .
+<br>
+<br>
+</li><li>
+<a name="Gutschow2018tuk"></a>[<a href="http://inspirehep.net/search?p=">Gut18</a>] 
+C. Gutschow and J. M. Lindert and M. Schonherr, <em>Multi-jet merged top-pair production including electroweak corrections</em>, Eur. Phys. J. <b>C78</b> (2018) 317 [arXiv:1803.00950].
+<br>
+<br>
 </li></ul>
 
 <hr>
@@ -10429,6 +10858,7 @@ M. Buschmann and others, <em>Mass Effects in the Higgs-Gluon Coupling: Boosted v
 <tr><td></td><td valign="top"><a href="#index-CORE_005fSCALE">CORE_SCALE</a></td><td>&nbsp;</td><td valign="top"><a href="#METS-scale-setting-with-multiparton-core-processes">5.5.4.6 METS scale setting with multiparton core processes</a></td></tr>
 <tr><td></td><td valign="top"><a href="#index-COUPLINGS">COUPLINGS</a></td><td>&nbsp;</td><td valign="top"><a href="#COUPLINGS">5.5.6 COUPLINGS</a></td></tr>
 <tr><td></td><td valign="top"><a href="#index-COUPLING_005fSCHEME">COUPLING_SCHEME</a></td><td>&nbsp;</td><td valign="top"><a href="#COUPLING_005fSCHEME">5.5.5 COUPLING_SCHEME</a></td></tr>
+<tr><td></td><td valign="top"><a href="#index-CSS_005fALPHAS_005fFREEZE_005fMODE">CSS_ALPHAS_FREEZE_MODE</a></td><td>&nbsp;</td><td valign="top"><a href="#CS-Shower-options">5.10.5 CS Shower options</a></td></tr>
 <tr><td></td><td valign="top"><a href="#index-CSS_005fEVOLUTION_005fSCHEME">CSS_EVOLUTION_SCHEME</a></td><td>&nbsp;</td><td valign="top"><a href="#CS-Shower-options">5.10.5 CS Shower options</a></td></tr>
 <tr><td></td><td valign="top"><a href="#index-CSS_005fEW_005fMODE">CSS_EW_MODE</a></td><td>&nbsp;</td><td valign="top"><a href="#CS-Shower-options">5.10.5 CS Shower options</a></td></tr>
 <tr><td></td><td valign="top"><a href="#index-CSS_005fFS_005fAS_005fFAC">CSS_FS_AS_FAC</a></td><td>&nbsp;</td><td valign="top"><a href="#CS-Shower-options">5.10.5 CS Shower options</a></td></tr>
@@ -10557,7 +10987,7 @@ M. Buschmann and others, <em>Mass Effects in the Higgs-Gluon Coupling: Boosted v
 <tr><td></td><td valign="top"><a href="#index-MI_005fRESULT_005fDIRECTORY">MI_RESULT_DIRECTORY</a></td><td>&nbsp;</td><td valign="top"><a href="#MI_005fRESULT_005fDIRECTORY">5.11.10 MI_RESULT_DIRECTORY</a></td></tr>
 <tr><td></td><td valign="top"><a href="#index-MI_005fRESULT_005fDIRECTORY_005fSUFFIX">MI_RESULT_DIRECTORY_SUFFIX</a></td><td>&nbsp;</td><td valign="top"><a href="#MI_005fRESULT_005fDIRECTORY_005fSUFFIX">5.11.11 MI_RESULT_DIRECTORY_SUFFIX</a></td></tr>
 <tr><td></td><td valign="top"><a href="#index-MODEL">MODEL</a></td><td>&nbsp;</td><td valign="top"><a href="#Models">5.4 Models</a></td></tr>
-<tr><td></td><td valign="top"><a href="#index-MOMENTA_005fDATA_005fFILE">MOMENTA_DATA_FILE</a></td><td>&nbsp;</td><td valign="top"><a href="#Matrix-Element-values-through-C_002b_002b-interface">9.11.2 Computing matrix elements for idividual phase space points using the C++ Interface</a></td></tr>
+<tr><td></td><td valign="top"><a href="#index-MOMENTA_005fDATA_005fFILE">MOMENTA_DATA_FILE</a></td><td>&nbsp;</td><td valign="top"><a href="#Matrix-Element-values-through-C_002b_002b-interface">9.12.2 Computing matrix elements for idividual phase space points using the C++ Interface</a></td></tr>
 <tr><td></td><td valign="top"><a href="#index-MSTJ">MSTJ</a></td><td>&nbsp;</td><td valign="top"><a href="#Fragmentation-models">5.12.1.1 Fragmentation models</a></td></tr>
 <tr><td></td><td valign="top"><a href="#index-MSTP">MSTP</a></td><td>&nbsp;</td><td valign="top"><a href="#Fragmentation-models">5.12.1.1 Fragmentation models</a></td></tr>
 <tr><td></td><td valign="top"><a href="#index-MSTU">MSTU</a></td><td>&nbsp;</td><td valign="top"><a href="#Fragmentation-models">5.12.1.1 Fragmentation models</a></td></tr>
@@ -10588,7 +11018,7 @@ M. Buschmann and others, <em>Mass Effects in the Higgs-Gluon Coupling: Boosted v
 <tr><td></td><td valign="top"><a href="#index-M_005fUP_005fDOWN">M_UP_DOWN</a></td><td>&nbsp;</td><td valign="top"><a href="#Hadron-constituents">5.12.1.2 Hadron constituents</a></td></tr>
 <tr><td colspan="4"> <hr></td></tr>
 <tr><th><a name="Index-1_cp_letter-N">N</a></th><td></td><td></td></tr>
-<tr><td></td><td valign="top"><a href="#index-NUMBER_005fOF_005fPOINTS">NUMBER_OF_POINTS</a></td><td>&nbsp;</td><td valign="top"><a href="#Matrix-Element-values-through-C_002b_002b-interface">9.11.2 Computing matrix elements for idividual phase space points using the C++ Interface</a></td></tr>
+<tr><td></td><td valign="top"><a href="#index-NUMBER_005fOF_005fPOINTS">NUMBER_OF_POINTS</a></td><td>&nbsp;</td><td valign="top"><a href="#Matrix-Element-values-through-C_002b_002b-interface">9.12.2 Computing matrix elements for idividual phase space points using the C++ Interface</a></td></tr>
 <tr><td></td><td valign="top"><a href="#index-NUM_005fACCURACY">NUM_ACCURACY</a></td><td>&nbsp;</td><td valign="top"><a href="#NUM_005fACCURACY">5.1.14 NUM_ACCURACY</a></td></tr>
 <tr><td colspan="4"> <hr></td></tr>
 <tr><th><a name="Index-1_cp_letter-O">O</a></th><td></td><td></td></tr>
@@ -11067,9 +11497,9 @@ M. Buschmann and others, <em>Mass Effects in the Higgs-Gluon Coupling: Boosted v
       <li><a name="toc-W_002bbb-production" href="#LHC_005fWbb">9.1.3 W+bb production</a></li>
       <li><a name="toc-Zbb-production" href="#LHC_005fZbb">9.1.4 Zbb production</a></li>
     </ul></li>
-    <li><a name="toc-Jet-production" href="#Jets">9.2 Jet production</a>
+    <li><a name="toc-Jet-production-1" href="#Jets">9.2 Jet production</a>
     <ul class="no-bullet">
-      <li><a name="toc-Jet-production-1" href="#LHC_005fJets">9.2.1 Jet production</a>
+      <li><a name="toc-Jet-production" href="#LHC_005fJets">9.2.1 Jet production</a>
       <ul class="no-bullet">
         <li><a name="toc-MC_0040NLO-setup-for-dijet-and-inclusive-jet-production" href="#LHC_005fJets_005fMCatNLO">9.2.1.1 MC@NLO setup for dijet and inclusive jet production</a></li>
         <li><a name="toc-MEPS-setup-for-jet-production" href="#LHC_005fJets_005fMEPS">9.2.1.2 MEPS setup for jet production</a></li>
@@ -11097,51 +11527,59 @@ M. Buschmann and others, <em>Mass Effects in the Higgs-Gluon Coupling: Boosted v
     <li><a name="toc-Top-quark-_0028pair_0029-_002b-jets-production" href="#TopsJets">9.4 Top quark (pair) + jets production</a>
     <ul class="no-bullet">
       <li><a name="toc-Top-quark-pair-production-1" href="#Top-quark-pair-production">9.4.1 Top quark pair production</a></li>
-      <li><a name="toc-Production-of-a-top-quark-pair-in-association-with-a-W_002dboson" href="#Tops-plus-W-in-MC_0040NLO">9.4.2 Production of a top quark pair in association with a W-boson</a></li>
+      <li><a name="toc-Top-quark-pair-production-including-approximate-EW-corrections-1" href="#Top-quark-pair-production-including-approximate-EW-corrections">9.4.2 Top quark pair production including approximate EW corrections</a></li>
+      <li><a name="toc-Production-of-a-top-quark-pair-in-association-with-a-W_002dboson" href="#Tops-plus-W-in-MC_0040NLO">9.4.3 Production of a top quark pair in association with a W-boson</a></li>
     </ul></li>
-    <li><a name="toc-Vector-boson-pairs-_002b-jets-production" href="#VVJets">9.5 Vector boson pairs + jets production</a>
+    <li><a name="toc-Single_002dtop-production-in-the-s_002c-t-and-tW-channel" href="#SingleTopChannels">9.5 Single-top production in the s, t and tW channel</a>
     <ul class="no-bullet">
-      <li><a name="toc-Dilepton_002c-missing-energy-and-jets-production" href="#Dilepton-missing-energy-and-jets-production">9.5.1 Dilepton, missing energy and jets production</a></li>
-      <li><a name="toc-Dilepton_002c-missing-energy-and-jets-production-_0028gluon-initiated_0029" href="#Dilepton-missing-energy-and-jets-production-_0028gluon-initiated_0029">9.5.2 Dilepton, missing energy and jets production (gluon initiated)</a></li>
-      <li><a name="toc-Four-lepton-and-jets-production-1" href="#Four-lepton-and-jets-production">9.5.3 Four lepton and jets production</a></li>
-      <li><a name="toc-Four-lepton-and-jets-production-_0028gluon-initiated_0029-1" href="#Four-lepton-and-jets-production-_0028gluon-initiated_0029">9.5.4 Four lepton and jets production (gluon initiated)</a></li>
-      <li><a name="toc-WZ-production-with-jets-production-1" href="#WZ-production-with-jets-production">9.5.5 WZ production with jets production</a></li>
-      <li><a name="toc-Same-sign-dilepton_002c-missing-energy-and-jets-production" href="#Same-sign-dilepton-missing-energy-and-jets-production">9.5.6 Same sign dilepton, missing energy and jets production</a></li>
+      <li><a name="toc-t_002dchannel-single_002dtop-production-1" href="#t_002dchannel-single_002dtop-production">9.5.1 t-channel single-top production</a></li>
+      <li><a name="toc-t_002dchannel-single_002dtop-production-with-N_005ff_003d4-1" href="#t_002dchannel-single_002dtop-production-with-N_005ff_003d4">9.5.2 t-channel single-top production with N_f=4</a></li>
+      <li><a name="toc-s_002dchannel-single_002dtop-production-1" href="#s_002dchannel-single_002dtop-production">9.5.3 s-channel single-top production</a></li>
+      <li><a name="toc-tW_002dchannel-single_002dtop-production-1" href="#tW_002dchannel-single_002dtop-production">9.5.4 tW-channel single-top production</a></li>
     </ul></li>
-    <li><a name="toc-Event-generation-in-the-MSSM-using-UFO" href="#MSSM_002fUFO">9.6 Event generation in the MSSM using UFO</a></li>
-    <li><a name="toc-Deep_002dinelastic-scattering" href="#DIS">9.7 Deep-inelastic scattering</a>
+    <li><a name="toc-Vector-boson-pairs-_002b-jets-production" href="#VVJets">9.6 Vector boson pairs + jets production</a>
     <ul class="no-bullet">
-      <li><a name="toc-DIS-at-HERA" href="#HERA">9.7.1 DIS at HERA</a></li>
+      <li><a name="toc-Dilepton_002c-missing-energy-and-jets-production" href="#Dilepton-missing-energy-and-jets-production">9.6.1 Dilepton, missing energy and jets production</a></li>
+      <li><a name="toc-Dilepton_002c-missing-energy-and-jets-production-_0028gluon-initiated_0029" href="#Dilepton-missing-energy-and-jets-production-_0028gluon-initiated_0029">9.6.2 Dilepton, missing energy and jets production (gluon initiated)</a></li>
+      <li><a name="toc-Four-lepton-and-jets-production-1" href="#Four-lepton-and-jets-production">9.6.3 Four lepton and jets production</a></li>
+      <li><a name="toc-Four-lepton-and-jets-production-_0028gluon-initiated_0029-1" href="#Four-lepton-and-jets-production-_0028gluon-initiated_0029">9.6.4 Four lepton and jets production (gluon initiated)</a></li>
+      <li><a name="toc-WZ-production-with-jets-production-1" href="#WZ-production-with-jets-production">9.6.5 WZ production with jets production</a></li>
+      <li><a name="toc-Same-sign-dilepton_002c-missing-energy-and-jets-production" href="#Same-sign-dilepton-missing-energy-and-jets-production">9.6.6 Same sign dilepton, missing energy and jets production</a></li>
     </ul></li>
-    <li><a name="toc-Fixed_002dorder-next_002dto_002dleading-order-calculations" href="#FONLO">9.8 Fixed-order next-to-leading order calculations</a>
+    <li><a name="toc-Event-generation-in-the-MSSM-using-UFO" href="#MSSM_002fUFO">9.7 Event generation in the MSSM using UFO</a></li>
+    <li><a name="toc-Deep_002dinelastic-scattering" href="#DIS">9.8 Deep-inelastic scattering</a>
     <ul class="no-bullet">
-      <li><a name="toc-Production-of-NTuples" href="#NTuple-production">9.8.1 Production of NTuples</a>
+      <li><a name="toc-DIS-at-HERA" href="#HERA">9.8.1 DIS at HERA</a></li>
+    </ul></li>
+    <li><a name="toc-Fixed_002dorder-next_002dto_002dleading-order-calculations" href="#FONLO">9.9 Fixed-order next-to-leading order calculations</a>
+    <ul class="no-bullet">
+      <li><a name="toc-Production-of-NTuples" href="#NTuple-production">9.9.1 Production of NTuples</a>
       <ul class="no-bullet">
-        <li><a name="toc-NTuple-production-1" href="#NTuple-production-1">9.8.1.1 NTuple production</a></li>
-        <li><a name="toc-Usage-of-NTuples-in-Sherpa" href="#Usage-of-NTuples-in-Sherpa">9.8.1.2 Usage of NTuples in Sherpa</a></li>
+        <li><a name="toc-NTuple-production-1" href="#NTuple-production-1">9.9.1.1 NTuple production</a></li>
+        <li><a name="toc-Usage-of-NTuples-in-Sherpa" href="#Usage-of-NTuples-in-Sherpa">9.9.1.2 Usage of NTuples in Sherpa</a></li>
       </ul>
 </li>
     </ul></li>
-    <li><a name="toc-Soft-QCD_003a-Minimum-Bias-and-Cross-Sections" href="#SoftQCD">9.9 Soft QCD: Minimum Bias and Cross Sections</a>
+    <li><a name="toc-Soft-QCD_003a-Minimum-Bias-and-Cross-Sections" href="#SoftQCD">9.10 Soft QCD: Minimum Bias and Cross Sections</a>
     <ul class="no-bullet">
-      <li><a name="toc-Calculation-of-inclusive-cross-sections-1" href="#Calculation-of-inclusive-cross-sections">9.9.1 Calculation of inclusive cross sections</a></li>
-      <li><a name="toc-Simulation-of-Minimum-Bias-events-1" href="#Simulation-of-Minimum-Bias-events">9.9.2 Simulation of Minimum Bias events</a></li>
+      <li><a name="toc-Calculation-of-inclusive-cross-sections-1" href="#Calculation-of-inclusive-cross-sections">9.10.1 Calculation of inclusive cross sections</a></li>
+      <li><a name="toc-Simulation-of-Minimum-Bias-events-1" href="#Simulation-of-Minimum-Bias-events">9.10.2 Simulation of Minimum Bias events</a></li>
     </ul></li>
-    <li><a name="toc-Setups-for-event-production-at-B_002dfactories" href="#BFactories">9.10 Setups for event production at B-factories</a>
+    <li><a name="toc-Setups-for-event-production-at-B_002dfactories" href="#BFactories">9.11 Setups for event production at B-factories</a>
     <ul class="no-bullet">
-      <li><a name="toc-QCD-continuum-1" href="#QCD-continuum">9.10.1 QCD continuum</a></li>
-      <li><a name="toc-Signal-process-1" href="#Signal-process">9.10.2 Signal process</a></li>
-      <li><a name="toc-Single-hadron-decay-chains-1" href="#Single-hadron-decay-chains">9.10.3 Single hadron decay chains</a></li>
+      <li><a name="toc-QCD-continuum-1" href="#QCD-continuum">9.11.1 QCD continuum</a></li>
+      <li><a name="toc-Signal-process-1" href="#Signal-process">9.11.2 Signal process</a></li>
+      <li><a name="toc-Single-hadron-decay-chains-1" href="#Single-hadron-decay-chains">9.11.3 Single hadron decay chains</a></li>
     </ul></li>
-    <li><a name="toc-Calculating-matrix-element-values-for-externally-given-configurations" href="#MEvalues">9.11 Calculating matrix element values for externally given configurations</a>
+    <li><a name="toc-Calculating-matrix-element-values-for-externally-given-configurations" href="#MEvalues">9.12 Calculating matrix element values for externally given configurations</a>
     <ul class="no-bullet">
-      <li><a name="toc-Computing-matrix-elements-for-idividual-phase-space-points-using-the-Python-Interface" href="#Matrix-Element-values-through-Python-interface">9.11.1 Computing matrix elements for idividual phase space points using the Python Interface</a></li>
-      <li><a name="toc-Computing-matrix-elements-for-idividual-phase-space-points-using-the-C_002b_002b-Interface" href="#Matrix-Element-values-through-C_002b_002b-interface">9.11.2 Computing matrix elements for idividual phase space points using the C++ Interface</a></li>
+      <li><a name="toc-Computing-matrix-elements-for-idividual-phase-space-points-using-the-Python-Interface" href="#Matrix-Element-values-through-Python-interface">9.12.1 Computing matrix elements for idividual phase space points using the Python Interface</a></li>
+      <li><a name="toc-Computing-matrix-elements-for-idividual-phase-space-points-using-the-C_002b_002b-Interface" href="#Matrix-Element-values-through-C_002b_002b-interface">9.12.2 Computing matrix elements for idividual phase space points using the C++ Interface</a></li>
     </ul></li>
-    <li><a name="toc-Using-the-Python-interface" href="#APIexamples">9.12 Using the Python interface</a>
+    <li><a name="toc-Using-the-Python-interface" href="#APIexamples">9.13 Using the Python interface</a>
     <ul class="no-bullet">
-      <li><a name="toc-Generate-events-using-scripts" href="#Events">9.12.1 Generate events using scripts</a></li>
-      <li><a name="toc-Generate-events-with-MPI-using-scripts" href="#MPIEvents">9.12.2 Generate events with MPI using scripts</a></li>
+      <li><a name="toc-Generate-events-using-scripts" href="#Events">9.13.1 Generate events using scripts</a></li>
+      <li><a name="toc-Generate-events-with-MPI-using-scripts" href="#MPIEvents">9.13.2 Generate events with MPI using scripts</a></li>
     </ul>
 </li>
   </ul></li>
@@ -11155,7 +11593,7 @@ M. Buschmann and others, <em>Mass Effects in the Higgs-Gluon Coupling: Boosted v
 <hr>
 <p>
  <font size="-1">
-  This document was generated on <i>August 29, 2017</i> using <a href="http://www.nongnu.org/texi2html/"><i>texi2html 5.0</i></a>.
+  This document was generated on <i>August 29, 2019</i> using <a href="http://www.nongnu.org/texi2html/"><i>texi2html 5.0</i></a>.
  </font>
  <br>
 

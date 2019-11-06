@@ -11,6 +11,8 @@ namespace PHASIC {
 
     double m_lastxs, m_lastbxs, m_lastflux;
     bool   m_zero;
+    size_t m_dadsmode;
+    double m_reweightscalecutoff;
 
     //! Override in a subclass that calculates KP terms to enable their reweighting
     virtual double KPTerms(int mode, double scalefac2=1.0) { return 0.; };
@@ -73,6 +75,7 @@ namespace PHASIC {
         bool skipsfirstampl, const double &Q2,
         const double &muf2fac=1.0,
         const double &mur2fac=1.0,
+        const double &showermuf2fac=1.0,
         MODEL::One_Running_AlphaS * as=NULL,
         const ATOOLS::Cluster_Sequence_Info * const nominalcsi=NULL);
     void AddISR(ATOOLS::Cluster_Sequence_Info &,
@@ -80,6 +83,7 @@ namespace PHASIC {
                 bool skipsfirstampl, const double &Q2,
                 const double &muf2fac=1.0,
                 const double &mur2fac=1.0,
+                const double &showermuf2fac=1.0,
                 MODEL::One_Running_AlphaS * as=NULL,
                 const ATOOLS::Cluster_Sequence_Info * const nominalcsi=NULL);
     void AddBeam(ATOOLS::Cluster_Sequence_Info &, const double &Q2);
@@ -104,9 +108,14 @@ namespace PHASIC {
     double ReweightWithoutSubevents(SHERPA::Variation_Parameters *,
                                     SHERPA::Variation_Weights *,
                                     ATOOLS::ClusterAmplitude_Vector &);
-    //! Return (wgt * \alpha_S * csi.pdfwgt)
+    //! Reweighting pure Born events
+    double ReweightBorn(SHERPA::Variation_Parameters *,
+                        SHERPA::Variation_Weights *,
+                        ATOOLS::ClusterAmplitude_Vector &);
+    //! Reweighting B(VI) events
     double ReweightBornLike(SHERPA::Variation_Parameters *,
-                            BornLikeReweightingInfo &);
+                            BornLikeReweightingInfo &,
+                            bool decrementalphasorder);
     //! Return (pdf1, pdf2)
     std::pair<double, double> GetPairOfPDFValuesOrOne(
         SHERPA::Variation_Parameters *,

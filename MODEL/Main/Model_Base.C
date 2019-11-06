@@ -200,6 +200,7 @@ void Model_Base::ReadParticleData() {
   for (;dit!=cdm.end();dit++) {
     if (s_kftable.find(dit->first)!=s_kftable.end()) {
       s_kftable[dit->first]->m_mass = dit->second;
+      s_kftable[dit->first]->m_hmass = dit->second;
       msg_Tracking()<<" set mass of "<<Flavour(dit->first)<<" to "<<dit->second<<" GeV"<<std::endl; 
     }
   }
@@ -382,12 +383,12 @@ void Model_Base::CustomContainerInit()
     for (size_t j(2);j<helpsvv[i].size();++j) {
       msg_Debugging()<<" "<<helpsvv[i][j];
       long int kfc(ToType<long int>(helpsvv[i][j]));
-      s_kftable[nkf]->Add(Flavour((kf_code)abs(kfc),kfc<0));
-      if (s_kftable[abs(kfc)]->m_priority)
+      s_kftable[nkf]->Add(Flavour((kf_code)std::abs(kfc),kfc<0));
+      if (s_kftable[std::abs(kfc)]->m_priority)
 	msg_Error()<<METHOD<<"(): Changing "<<Flavour(kfc)<<" sort priority: "
-		   <<s_kftable[abs(kfc)]->m_priority<<" -> "
+		   <<s_kftable[std::abs(kfc)]->m_priority<<" -> "
 		   <<s_kftable[nkf]->m_priority<<std::endl;
-      s_kftable[abs(kfc)]->m_priority=s_kftable[abs(nkf)]->m_priority;
+      s_kftable[std::abs(kfc)]->m_priority=s_kftable[std::abs(nkf)]->m_priority;
     }
     s_kftable[nkf]->SetIsGroup(true);
     msg_Debugging()<<" }\n";
@@ -399,13 +400,14 @@ void Model_Base::InitializeInteractionModel()
   InitVertices();
   for (std::vector<Single_Vertex>::iterator
 	 vit(m_v.begin());vit!=m_v.end();) {
-    for (size_t i(0);i<vit->cpl.size();++i)
+    for (size_t i(0);i<vit->cpl.size();)
       if (vit->cpl[i].Value().real()==0.0 &&
 	  vit->cpl[i].Value().imag()==0.0) {
 	vit->cpl.erase(vit->cpl.begin()+i);
 	vit->Color.erase(vit->Color.begin()+i);
 	vit->Lorentz.erase(vit->Lorentz.begin()+i);
       }
+      else { ++i; }
     if (vit->cpl.empty()) vit=m_v.erase(vit);
     else ++vit;
   }

@@ -2,6 +2,7 @@
 #include "SHERPA/Initialization/Initialization_Handler.H"
 #include "SHERPA/Single_Events/Event_Handler.H"
 #include "SHERPA/Single_Events/Analysis_Phase.H"
+#include "SHERPA/Single_Events/Userhook_Phase.H"
 #include "SHERPA/Single_Events/Output_Phase.H"
 #include "SHERPA/Single_Events/EvtReadin_Phase.H"
 #include "SHERPA/Single_Events/Signal_Processes.H"
@@ -24,6 +25,7 @@
 #include "ATOOLS/Org/My_MPI.H"
 #include "ATOOLS/Org/CXXFLAGS.H"
 #include "ATOOLS/Org/CXXFLAGS_PACKAGES.H"
+#include "PDF/Main/PDF_Base.H"
 #include <cstring>
 
 using namespace SHERPA;
@@ -39,6 +41,7 @@ Sherpa::Sherpa() :
   ATOOLS::ran = new Random(1234);
   ATOOLS::rpa = new Run_Parameter();
   ATOOLS::s_loader = new Library_Loader();
+  PDF::pdfdefs = new PDF::PDF_Defaults();
   m_trials = 100;
   m_debuginterval = 0;
   m_debugstep = -1;
@@ -53,13 +56,16 @@ Sherpa::~Sherpa()
   rpa->gen.WriteCitationInfo();
   if (p_eventhandler) { delete p_eventhandler; p_eventhandler = NULL; }
   if (p_inithandler)  { delete p_inithandler;  p_inithandler  = NULL; }
+#ifdef USING__HEPMC2
+  if (p_hepmc2)       { delete p_hepmc2;       p_hepmc2       = NULL; }
+#endif
   exh->RemoveTerminatorObject(this);
   delete ATOOLS::s_loader;
   delete ATOOLS::rpa;
   delete ATOOLS::ran;
 #ifdef USING__MPI
   int dummy=0;
-  MPI::COMM_WORLD.Bcast(&dummy,1,MPI::INT,0);
+  mpi->Bcast(&dummy,1,MPI_INT,0);
 #endif  
   delete ATOOLS::msg;
   delete ATOOLS::exh;
@@ -108,7 +114,7 @@ bool Sherpa::InitializeTheRun(int argc,char * argv[])
 
   p_inithandler  = new Initialization_Handler(argc, argv);
 
-  mpi->SetUpSendRecv(p_inithandler->DataReader());
+  mpi->PrintRankInfo();
 
   DrawLogo(p_inithandler->DataReader()->GetValue("PRINT_VERSION_INFO",0));
 
@@ -142,7 +148,7 @@ bool Sherpa::InitializeTheRun(int argc,char * argv[])
     m_evt_output =read.GetValue<int>("EVT_OUTPUT",msg->Level());
     m_evt_output_start=read.GetValue<int>("EVT_OUTPUT_START",
                                           m_evt_output!=msg->Level()?1:0);
-    
+
     return res;
   }
   msg_Error()<<"Error in Sherpa::InitializeRun("<<m_path<<")"<<endl
@@ -157,7 +163,6 @@ bool Sherpa::InitializeTheEventHandler()
 {
   eventtype::code mode = p_inithandler->Mode();
   p_eventhandler  = new Event_Handler();
-  Output_Vector *outs(p_inithandler->GetOutputs());
   Analysis_Vector *anas(p_inithandler->GetAnalyses());
   for (Analysis_Vector::iterator it=anas->begin(); it!=anas->end(); ++it) {
     (*it)->SetEventHandler(p_eventhandler);
@@ -186,8 +191,11 @@ bool Sherpa::InitializeTheEventHandler()
     p_eventhandler->AddEventPhase(new Hadron_Decays(p_inithandler->GetHDHandler()));
 
   }
+  p_eventhandler->AddEventPhase(new Userhook_Phase(this));
   if (!anas->empty()) p_eventhandler->AddEventPhase(new Analysis_Phase(anas));
-  if (!outs->empty()) p_eventhandler->AddEventPhase(new Output_Phase(outs,p_eventhandler));
+  if (!p_inithandler->GetOutputs()->empty())
+    p_eventhandler->AddEventPhase(new Output_Phase(p_inithandler->GetOutputs(), p_eventhandler));
+  p_eventhandler->SetFilter(p_inithandler->GetFilter());
   p_eventhandler->PrintGenericEventStructure();
 
   return 1;
@@ -327,8 +335,8 @@ bool Sherpa::SummarizeRun()
               << rpa->gen.NumberOfGeneratedEvents()*3600*24/
                  ((size_t) rpa->gen.Timer().RealTime()-m_evt_starttime)
               <<" evts/day                    "<<std::endl;
+    p_eventhandler->Finish();
   }
-  p_eventhandler->Finish(); 
   return true; 
 }
 
@@ -404,7 +412,7 @@ void Sherpa::DrawLogo(const int mode)
 	    <<"                                                                             "<<std::endl
 	    <<"-----------------------------------------------------------------------------"<<std::endl
 	    <<std::endl;
-  rpa->gen.PrintSVNVersion(msg->Info(),mode);
+  rpa->gen.PrintGitVersion(msg->Info(),mode);
   rpa->gen.AddCitation
     (0,"The complete Sherpa package is published under \\cite{Gleisberg:2008ta}.");
 }
